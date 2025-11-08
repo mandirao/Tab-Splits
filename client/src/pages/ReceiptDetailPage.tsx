@@ -195,10 +195,11 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
 
   const handleAddNewPerson = () => {
     if (newPersonName.trim()) {
-      createPersonMutation.mutate({
+      const personData = {
         name: newPersonName.trim(),
-        phone: newPersonPhone.trim() || undefined
-      });
+        ...(newPersonPhone.trim() && { phone: newPersonPhone.trim() })
+      };
+      createPersonMutation.mutate(personData);
     }
   };
 
