@@ -1,9 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { ReceiptItem } from "@shared/schema";
 import { ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface RedactedPerson {
   id: string;
@@ -42,10 +47,96 @@ const PERSON_COLORS = [
 
 export default function SharedReceiptPage({ params }: { params: { token: string } }) {
   const shareToken = params?.token || window.location.pathname.split('/').pop();
+  const { toast } = useToast();
+  
+  const [isVerified, setIsVerified] = useState(false);
+  const [verifiedPersonId, setVerifiedPersonId] = useState<string | null>(null);
+  const [phone, setPhone] = useState("");
+  const [showLinkOptions, setShowLinkOptions] = useState(false);
+  const [unmatchedPeople, setUnmatchedPeople] = useState<RedactedPerson[]>([]);
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+  const [newName, setNewName] = useState("");
 
   const { data, isLoading, error } = useQuery<SharedReceiptPayload>({
     queryKey: [`/api/share/${shareToken}`],
+    enabled: isVerified,
   });
+
+  const verifyPhoneMutation = useMutation({
+    mutationFn: async (phoneNumber: string) => {
+      return await apiRequest(`/api/share/${shareToken}/verify-phone`, "POST", { phone: phoneNumber });
+    },
+    onSuccess: (result: { verified: boolean; personId?: string; personName?: string; unmatchedPeople?: RedactedPerson[] }) => {
+      if (result.verified) {
+        setIsVerified(true);
+        setVerifiedPersonId(result.personId || null);
+        toast({
+          title: "Access granted",
+          description: `Welcome ${result.personName}!`
+        });
+      } else {
+        setUnmatchedPeople(result.unmatchedPeople || []);
+        setShowLinkOptions(true);
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Verification failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const linkPhoneMutation = useMutation({
+    mutationFn: async (data: { phone: string; personId?: string; name?: string }) => {
+      return await apiRequest(`/api/share/${shareToken}/link-phone`, "POST", data);
+    },
+    onSuccess: (result: { verified: boolean; personId: string; personName: string }) => {
+      setIsVerified(true);
+      setVerifiedPersonId(result.personId);
+      setShowLinkOptions(false);
+      toast({
+        title: "Access granted",
+        description: `Welcome ${result.personName}!`
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Link failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleVerifyPhone = () => {
+    if (!phone.trim()) {
+      toast({
+        title: "Phone number required",
+        description: "Please enter your phone number",
+        variant: "destructive"
+      });
+      return;
+    }
+    verifyPhoneMutation.mutate(phone);
+  };
+
+  const handleLinkToExisting = (personId: string) => {
+    linkPhoneMutation.mutate({ phone, personId });
+  };
+
+  const handleCreateNew = () => {
+    if (!newName.trim()) {
+      toast({
+        title: "Name required",
+        description: "Please enter your name",
+        variant: "destructive"
+      });
+      return;
+    }
+    linkPhoneMutation.mutate({ phone, name: newName });
+  };
 
   const receipt = data?.receipt;
   const items = data?.items || [];
@@ -63,6 +154,115 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
     return person.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
   const getColorForPerson = (personId: string) => getPersonById(personId)?.color || PERSON_COLORS[0];
+
+  // Show phone verification screen if not verified
+  if (!isVerified) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <h2 className="text-2xl font-bold text-center">Enter Your Phone Number</h2>
+            <p className="text-sm text-muted-foreground text-center">
+              To view this receipt, please verify your phone number
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!showLinkOptions ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="+1 (555) 123-4567"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleVerifyPhone()}
+                    data-testid="input-verify-phone"
+                  />
+                </div>
+                <Button
+                  className="w-full"
+                  onClick={handleVerifyPhone}
+                  disabled={verifyPhoneMutation.isPending}
+                  data-testid="button-verify-phone"
+                >
+                  {verifyPhoneMutation.isPending ? "Verifying..." : "Continue"}
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  <p className="text-sm font-medium">Your phone number is not linked to anyone on this receipt.</p>
+                  
+                  {unmatchedPeople.length > 0 && (
+                    <>
+                      <p className="text-sm text-muted-foreground">Are you one of these people?</p>
+                      <div className="space-y-2">
+                        {unmatchedPeople.map((person) => (
+                          <Button
+                            key={person.id}
+                            variant="outline"
+                            className="w-full justify-start"
+                            onClick={() => handleLinkToExisting(person.id)}
+                            disabled={linkPhoneMutation.isPending}
+                            data-testid={`button-link-person-${person.id}`}
+                          >
+                            {person.name}
+                          </Button>
+                        ))}
+                      </div>
+                      <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                          <span className="w-full border-t" />
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                          <span className="bg-background px-2 text-muted-foreground">Or</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="new-name">Enter your name</Label>
+                    <Input
+                      id="new-name"
+                      type="text"
+                      placeholder="Your name"
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleCreateNew()}
+                      data-testid="input-new-name"
+                    />
+                  </div>
+                  <Button
+                    className="w-full"
+                    onClick={handleCreateNew}
+                    disabled={linkPhoneMutation.isPending}
+                    data-testid="button-create-new-person"
+                  >
+                    {linkPhoneMutation.isPending ? "Linking..." : "Continue with this name"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full"
+                    onClick={() => {
+                      setShowLinkOptions(false);
+                      setPhone("");
+                      setNewName("");
+                    }}
+                    data-testid="button-back-to-phone"
+                  >
+                    Use a different phone number
+                  </Button>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

@@ -224,8 +224,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Receipt not found" });
       }
 
+      const items = await storage.getReceiptItems(receipt.id);
+      const allPeople = await storage.getAllPeople();
+      
+      const assignedPersonIds = new Set<string>();
+      items.forEach(item => {
+        const assigned = (item.assignedTo as string[]) || [];
+        assigned.forEach(id => assignedPersonIds.add(id));
+      });
+
       let person;
       if (personId) {
+        if (!assignedPersonIds.has(personId)) {
+          return res.status(403).json({ message: "This person is not assigned to this receipt" });
+        }
+        
         await storage.updatePerson(personId, { phone });
         person = await storage.getPerson(personId);
         if (!person) {
