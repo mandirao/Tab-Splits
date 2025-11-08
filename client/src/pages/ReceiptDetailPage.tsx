@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,76 +8,104 @@ import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
 import { ArrowLeft, Users, Share2 } from "lucide-react";
 import { useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { Receipt, ReceiptItem, Person } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
 
-interface ReceiptItem {
-  id: string;
-  name: string;
-  quantity: number;
-  price: number;
-  assignedTo: string[];
-}
-
-interface Person {
-  id: string;
-  name: string;
-  initials: string;
+interface PersonWithColor extends Person {
   color: string;
 }
 
 const PERSON_COLORS = [
-  'hsl(330, 75%, 65%)',  // Pink
-  'hsl(340, 80%, 60%)',  // Hot Pink
-  'hsl(25, 90%, 62%)',   // Orange
-  'hsl(15, 85%, 65%)',   // Coral
-  'hsl(45, 95%, 65%)',   // Yellow
-  'hsl(185, 65%, 70%)',  // Cyan
-  'hsl(195, 70%, 65%)',  // Sky Blue
-  'hsl(280, 55%, 68%)',  // Purple
-  'hsl(270, 60%, 70%)',  // Lavender
-  'hsl(35, 85%, 68%)',   // Peach
+  'hsl(330, 75%, 65%)',
+  'hsl(340, 80%, 60%)',
+  'hsl(25, 90%, 62%)',
+  'hsl(15, 85%, 65%)',
+  'hsl(45, 95%, 65%)',
+  'hsl(185, 65%, 70%)',
+  'hsl(195, 70%, 65%)',
+  'hsl(280, 55%, 68%)',
+  'hsl(270, 60%, 70%)',
+  'hsl(35, 85%, 68%)',
 ];
 
-export default function ReceiptDetailPage() {
+export default function ReceiptDetailPage({ params }: { params: { id: string } }) {
+  const receiptId = params?.id || window.location.pathname.split('/')[2];
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [assignBottomSheetOpen, setAssignBottomSheetOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const [tipPercentage, setTipPercentage] = useState(20);
-  const [tipAmount, setTipAmount] = useState(25.50);
 
-  const mockPeople: Person[] = [
-    { id: "1", name: "John Doe", initials: "JD", color: PERSON_COLORS[0] },
-    { id: "2", name: "Sarah Miller", initials: "SM", color: PERSON_COLORS[1] },
-    { id: "3", name: "Alex Brown", initials: "AB", color: PERSON_COLORS[2] },
-    { id: "4", name: "Emma Wilson", initials: "EW", color: PERSON_COLORS[3] }
-  ];
+  const { data: receipt } = useQuery<Receipt>({
+    queryKey: ["/api/receipts", receiptId],
+  });
 
-  const [items, setItems] = useState<ReceiptItem[]>([
-    { id: "1", name: "Margherita Pizza", quantity: 2, price: 24.00, assignedTo: ["1", "2"] },
-    { id: "2", name: "Caesar Salad", quantity: 1, price: 12.50, assignedTo: ["3"] },
-    { id: "3", name: "Garlic Bread", quantity: 1, price: 6.00, assignedTo: [] },
-    { id: "4", name: "House Wine", quantity: 2, price: 16.00, assignedTo: ["1", "4"] },
-    { id: "5", name: "Tiramisu", quantity: 1, price: 8.00, assignedTo: [] }
-  ]);
+  const { data: items = [] } = useQuery<ReceiptItem[]>({
+    queryKey: ["/api/receipts", receiptId, "items"],
+  });
 
-  const subtotal = 127.50;
-  const tax = 11.48;
+  const { data: allPeople = [] } = useQuery<Person[]>({
+    queryKey: ["/api/people"],
+  });
+
+  const peopleWithColors: PersonWithColor[] = allPeople.map((person, idx) => ({
+    ...person,
+    color: PERSON_COLORS[idx % PERSON_COLORS.length]
+  }));
+
+  const subtotal = receipt ? parseFloat(receipt.subtotal) : 0;
+  const tax = receipt ? parseFloat(receipt.tax) : 0;
+  const tipAmount = receipt ? parseFloat(receipt.tip) : subtotal * 0.2;
   const total = subtotal + tax + tipAmount;
+
+  useEffect(() => {
+    if (receipt && tipPercentage !== (parseFloat(receipt.tip) / subtotal * 100)) {
+      setTipPercentage((parseFloat(receipt.tip) / subtotal) * 100);
+    }
+  }, [receipt]);
+
+  const updateReceiptMutation = useMutation({
+    mutationFn: async (data: { tip: number }) => {
+      return await apiRequest(`/api/receipts/${receiptId}`, "PATCH", {
+        tip: data.tip.toFixed(2),
+        total: (subtotal + tax + data.tip).toFixed(2)
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId] });
+    }
+  });
+
+  const updateItemMutation = useMutation({
+    mutationFn: async ({ itemId, assignedTo }: { itemId: string; assignedTo: string[] }) => {
+      return await apiRequest(`/api/items/${itemId}`, "PATCH", { assignedTo });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
+      toast({ title: "Assignment saved" });
+    }
+  });
+
+  const handleTipChange = (amount: number) => {
+    updateReceiptMutation.mutate({ tip: amount });
+  };
 
   const handleAssignClick = (itemId: string) => {
     const item = items.find(i => i.id === itemId);
     setSelectedItemId(itemId);
-    setSelectedPeople(item?.assignedTo || []);
+    setSelectedPeople((item?.assignedTo as string[]) || []);
     setAssignBottomSheetOpen(true);
   };
 
   const handleSaveAssignment = () => {
     if (selectedItemId) {
-      setItems(items.map(item => 
-        item.id === selectedItemId 
-          ? { ...item, assignedTo: selectedPeople }
-          : item
-      ));
+      updateItemMutation.mutate({
+        itemId: selectedItemId,
+        assignedTo: selectedPeople
+      });
     }
     setAssignBottomSheetOpen(false);
     setSelectedItemId(null);
@@ -92,13 +120,21 @@ export default function ReceiptDetailPage() {
     );
   };
 
+  const getPersonById = (id: string) => peopleWithColors.find(p => p.id === id);
   const getInitialsForPerson = (personId: string) => {
-    return mockPeople.find(p => p.id === personId)?.initials || "";
+    const person = getPersonById(personId);
+    if (!person) return "";
+    return person.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
+  const getColorForPerson = (personId: string) => getPersonById(personId)?.color || PERSON_COLORS[0];
 
-  const getColorForPerson = (personId: string) => {
-    return mockPeople.find(p => p.id === personId)?.color || PERSON_COLORS[0];
-  };
+  if (!receipt) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-muted-foreground">Loading receipt...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -112,7 +148,7 @@ export default function ReceiptDetailPage() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-xl font-bold flex-1 text-center">The Italian Kitchen</h1>
+          <h1 className="text-xl font-bold flex-1 text-center">{receipt.restaurantName || "Receipt"}</h1>
           <Button 
             size="icon" 
             variant="ghost"
@@ -126,11 +162,11 @@ export default function ReceiptDetailPage() {
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="flex items-center gap-1">
             <Users className="h-3 w-3" />
-            {mockPeople.length} people
+            {peopleWithColors.length} people
           </Badge>
           <Badge variant="outline">{items.length} items</Badge>
-          <Badge variant={items.every(i => i.assignedTo.length > 0) ? "default" : "secondary"}>
-            {items.filter(i => i.assignedTo.length > 0).length}/{items.length} assigned
+          <Badge variant={items.every(i => (i.assignedTo as string[] || []).length > 0) ? "default" : "secondary"}>
+            {items.filter(i => (i.assignedTo as string[] || []).length > 0).length}/{items.length} assigned
           </Badge>
         </div>
       </header>
@@ -144,9 +180,12 @@ export default function ReceiptDetailPage() {
             {items.map((item) => (
               <ReceiptItemRow
                 key={item.id}
-                {...item}
-                assignedInitials={item.assignedTo.map(getInitialsForPerson)}
-                assignedColors={item.assignedTo.map(getColorForPerson)}
+                id={item.id}
+                name={item.name}
+                quantity={item.quantity || 1}
+                price={parseFloat(item.price)}
+                assignedInitials={(item.assignedTo as string[] || []).map(getInitialsForPerson)}
+                assignedColors={(item.assignedTo as string[] || []).map(getColorForPerson)}
                 onAssign={() => handleAssignClick(item.id)}
                 onEdit={() => console.log('Edit item', item.id)}
               />
@@ -159,7 +198,7 @@ export default function ReceiptDetailPage() {
           tipPercentage={tipPercentage}
           tipAmount={tipAmount}
           onTipPercentageChange={setTipPercentage}
-          onTipAmountChange={setTipAmount}
+          onTipAmountChange={handleTipChange}
         />
       </main>
 
@@ -174,7 +213,7 @@ export default function ReceiptDetailPage() {
             <span data-testid="text-receipt-tax">${tax.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Tip ({tipPercentage}%)</span>
+            <span className="text-muted-foreground">Tip ({tipPercentage.toFixed(0)}%)</span>
             <span data-testid="text-receipt-tip">${tipAmount.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-xl font-bold pt-2 border-t">
@@ -185,7 +224,7 @@ export default function ReceiptDetailPage() {
         
         <Button 
           className="w-full h-12"
-          onClick={() => setLocation('/receipt/1/summary')}
+          onClick={() => setLocation(`/receipt/${receiptId}/summary`)}
           data-testid="button-view-summary"
         >
           View Summary
@@ -214,11 +253,11 @@ export default function ReceiptDetailPage() {
             Select one or more people to assign this item to
           </p>
           <div className="flex flex-wrap gap-2">
-            {mockPeople.map((person) => (
+            {peopleWithColors.map((person) => (
               <PersonChip
                 key={person.id}
                 name={person.name}
-                initials={person.initials}
+                initials={person.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                 color={person.color}
                 selected={selectedPeople.includes(person.id)}
                 onSelect={() => togglePersonSelection(person.id)}

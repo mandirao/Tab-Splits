@@ -1,38 +1,130 @@
-import { type User, type InsertUser } from "@shared/schema";
-import { randomUUID } from "crypto";
-
-// modify the interface with any CRUD methods
-// you might need
+import { 
+  type Receipt, 
+  type InsertReceipt, 
+  type ReceiptItem,
+  type InsertReceiptItem,
+  type Person,
+  type InsertPerson,
+  receipts,
+  receiptItems,
+  people
+} from "@shared/schema";
+import { db } from "./db";
+import { eq, and } from "drizzle-orm";
 
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  // Receipt operations
+  createReceipt(receipt: InsertReceipt): Promise<Receipt>;
+  getReceipt(id: string): Promise<Receipt | undefined>;
+  getAllReceipts(): Promise<Receipt[]>;
+  updateReceipt(id: string, receipt: Partial<InsertReceipt>): Promise<Receipt>;
+  deleteReceipt(id: string): Promise<void>;
+
+  // Receipt Item operations
+  createReceiptItem(item: InsertReceiptItem): Promise<ReceiptItem>;
+  getReceiptItems(receiptId: string): Promise<ReceiptItem[]>;
+  updateReceiptItem(id: string, item: Partial<InsertReceiptItem>): Promise<ReceiptItem>;
+  deleteReceiptItem(id: string): Promise<void>;
+
+  // People operations
+  createPerson(person: InsertPerson): Promise<Person>;
+  getAllPeople(): Promise<Person[]>;
+  getRegulars(): Promise<Person[]>;
+  updatePerson(id: string, person: Partial<InsertPerson>): Promise<Person>;
+  deletePerson(id: string): Promise<void>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-
-  constructor() {
-    this.users = new Map();
+export class DatabaseStorage implements IStorage {
+  // Receipt operations
+  async createReceipt(receipt: InsertReceipt): Promise<Receipt> {
+    const [result] = await db.insert(receipts).values(receipt).returning();
+    return result;
   }
 
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+  async getReceipt(id: string): Promise<Receipt | undefined> {
+    const [result] = await db.select().from(receipts).where(eq(receipts.id, id));
+    return result;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+  async getAllReceipts(): Promise<Receipt[]> {
+    return await db.select().from(receipts).orderBy(receipts.date);
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+  async updateReceipt(id: string, receipt: Partial<InsertReceipt>): Promise<Receipt> {
+    const [result] = await db
+      .update(receipts)
+      .set(receipt)
+      .where(eq(receipts.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteReceipt(id: string): Promise<void> {
+    await db.delete(receipts).where(eq(receipts.id, id));
+  }
+
+  // Receipt Item operations
+  async createReceiptItem(item: InsertReceiptItem): Promise<ReceiptItem> {
+    const [result] = await db.insert(receiptItems).values(item as any).returning();
+    return result;
+  }
+
+  async getReceiptItems(receiptId: string): Promise<ReceiptItem[]> {
+    return await db
+      .select()
+      .from(receiptItems)
+      .where(eq(receiptItems.receiptId, receiptId));
+  }
+
+  async updateReceiptItem(id: string, item: Partial<InsertReceiptItem>): Promise<ReceiptItem> {
+    const existing = await db.select().from(receiptItems).where(eq(receiptItems.id, id)).limit(1);
+    if (!existing.length) {
+      throw new Error("Item not found");
+    }
+    
+    const updateData: any = {
+      ...item,
+      assignedTo: item.assignedTo !== undefined ? item.assignedTo : existing[0].assignedTo
+    };
+    
+    const [result] = await db
+      .update(receiptItems)
+      .set(updateData)
+      .where(eq(receiptItems.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteReceiptItem(id: string): Promise<void> {
+    await db.delete(receiptItems).where(eq(receiptItems.id, id));
+  }
+
+  // People operations
+  async createPerson(person: InsertPerson): Promise<Person> {
+    const [result] = await db.insert(people).values(person).returning();
+    return result;
+  }
+
+  async getAllPeople(): Promise<Person[]> {
+    return await db.select().from(people);
+  }
+
+  async getRegulars(): Promise<Person[]> {
+    return await db.select().from(people).where(eq(people.isRegular, 1));
+  }
+
+  async updatePerson(id: string, person: Partial<InsertPerson>): Promise<Person> {
+    const [result] = await db
+      .update(people)
+      .set(person)
+      .where(eq(people.id, id))
+      .returning();
+    return result;
+  }
+
+  async deletePerson(id: string): Promise<void> {
+    await db.delete(people).where(eq(people.id, id));
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

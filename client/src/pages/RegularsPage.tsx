@@ -4,15 +4,10 @@ import { Input } from "@/components/ui/input";
 import RegularPersonCard from "@/components/RegularPersonCard";
 import BottomSheet from "@/components/BottomSheet";
 import { Search, Plus } from "lucide-react";
-
-interface Person {
-  id: string;
-  name: string;
-  initials: string;
-  color: string;
-  phone?: string;
-  email?: string;
-}
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { Person } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
 
 const PERSON_COLORS = [
   'hsl(330, 75%, 65%)',
@@ -28,18 +23,43 @@ const PERSON_COLORS = [
 ];
 
 export default function RegularsPage() {
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [addPersonOpen, setAddPersonOpen] = useState(false);
   const [newPersonName, setNewPersonName] = useState("");
   const [newPersonPhone, setNewPersonPhone] = useState("");
   const [newPersonEmail, setNewPersonEmail] = useState("");
 
-  const [people, setPeople] = useState<Person[]>([
-    { id: "1", name: "John Doe", initials: "JD", color: PERSON_COLORS[0], phone: "+1 555-0123", email: "john@example.com" },
-    { id: "2", name: "Sarah Miller", initials: "SM", color: PERSON_COLORS[1], phone: "+1 555-0456" },
-    { id: "3", name: "Alex Brown", initials: "AB", color: PERSON_COLORS[2], phone: "+1 555-0789", email: "alex@example.com" },
-    { id: "4", name: "Emma Wilson", initials: "EW", color: PERSON_COLORS[3], phone: "+1 555-0321" }
-  ]);
+  const { data: people = [] } = useQuery<Person[]>({
+    queryKey: ["/api/people"],
+  });
+
+  const createPersonMutation = useMutation({
+    mutationFn: async (data: { name: string; phone?: string; email?: string }) => {
+      return await apiRequest("/api/people", "POST", {
+        ...data,
+        isRegular: 1
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/people"] });
+      toast({ title: "Person added to regulars" });
+      setNewPersonName("");
+      setNewPersonPhone("");
+      setNewPersonEmail("");
+      setAddPersonOpen(false);
+    }
+  });
+
+  const deletePersonMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest(`/api/people/${id}`, "DELETE");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/people"] });
+      toast({ title: "Person removed from regulars" });
+    }
+  });
 
   const filteredPeople = people.filter(p => 
     !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -54,30 +74,18 @@ export default function RegularsPage() {
       .slice(0, 2);
   };
 
-  const getNextColor = () => {
-    return PERSON_COLORS[people.length % PERSON_COLORS.length];
+  const getColorForPerson = (index: number) => {
+    return PERSON_COLORS[index % PERSON_COLORS.length];
   };
 
   const handleAddPerson = () => {
     if (newPersonName.trim()) {
-      const newPerson: Person = {
-        id: Date.now().toString(),
+      createPersonMutation.mutate({
         name: newPersonName.trim(),
-        initials: getInitials(newPersonName.trim()),
-        color: getNextColor(),
         phone: newPersonPhone.trim() || undefined,
         email: newPersonEmail.trim() || undefined
-      };
-      setPeople([...people, newPerson]);
-      setNewPersonName("");
-      setNewPersonPhone("");
-      setNewPersonEmail("");
-      setAddPersonOpen(false);
+      });
     }
-  };
-
-  const handleRemovePerson = (id: string) => {
-    setPeople(people.filter(p => p.id !== id));
   };
 
   return (
@@ -109,17 +117,22 @@ export default function RegularsPage() {
 
       <main className="flex-1 overflow-y-auto p-4">
         <div className="space-y-3">
-          {filteredPeople.map((person) => (
+          {filteredPeople.map((person, idx) => (
             <RegularPersonCard
               key={person.id}
-              {...person}
+              name={person.name}
+              initials={getInitials(person.name)}
+              color={getColorForPerson(idx)}
+              phone={person.phone || undefined}
+              email={person.email || undefined}
               onSelect={() => console.log('Selected', person.name)}
-              onRemove={() => handleRemovePerson(person.id)}
+              onRemove={() => deletePersonMutation.mutate(person.id)}
             />
           ))}
           {filteredPeople.length === 0 && (
             <div className="text-center py-12 text-muted-foreground">
               <p>No people found</p>
+              <p className="text-sm mt-2">Add your dining regulars to quickly assign items</p>
             </div>
           )}
         </div>
@@ -138,10 +151,10 @@ export default function RegularsPage() {
           <Button 
             className="w-full" 
             onClick={handleAddPerson}
-            disabled={!newPersonName.trim()}
+            disabled={!newPersonName.trim() || createPersonMutation.isPending}
             data-testid="button-save-person"
           >
-            Add Person
+            {createPersonMutation.isPending ? "Adding..." : "Add Person"}
           </Button>
         }
       >

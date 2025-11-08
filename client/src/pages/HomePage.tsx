@@ -4,39 +4,47 @@ import { Input } from "@/components/ui/input";
 import ReceiptCard from "@/components/ReceiptCard";
 import { Camera, Upload, Search } from "lucide-react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import type { Receipt, ReceiptItem } from "@shared/schema";
+
+interface ReceiptWithDetails extends Receipt {
+  items?: ReceiptItem[];
+}
 
 export default function HomePage() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
 
-  const mockReceipts = [
-    {
-      id: "1",
-      restaurantName: "The Italian Kitchen",
-      date: new Date("2024-03-15"),
-      total: 127.50,
-      peopleCount: 4,
-      itemCount: 8
-    },
-    {
-      id: "2",
-      restaurantName: "Sushi Palace",
-      date: new Date("2024-03-10"),
-      total: 89.25,
-      peopleCount: 2,
-      itemCount: 6
-    },
-    {
-      id: "3",
-      restaurantName: "Burger Barn",
-      date: new Date("2024-03-08"),
-      total: 45.80,
-      peopleCount: 3,
-      itemCount: 5
-    }
-  ];
+  const { data: receipts = [], isLoading } = useQuery<Receipt[]>({
+    queryKey: ["/api/receipts"],
+  });
 
-  const filteredReceipts = mockReceipts.filter(r => 
+  const { data: allItems = [] } = useQuery<ReceiptItem[]>({
+    queryKey: ["/api/items/all"],
+    queryFn: async () => {
+      if (!receipts.length) return [];
+      const itemPromises = receipts.map(receipt =>
+        fetch(`/api/receipts/${receipt.id}/items`).then(r => r.json())
+      );
+      const itemArrays = await Promise.all(itemPromises);
+      return itemArrays.flat();
+    },
+    enabled: receipts.length > 0
+  });
+
+  const getItemCountForReceipt = (receiptId: string) => {
+    return allItems.filter(item => item.receiptId === receiptId).length;
+  };
+
+  const getPeopleCountForReceipt = (receiptId: string) => {
+    const items = allItems.filter(item => item.receiptId === receiptId);
+    const uniquePeople = new Set(
+      items.flatMap(item => (item.assignedTo as string[]) || [])
+    );
+    return uniquePeople.size;
+  };
+
+  const filteredReceipts = receipts.filter(r => 
     !searchQuery || r.restaurantName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -64,27 +72,39 @@ export default function HomePage() {
       </header>
 
       <main className="flex-1 overflow-y-auto p-4">
-        <div className="space-y-3 mb-24">
-          {filteredReceipts.map((receipt) => (
-            <ReceiptCard
-              key={receipt.id}
-              {...receipt}
-              onClick={() => setLocation(`/receipt/${receipt.id}`)}
-            />
-          ))}
-          {filteredReceipts.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground">
-              <p>No receipts found</p>
-            </div>
-          )}
-        </div>
+        {isLoading ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <p>Loading receipts...</p>
+          </div>
+        ) : (
+          <div className="space-y-3 mb-24">
+            {filteredReceipts.map((receipt) => (
+              <ReceiptCard
+                key={receipt.id}
+                id={receipt.id}
+                restaurantName={receipt.restaurantName || undefined}
+                date={new Date(receipt.date)}
+                total={parseFloat(receipt.total)}
+                peopleCount={getPeopleCountForReceipt(receipt.id)}
+                itemCount={getItemCountForReceipt(receipt.id)}
+                onClick={() => setLocation(`/receipt/${receipt.id}`)}
+              />
+            ))}
+            {filteredReceipts.length === 0 && !isLoading && (
+              <div className="text-center py-12 text-muted-foreground">
+                <p>No receipts found</p>
+                <p className="text-sm mt-2">Scan or upload a receipt to get started</p>
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t">
         <div className="flex gap-3">
           <Button 
             className="flex-1 h-12" 
-            onClick={() => console.log('Camera clicked')}
+            onClick={() => setLocation("/scan")}
             data-testid="button-camera"
           >
             <Camera className="h-5 w-5 mr-2" />
@@ -94,7 +114,7 @@ export default function HomePage() {
             variant="outline" 
             size="icon" 
             className="h-12 w-12"
-            onClick={() => console.log('Upload clicked')}
+            onClick={() => setLocation("/scan")}
             data-testid="button-upload"
           >
             <Upload className="h-5 w-5" />
