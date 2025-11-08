@@ -1,0 +1,144 @@
+# SplitTab - Bill Splitting Application
+
+## Overview
+
+SplitTab is a mobile-first bill splitting application that helps groups divide restaurant bills fairly and efficiently. The app allows users to scan receipts, assign items to different people, calculate individual shares including tax and tip, and share payment summaries. Built with a focus on simplicity and ease of use at the dining table, it follows Apple Human Interface Guidelines for an intuitive iOS-like experience.
+
+## User Preferences
+
+Preferred communication style: Simple, everyday language.
+
+## System Architecture
+
+### Frontend Architecture
+
+**Technology Stack:**
+- React with TypeScript for type-safe component development
+- Vite as the build tool and development server
+- Wouter for lightweight client-side routing
+- TanStack Query for server state management and caching
+- Tailwind CSS with shadcn/ui component library following the "new-york" style
+
+**Design System:**
+- Mobile-first responsive design optimized for iOS patterns
+- SF Pro font system via system font stack
+- Custom color palette with predefined person colors (10 distinct HSL values)
+- Spacing based on Tailwind's 8px increment system (2, 4, 6, 8 units)
+- Minimum touch target height of 48px (h-12) for accessibility
+
+**Component Architecture:**
+- Reusable UI components built on Radix UI primitives
+- Custom domain components: ReceiptCard, ReceiptItemRow, PersonChip, PersonSummaryCard, RegularPersonCard, TipCalculator, BottomSheet
+- Page-based routing with dedicated views: HomePage, ReceiptDetailPage, SummaryPage, RegularsPage, ScanReceiptPage
+
+**State Management Strategy:**
+- Server state cached via TanStack Query with manual invalidation on mutations
+- Local UI state managed with React hooks (useState, useEffect)
+- No global state management library - keeps architecture simple
+- Query keys follow RESTful pattern: ["/api/resource", id]
+
+### Backend Architecture
+
+**Technology Stack:**
+- Express.js server with TypeScript
+- Drizzle ORM for type-safe database operations
+- Zod for runtime schema validation
+- Neon PostgreSQL serverless database with WebSocket connection pooling
+
+**API Design:**
+- RESTful API endpoints under `/api` prefix
+- CRUD operations for three main resources: receipts, receipt items, and people
+- Request validation using Zod schemas with friendly error messages via zod-validation-error
+- Response format: JSON with appropriate HTTP status codes
+
+**Database Schema:**
+- Three main tables: `receipts`, `receipt_items`, `people`
+- Receipts store: restaurant name, date, financial totals (subtotal, tax, tip, total), optional image URL
+- Receipt items store: name, quantity, price, and array of assigned person IDs (JSONB column)
+- People store: name, contact info (phone, email), and regular status flag
+- All numeric currency values stored as DECIMAL(10,2) for precision
+- UUID primary keys generated via PostgreSQL's gen_random_uuid()
+
+**Server Architecture:**
+- Separation of concerns: routes.ts handles HTTP layer, storage.ts handles data layer
+- Interface-based storage layer (IStorage) for potential future abstraction
+- Middleware for request logging with response time tracking
+- Development-only Vite middleware for HMR and SSR
+
+### Receipt Scanning Feature
+
+**OCR Integration:**
+- Tesseract.js for client-side optical character recognition
+- Browser-based processing to avoid server load and keep costs down
+- Basic text parsing to extract items, prices, and totals from receipt images
+- Manual fallback editing available for inaccurate scans
+
+**Trade-offs:**
+- Client-side OCR chosen over cloud services (Google Vision, AWS Textract) to eliminate API costs and improve privacy
+- Accuracy depends on receipt quality and format - intentionally basic implementation
+- Processing happens on-device which may be slower but provides immediate feedback
+
+### Person Assignment System
+
+**Color Assignment:**
+- 10 predefined HSL color values ensure visual distinction between people
+- Colors assigned sequentially as people are added to a receipt
+- Person initials displayed in colored circles for quick visual identification
+- Initials generated from first letters of first/last name
+
+**Assignment Logic:**
+- Items can be assigned to multiple people (split items)
+- Proportional tax and tip calculation based on subtotal share
+- Unassigned items visually de-emphasized (opacity-60)
+- Assignment state stored as JSON array in database for flexibility
+
+### Navigation Pattern
+
+**Bottom Sheet Pattern:**
+- iOS-style modal bottom sheets for assignment interfaces
+- Slides up from bottom with backdrop overlay
+- Touch-friendly person selection with large tap targets (h-14)
+- Clear visual feedback for selected state with primary color highlight
+
+**Rationale:**
+- Bottom sheets keep context visible while providing focused interaction
+- Familiar pattern from iOS apps reduces learning curve
+- Easier thumb access on large mobile screens compared to center modals
+
+## External Dependencies
+
+### Database
+- **Neon Serverless PostgreSQL**: Managed PostgreSQL with WebSocket support for serverless environments
+- **Connection**: Uses WebSocket constructor (ws package) for Node.js compatibility
+- **Environment**: Requires DATABASE_URL environment variable
+
+### UI Component Library
+- **shadcn/ui**: Unstyled, accessible component primitives based on Radix UI
+- **Radix UI**: ~20 primitive components for dialogs, dropdowns, forms, etc.
+- **Configuration**: "new-york" style variant with neutral base color and CSS variables enabled
+
+### Form & Validation
+- **React Hook Form**: Form state management with @hookform/resolvers for Zod integration
+- **Zod**: Runtime type validation for API requests and form inputs
+- **drizzle-zod**: Automatic Zod schema generation from Drizzle database schemas
+
+### Styling
+- **Tailwind CSS**: Utility-first CSS framework with custom configuration
+- **class-variance-authority**: Type-safe variant management for component styles
+- **clsx & tailwind-merge**: Class name merging utilities
+
+### Development Tools
+- **Vite**: Fast development server with HMR
+- **TypeScript**: Type safety across frontend and backend
+- **esbuild**: Production bundling for server code
+- **Replit plugins**: Runtime error modal, cartographer, and dev banner (development only)
+
+### Additional Libraries
+- **date-fns**: Date formatting and manipulation
+- **Tesseract.js**: Browser-based OCR for receipt scanning
+- **nanoid**: Unique ID generation
+- **embla-carousel**: Touch-friendly carousel component (imported but usage unclear)
+- **wouter**: Minimal client-side router (~1KB)
+
+### Session Management
+- **connect-pg-simple**: PostgreSQL session store for Express sessions (imported but session middleware not evident in provided code)

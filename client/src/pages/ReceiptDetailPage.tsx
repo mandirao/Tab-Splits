@@ -89,6 +89,13 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
       toast({ title: "Assignment saved" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to save assignment", 
+        description: error.message,
+        variant: "destructive" 
+      });
     }
   });
 
