@@ -49,6 +49,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
   const [activeShareToken, setActiveShareToken] = useState<string | null>(null);
   const [tipPercentage, setTipPercentage] = useState(20);
+  const [selectedTab, setSelectedTab] = useState<string>("all");
 
   const { data: receipt } = useQuery<Receipt>({
     queryKey: ["/api/receipts", receiptId],
@@ -329,6 +330,46 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   };
   const getColorForPerson = (personId: string) => getPersonById(personId)?.color || PERSON_COLORS[0];
 
+  // Calculate per-person totals
+  const personTotals = new Map<string, { subtotal: number; tax: number; tip: number; total: number }>();
+  
+  items.forEach(item => {
+    const itemPrice = parseFloat(item.price) || 0;
+    const assignedPeople = (item.assignedTo as string[]) || [];
+    
+    if (assignedPeople.length > 0) {
+      const pricePerPerson = itemPrice / assignedPeople.length;
+      
+      assignedPeople.forEach(personId => {
+        if (!personTotals.has(personId)) {
+          personTotals.set(personId, { subtotal: 0, tax: 0, tip: 0, total: 0 });
+        }
+        const current = personTotals.get(personId)!;
+        current.subtotal += pricePerPerson;
+      });
+    }
+  });
+
+  personTotals.forEach((totals, personId) => {
+    const proportion = subtotal > 0 ? totals.subtotal / subtotal : 0;
+    totals.tax = tax * proportion;
+    totals.tip = tipAmount * proportion;
+    totals.total = totals.subtotal + totals.tax + totals.tip;
+  });
+
+  // Check if there are unassigned items
+  const hasUnassignedItems = items.some(item => (item.assignedTo as string[] || []).length === 0);
+
+  // Filter items based on selected tab
+  const filteredItems = selectedTab === "all" 
+    ? items 
+    : selectedTab === "unassigned"
+    ? items.filter(item => (item.assignedTo as string[] || []).length === 0)
+    : items.filter(item => {
+        const assignedPeople = (item.assignedTo as string[]) || [];
+        return assignedPeople.includes(selectedTab);
+      });
+
   if (!receipt) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -372,13 +413,76 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         </div>
       </header>
 
+      {/* Horizontal Tabs */}
+      <div className="flex-shrink-0 border-b bg-card overflow-x-auto scrollbar-hide">
+        <div className="flex gap-2 p-2 min-w-max">
+          <Button
+            variant={selectedTab === "all" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedTab("all")}
+            className="whitespace-nowrap"
+            data-testid="tab-all-items"
+          >
+            All Items
+          </Button>
+          
+          {hasUnassignedItems && (
+            <Button
+              variant={selectedTab === "unassigned" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedTab("unassigned")}
+              className="whitespace-nowrap"
+              data-testid="tab-unassigned"
+            >
+              Unassigned
+            </Button>
+          )}
+          
+          {peopleWithColors.map((person) => {
+            const personTotal = personTotals.get(person.id);
+            if (!personTotal) return null;
+            
+            return (
+              <Button
+                key={person.id}
+                variant={selectedTab === person.id ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedTab(person.id)}
+                className="whitespace-nowrap flex items-center gap-2"
+                style={{
+                  backgroundColor: selectedTab === person.id ? person.color : undefined,
+                  borderColor: person.color,
+                  color: selectedTab === person.id ? 'white' : undefined
+                }}
+                data-testid={`tab-person-${person.id}`}
+              >
+                <div
+                  className="w-5 h-5 rounded-full text-white text-xs font-semibold flex items-center justify-center"
+                  style={{ backgroundColor: person.color }}
+                >
+                  {getInitialsForPerson(person.id)}
+                </div>
+                <span>{person.name}</span>
+                <span className="font-semibold">${personTotal.total.toFixed(2)}</span>
+              </Button>
+            );
+          })}
+        </div>
+      </div>
+
       <main className="flex-1 overflow-y-auto p-4 pb-32">
         <Card className="mb-4">
           <CardHeader className="pb-3">
-            <h2 className="font-semibold text-base">Items</h2>
+            <h2 className="font-semibold text-base">
+              {selectedTab === "all" 
+                ? "All Items" 
+                : selectedTab === "unassigned"
+                ? "Unassigned Items"
+                : `${getPersonById(selectedTab)?.name}'s Items`}
+            </h2>
           </CardHeader>
           <CardContent className="divide-y">
-            {items.map((item) => (
+            {filteredItems.map((item) => (
               <ReceiptItemRow
                 key={item.id}
                 id={item.id}
@@ -404,7 +508,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       </main>
 
       <div className="fixed bottom-0 left-0 right-0 bg-card border-t p-4">
-        <div className="space-y-3 mb-3">
+        <div className="space-y-3">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Subtotal</span>
             <span data-testid="text-receipt-subtotal">${subtotal.toFixed(2)}</span>
@@ -422,14 +526,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             <span data-testid="text-receipt-total">${total.toFixed(2)}</span>
           </div>
         </div>
-        
-        <Button 
-          className="w-full h-12"
-          onClick={() => setLocation(`/receipt/${receiptId}/summary`)}
-          data-testid="button-view-summary"
-        >
-          View Summary
-        </Button>
       </div>
 
       <BottomSheet
