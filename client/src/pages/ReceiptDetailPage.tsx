@@ -8,7 +8,7 @@ import ReceiptItemRow from "@/components/ReceiptItemRow";
 import TipCalculator from "@/components/TipCalculator";
 import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
-import { ArrowLeft, Users, Share2, QrCode, MessageSquare } from "lucide-react";
+import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -50,6 +50,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [activeShareToken, setActiveShareToken] = useState<string | null>(null);
   const [tipPercentage, setTipPercentage] = useState(20);
   const [selectedTab, setSelectedTab] = useState<string>("all");
+  const [tipBottomSheetOpen, setTipBottomSheetOpen] = useState(false);
 
   const { data: receipt } = useQuery<Receipt>({
     queryKey: ["/api/receipts", receiptId],
@@ -497,14 +498,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             ))}
           </CardContent>
         </Card>
-
-        <TipCalculator
-          subtotal={subtotal}
-          tipPercentage={tipPercentage}
-          tipAmount={tipAmount}
-          onTipPercentageChange={setTipPercentage}
-          onTipAmountChange={handleTipChange}
-        />
       </main>
 
       <div className="fixed bottom-0 left-0 right-0 bg-card border-t p-4">
@@ -517,10 +510,17 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             <span className="text-muted-foreground">Tax</span>
             <span data-testid="text-receipt-tax">${tax.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-sm">
+          <button
+            className="flex justify-between items-center text-sm w-full hover-elevate active-elevate-2 rounded-md -mx-2 px-2 py-1"
+            onClick={() => setTipBottomSheetOpen(true)}
+            data-testid="button-edit-tip"
+          >
             <span className="text-muted-foreground">Tip ({tipPercentage.toFixed(0)}%)</span>
-            <span data-testid="text-receipt-tip">${tipAmount.toFixed(2)}</span>
-          </div>
+            <div className="flex items-center gap-2">
+              <span data-testid="text-receipt-tip">${tipAmount.toFixed(2)}</span>
+              <Pencil className="h-3 w-3 text-muted-foreground" />
+            </div>
+          </button>
           <div className="flex justify-between text-xl font-bold pt-2 border-t">
             <span>Total</span>
             <span data-testid="text-receipt-total">${total.toFixed(2)}</span>
@@ -765,6 +765,20 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             </>
           )}
         </div>
+      </BottomSheet>
+
+      <BottomSheet
+        open={tipBottomSheetOpen}
+        onClose={() => setTipBottomSheetOpen(false)}
+        title="Edit Tip"
+      >
+        <TipCalculator
+          subtotal={subtotal}
+          tipPercentage={tipPercentage}
+          tipAmount={tipAmount}
+          onTipPercentageChange={setTipPercentage}
+          onTipAmountChange={handleTipChange}
+        />
       </BottomSheet>
     </div>
   );
