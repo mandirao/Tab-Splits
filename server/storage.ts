@@ -30,6 +30,7 @@ export interface IStorage {
 
   // People operations
   createPerson(person: InsertPerson): Promise<Person>;
+  getPerson(id: string): Promise<Person | undefined>;
   getAllPeople(): Promise<Person[]>;
   getRegulars(): Promise<Person[]>;
   updatePerson(id: string, person: Partial<InsertPerson>): Promise<Person>;
@@ -122,6 +123,11 @@ export class DatabaseStorage implements IStorage {
   // People operations
   async createPerson(person: InsertPerson): Promise<Person> {
     const [result] = await db.insert(people).values(person).returning();
+    return result;
+  }
+
+  async getPerson(id: string): Promise<Person | undefined> {
+    const [result] = await db.select().from(people).where(eq(people.id, id));
     return result;
   }
 

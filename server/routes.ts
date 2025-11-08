@@ -166,6 +166,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/share/:token/verify-phone", async (req, res) => {
+    try {
+      const { phone } = req.body;
+      if (!phone) {
+        return res.status(400).json({ message: "Phone number is required" });
+      }
+
+      const receipt = await storage.getReceiptByShareToken(req.params.token);
+      if (!receipt) {
+        return res.status(404).json({ message: "Receipt not found" });
+      }
+
+      const items = await storage.getReceiptItems(receipt.id);
+      const allPeople = await storage.getAllPeople();
+      
+      const assignedPersonIds = new Set<string>();
+      items.forEach(item => {
+        const assigned = (item.assignedTo as string[]) || [];
+        assigned.forEach(id => assignedPersonIds.add(id));
+      });
+
+      const assignedPeople = allPeople.filter(person => assignedPersonIds.has(person.id));
+      
+      const matchingPerson = assignedPeople.find(p => p.phone === phone);
+      
+      if (matchingPerson) {
+        return res.json({ 
+          verified: true, 
+          personId: matchingPerson.id,
+          personName: matchingPerson.name
+        });
+      }
+
+      const unmatchedPeople = assignedPeople
+        .filter(p => !p.phone)
+        .map(p => ({ id: p.id, name: p.name }));
+
+      res.json({ 
+        verified: false, 
+        unmatchedPeople 
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/share/:token/link-phone", async (req, res) => {
+    try {
+      const { phone, personId, name } = req.body;
+      if (!phone) {
+        return res.status(400).json({ message: "Phone number is required" });
+      }
+
+      const receipt = await storage.getReceiptByShareToken(req.params.token);
+      if (!receipt) {
+        return res.status(404).json({ message: "Receipt not found" });
+      }
+
+      let person;
+      if (personId) {
+        await storage.updatePerson(personId, { phone });
+        person = await storage.getPerson(personId);
+        if (!person) {
+          return res.status(404).json({ message: "Person not found" });
+        }
+      } else if (name) {
+        person = await storage.createPerson({ name, phone });
+      } else {
+        return res.status(400).json({ message: "Either personId or name is required" });
+      }
+
+      res.json({ 
+        verified: true, 
+        personId: person.id,
+        personName: person.name
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/share/:token", async (req, res) => {
     try {
       const receipt = await storage.getReceiptByShareToken(req.params.token);
