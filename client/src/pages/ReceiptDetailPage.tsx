@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import ReceiptItemRow from "@/components/ReceiptItemRow";
 import TipCalculator from "@/components/TipCalculator";
 import BottomSheet from "@/components/BottomSheet";
@@ -35,8 +37,10 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [assignBottomSheetOpen, setAssignBottomSheetOpen] = useState(false);
+  const [editBottomSheetOpen, setEditBottomSheetOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
+  const [editItemData, setEditItemData] = useState({ name: "", quantity: 1, price: "" });
   const [tipPercentage, setTipPercentage] = useState(20);
 
   const { data: receipt } = useQuery<Receipt>({
@@ -99,6 +103,24 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     }
   });
 
+  const updateItemDetailsMutation = useMutation({
+    mutationFn: async ({ itemId, data }: { itemId: string; data: { name: string; quantity: number; price: string } }) => {
+      return await apiRequest(`/api/items/${itemId}`, "PATCH", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId] });
+      toast({ title: "Item updated" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to update item", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    }
+  });
+
   const handleTipChange = (amount: number) => {
     updateReceiptMutation.mutate({ tip: amount });
   };
@@ -120,6 +142,31 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     setAssignBottomSheetOpen(false);
     setSelectedItemId(null);
     setSelectedPeople([]);
+  };
+
+  const handleEditClick = (itemId: string) => {
+    const item = items.find(i => i.id === itemId);
+    if (item) {
+      setSelectedItemId(itemId);
+      setEditItemData({
+        name: item.name,
+        quantity: item.quantity || 1,
+        price: item.price
+      });
+      setEditBottomSheetOpen(true);
+    }
+  };
+
+  const handleSaveEdit = () => {
+    if (selectedItemId && editItemData.name && editItemData.price) {
+      updateItemDetailsMutation.mutate({
+        itemId: selectedItemId,
+        data: editItemData
+      });
+      setEditBottomSheetOpen(false);
+      setSelectedItemId(null);
+      setEditItemData({ name: "", quantity: 1, price: "" });
+    }
   };
 
   const togglePersonSelection = (personId: string) => {
@@ -197,7 +244,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                 assignedInitials={(item.assignedTo as string[] || []).map(getInitialsForPerson)}
                 assignedColors={(item.assignedTo as string[] || []).map(getColorForPerson)}
                 onAssign={() => handleAssignClick(item.id)}
-                onEdit={() => console.log('Edit item', item.id)}
+                onEdit={() => handleEditClick(item.id)}
               />
             ))}
           </CardContent>
@@ -273,6 +320,62 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                 onSelect={() => togglePersonSelection(person.id)}
               />
             ))}
+          </div>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        open={editBottomSheetOpen}
+        onClose={() => {
+          setEditBottomSheetOpen(false);
+          setEditItemData({ name: "", quantity: 1, price: "" });
+        }}
+        title="Edit Item"
+        footer={
+          <Button 
+            className="w-full" 
+            onClick={handleSaveEdit}
+            disabled={!editItemData.name || !editItemData.price}
+            data-testid="button-save-item-edit"
+          >
+            Save Changes
+          </Button>
+        }
+      >
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="item-name">Item Name</Label>
+            <Input
+              id="item-name"
+              type="text"
+              value={editItemData.name}
+              onChange={(e) => setEditItemData(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="e.g. Caesar Salad"
+              data-testid="input-edit-item-name"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="item-quantity">Quantity</Label>
+            <Input
+              id="item-quantity"
+              type="number"
+              min="1"
+              value={editItemData.quantity}
+              onChange={(e) => setEditItemData(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
+              data-testid="input-edit-item-quantity"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="item-price">Price</Label>
+            <Input
+              id="item-price"
+              type="text"
+              inputMode="decimal"
+              value={editItemData.price}
+              onChange={(e) => setEditItemData(prev => ({ ...prev, price: e.target.value }))}
+              placeholder="0.00"
+              data-testid="input-edit-item-price"
+            />
           </div>
         </div>
       </BottomSheet>
