@@ -19,6 +19,8 @@ export interface IStorage {
   getAllReceipts(): Promise<Receipt[]>;
   updateReceipt(id: string, receipt: Partial<InsertReceipt>): Promise<Receipt>;
   deleteReceipt(id: string): Promise<void>;
+  generateShareToken(id: string): Promise<Receipt | undefined>;
+  getReceiptByShareToken(token: string): Promise<Receipt | undefined>;
 
   // Receipt Item operations
   createReceiptItem(item: InsertReceiptItem): Promise<ReceiptItem>;
@@ -61,6 +63,24 @@ export class DatabaseStorage implements IStorage {
 
   async deleteReceipt(id: string): Promise<void> {
     await db.delete(receipts).where(eq(receipts.id, id));
+  }
+
+  async generateShareToken(id: string): Promise<Receipt | undefined> {
+    const shareToken = crypto.randomUUID();
+    const [result] = await db
+      .update(receipts)
+      .set({ shareToken })
+      .where(eq(receipts.id, id))
+      .returning();
+    return result;
+  }
+
+  async getReceiptByShareToken(token: string): Promise<Receipt | undefined> {
+    const [result] = await db
+      .select()
+      .from(receipts)
+      .where(eq(receipts.shareToken, token));
+    return result;
   }
 
   // Receipt Item operations

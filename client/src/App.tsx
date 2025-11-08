@@ -8,6 +8,7 @@ import ReceiptDetailPage from "@/pages/ReceiptDetailPage";
 import SummaryPage from "@/pages/SummaryPage";
 import RegularsPage from "@/pages/RegularsPage";
 import ScanReceiptPage from "@/pages/ScanReceiptPage";
+import SharedReceiptPage from "@/pages/SharedReceiptPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -18,6 +19,7 @@ function Router() {
       <Route path="/receipt/:id" component={ReceiptDetailPage} />
       <Route path="/receipt/:id/summary" component={SummaryPage} />
       <Route path="/regulars" component={RegularsPage} />
+      <Route path="/share/:token" component={SharedReceiptPage} />
       <Route component={NotFound} />
     </Switch>
   );

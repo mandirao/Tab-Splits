@@ -12,6 +12,7 @@ export const receipts = pgTable("receipts", {
   tip: numeric("tip", { precision: 10, scale: 2 }).notNull(),
   total: numeric("total", { precision: 10, scale: 2 }).notNull(),
   imageUrl: text("image_url"),
+  shareToken: varchar("share_token").unique(),
 });
 
 export const receiptItems = pgTable("receipt_items", {

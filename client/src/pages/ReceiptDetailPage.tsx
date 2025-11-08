@@ -8,12 +8,13 @@ import ReceiptItemRow from "@/components/ReceiptItemRow";
 import TipCalculator from "@/components/TipCalculator";
 import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
-import { ArrowLeft, Users, Share2 } from "lucide-react";
+import { ArrowLeft, Users, Share2, QrCode, MessageSquare } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Receipt, ReceiptItem, Person } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import QRCodeLib from "qrcode";
 
 interface PersonWithColor extends Person {
   color: string;
@@ -44,6 +45,9 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [showAddPersonForm, setShowAddPersonForm] = useState(false);
   const [newPersonName, setNewPersonName] = useState("");
   const [newPersonPhone, setNewPersonPhone] = useState("");
+  const [shareBottomSheetOpen, setShareBottomSheetOpen] = useState(false);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
+  const [activeShareToken, setActiveShareToken] = useState<string | null>(null);
   const [tipPercentage, setTipPercentage] = useState(20);
 
   const { data: receipt } = useQuery<Receipt>({
@@ -76,6 +80,12 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       }
     }
   }, [receipt, subtotal]);
+
+  useEffect(() => {
+    if (receipt?.shareToken) {
+      setActiveShareToken(receipt.shareToken);
+    }
+  }, [receipt?.shareToken]);
 
   const updateReceiptMutation = useMutation({
     mutationFn: async (data: { tip: number }) => {
@@ -139,6 +149,38 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     onError: (error: any) => {
       toast({ 
         title: "Failed to add person", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    }
+  });
+
+  const generateShareTokenMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest(`/api/receipts/${receiptId}/generate-share-token`, "POST", {});
+    },
+    onSuccess: async (data: { shareToken: string }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId] });
+      setActiveShareToken(data.shareToken);
+      const shareUrl = `${window.location.origin}/share/${data.shareToken}`;
+      try {
+        const qrDataUrl = await QRCodeLib.toDataURL(shareUrl);
+        setQrCodeDataUrl(qrDataUrl);
+        toast({ 
+          title: "Share link ready",
+          description: "QR code generated successfully"
+        });
+      } catch (qrError) {
+        toast({ 
+          title: "QR code generation failed", 
+          description: "Share link is available but QR code could not be generated",
+          variant: "destructive" 
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to generate share link", 
         description: error.message,
         variant: "destructive" 
       });
@@ -230,6 +272,47 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     }
   };
 
+  const handleShareClick = async () => {
+    setShareBottomSheetOpen(true);
+    if (!activeShareToken) {
+      await generateShareTokenMutation.mutateAsync();
+    } else {
+      const shareUrl = `${window.location.origin}/share/${activeShareToken}`;
+      const qrDataUrl = await QRCodeLib.toDataURL(shareUrl);
+      setQrCodeDataUrl(qrDataUrl);
+    }
+  };
+
+  const handleSendSMS = (personId: string) => {
+    const person = getPersonById(personId);
+    if (!person || !person.phone) {
+      toast({
+        title: "Cannot send SMS",
+        description: "This person doesn't have a phone number",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!activeShareToken) {
+      toast({
+        title: "Share link not ready",
+        description: "Please wait for the share link to be generated",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const shareUrl = `${window.location.origin}/share/${activeShareToken}`;
+    const message = `Check out our bill at ${receipt?.restaurantName || 'the restaurant'}! ${shareUrl}`;
+    window.location.href = `sms:${person.phone}?body=${encodeURIComponent(message)}`;
+    
+    toast({
+      title: "Opening SMS app",
+      description: `Sending share link to ${person.name}`
+    });
+  };
+
   const togglePersonSelection = (personId: string) => {
     setSelectedPeople(prev => 
       prev.includes(personId)
@@ -270,7 +353,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           <Button 
             size="icon" 
             variant="ghost"
-            onClick={() => console.log('Share receipt')}
+            onClick={handleShareClick}
             data-testid="button-share-receipt"
           >
             <Share2 className="h-5 w-5" />
@@ -519,6 +602,72 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               data-testid="input-edit-item-price"
             />
           </div>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        open={shareBottomSheetOpen}
+        onClose={() => {
+          setShareBottomSheetOpen(false);
+        }}
+        title="Share Receipt"
+      >
+        <div className="space-y-4">
+          {generateShareTokenMutation.isPending ? (
+            <div className="text-center py-8">
+              <p className="text-sm text-muted-foreground">Generating share link...</p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-3">
+                <h3 className="font-semibold text-sm">Scan QR Code</h3>
+                <p className="text-sm text-muted-foreground">
+                  Anyone at the table can scan this code to see the receipt and their total
+                </p>
+                {qrCodeDataUrl && (
+                  <div className="flex justify-center p-4 bg-white rounded-lg">
+                    <img src={qrCodeDataUrl} alt="QR Code" className="w-64 h-64" data-testid="img-qr-code" />
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="font-semibold text-sm mb-3">Send via Text</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Select people with phone numbers to send them the link
+                </p>
+                <div className="space-y-2">
+                  {peopleWithColors
+                    .filter(person => person.phone)
+                    .map((person) => (
+                      <Button
+                        key={person.id}
+                        variant="outline"
+                        className="w-full justify-between"
+                        onClick={() => handleSendSMS(person.id)}
+                        data-testid={`button-send-sms-${person.id}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-6 h-6 rounded-full text-white text-xs font-semibold flex items-center justify-center"
+                            style={{ backgroundColor: person.color }}
+                          >
+                            {person.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                          </div>
+                          <span>{person.name}</span>
+                        </div>
+                        <MessageSquare className="h-4 w-4" />
+                      </Button>
+                    ))}
+                  {peopleWithColors.filter(person => person.phone).length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No people with phone numbers yet. Add phone numbers when creating people to send them text messages.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </BottomSheet>
     </div>

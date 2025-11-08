@@ -153,6 +153,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Share routes
+  app.post("/api/receipts/:id/generate-share-token", async (req, res) => {
+    try {
+      const receipt = await storage.generateShareToken(req.params.id);
+      if (!receipt) {
+        return res.status(404).json({ message: "Receipt not found" });
+      }
+      res.json({ shareToken: receipt.shareToken });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/share/:token", async (req, res) => {
+    try {
+      const receipt = await storage.getReceiptByShareToken(req.params.token);
+      if (!receipt) {
+        return res.status(404).json({ message: "Receipt not found" });
+      }
+      
+      const items = await storage.getReceiptItems(receipt.id);
+      const allPeople = await storage.getAllPeople();
+      
+      const assignedPersonIds = new Set<string>();
+      items.forEach(item => {
+        const assigned = (item.assignedTo as string[]) || [];
+        assigned.forEach(id => assignedPersonIds.add(id));
+      });
+      
+      const redactedPeople = allPeople
+        .filter(person => assignedPersonIds.has(person.id))
+        .map(person => ({
+          id: person.id,
+          name: person.name
+        }));
+      
+      const redactedReceipt = {
+        id: receipt.id,
+        restaurantName: receipt.restaurantName,
+        date: receipt.date,
+        subtotal: receipt.subtotal,
+        tax: receipt.tax,
+        tip: receipt.tip,
+        total: receipt.total,
+        imageUrl: receipt.imageUrl
+      };
+      
+      res.json({ receipt: redactedReceipt, items, people: redactedPeople });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
