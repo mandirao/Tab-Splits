@@ -43,6 +43,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [editItemData, setEditItemData] = useState({ name: "", quantity: 1, price: "" });
   const [showAddPersonForm, setShowAddPersonForm] = useState(false);
   const [newPersonName, setNewPersonName] = useState("");
+  const [newPersonPhone, setNewPersonPhone] = useState("");
   const [tipPercentage, setTipPercentage] = useState(20);
 
   const { data: receipt } = useQuery<Receipt>({
@@ -124,13 +125,14 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   });
 
   const createPersonMutation = useMutation({
-    mutationFn: async (name: string) => {
-      return await apiRequest("/api/people", "POST", { name });
+    mutationFn: async (data: { name: string; phone?: string }) => {
+      return await apiRequest("/api/people", "POST", data);
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/people"] });
       setSelectedPeople(prev => [...prev, data.id]);
       setNewPersonName("");
+      setNewPersonPhone("");
       setShowAddPersonForm(false);
       toast({ title: "Person added" });
     },
@@ -193,7 +195,37 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
 
   const handleAddNewPerson = () => {
     if (newPersonName.trim()) {
-      createPersonMutation.mutate(newPersonName.trim());
+      createPersonMutation.mutate({
+        name: newPersonName.trim(),
+        phone: newPersonPhone.trim() || undefined
+      });
+    }
+  };
+
+  const handleSelectFromContacts = async () => {
+    if ('contacts' in navigator && 'ContactsManager' in window) {
+      try {
+        const props = ['name', 'tel'];
+        const opts = { multiple: false };
+        const contacts = await (navigator as any).contacts.select(props, opts);
+        
+        if (contacts && contacts.length > 0) {
+          const contact = contacts[0];
+          if (contact.name && contact.name.length > 0) {
+            setNewPersonName(contact.name[0]);
+          }
+          if (contact.tel && contact.tel.length > 0) {
+            setNewPersonPhone(contact.tel[0]);
+          }
+        }
+      } catch (error) {
+        console.error('Error selecting contact:', error);
+        toast({
+          title: "Could not access contacts",
+          description: "Please enter the name manually",
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -323,6 +355,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           setSelectedPeople([]);
           setShowAddPersonForm(false);
           setNewPersonName("");
+          setNewPersonPhone("");
         }}
         title="Assign to People"
         footer={
@@ -363,8 +396,19 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             </Button>
           ) : (
             <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+              {'contacts' in navigator && 'ContactsManager' in window && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleSelectFromContacts}
+                  data-testid="button-select-from-contacts"
+                >
+                  Select from Contacts
+                </Button>
+              )}
+              
               <div className="space-y-2">
-                <Label htmlFor="new-person-name">Person Name</Label>
+                <Label htmlFor="new-person-name">Name *</Label>
                 <Input
                   id="new-person-name"
                   type="text"
@@ -379,6 +423,19 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                   }}
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="new-person-phone">Phone Number (Optional)</Label>
+                <Input
+                  id="new-person-phone"
+                  type="tel"
+                  value={newPersonPhone}
+                  onChange={(e) => setNewPersonPhone(e.target.value)}
+                  placeholder="e.g. (555) 123-4567"
+                  data-testid="input-new-person-phone"
+                />
+              </div>
+
               <div className="flex gap-2">
                 <Button
                   variant="outline"
@@ -387,6 +444,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                   onClick={() => {
                     setShowAddPersonForm(false);
                     setNewPersonName("");
+                    setNewPersonPhone("");
                   }}
                   data-testid="button-cancel-add-person"
                 >
