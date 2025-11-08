@@ -41,6 +41,8 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const [editItemData, setEditItemData] = useState({ name: "", quantity: 1, price: "" });
+  const [showAddPersonForm, setShowAddPersonForm] = useState(false);
+  const [newPersonName, setNewPersonName] = useState("");
   const [tipPercentage, setTipPercentage] = useState(20);
 
   const { data: receipt } = useQuery<Receipt>({
@@ -121,6 +123,26 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     }
   });
 
+  const createPersonMutation = useMutation({
+    mutationFn: async (name: string) => {
+      return await apiRequest("/api/people", "POST", { name });
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/people"] });
+      setSelectedPeople(prev => [...prev, data.id]);
+      setNewPersonName("");
+      setShowAddPersonForm(false);
+      toast({ title: "Person added" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to add person", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    }
+  });
+
   const handleTipChange = (amount: number) => {
     updateReceiptMutation.mutate({ tip: amount });
   };
@@ -166,6 +188,12 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       setEditBottomSheetOpen(false);
       setSelectedItemId(null);
       setEditItemData({ name: "", quantity: 1, price: "" });
+    }
+  };
+
+  const handleAddNewPerson = () => {
+    if (newPersonName.trim()) {
+      createPersonMutation.mutate(newPersonName.trim());
     }
   };
 
@@ -293,6 +321,8 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         onClose={() => {
           setAssignBottomSheetOpen(false);
           setSelectedPeople([]);
+          setShowAddPersonForm(false);
+          setNewPersonName("");
         }}
         title="Assign to People"
         footer={
@@ -321,6 +351,59 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               />
             ))}
           </div>
+
+          {!showAddPersonForm ? (
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={() => setShowAddPersonForm(true)}
+              data-testid="button-show-add-person-form"
+            >
+              + Add New Person
+            </Button>
+          ) : (
+            <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+              <div className="space-y-2">
+                <Label htmlFor="new-person-name">Person Name</Label>
+                <Input
+                  id="new-person-name"
+                  type="text"
+                  value={newPersonName}
+                  onChange={(e) => setNewPersonName(e.target.value)}
+                  placeholder="e.g. John Doe"
+                  data-testid="input-new-person-name"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newPersonName.trim()) {
+                      handleAddNewPerson();
+                    }
+                  }}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowAddPersonForm(false);
+                    setNewPersonName("");
+                  }}
+                  data-testid="button-cancel-add-person"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  className="flex-1"
+                  onClick={handleAddNewPerson}
+                  disabled={!newPersonName.trim() || createPersonMutation.isPending}
+                  data-testid="button-add-person"
+                >
+                  {createPersonMutation.isPending ? "Adding..." : "Add Person"}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </BottomSheet>
 
