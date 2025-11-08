@@ -45,7 +45,11 @@ export default function ReceiptItemRow({
       
       <div className="flex items-center gap-2">
         {isAssigned ? (
-          <div className="flex -space-x-1" data-testid="container-initials">
+          <button
+            onClick={onAssign}
+            className="flex -space-x-1 hover-elevate active-elevate-2 rounded-full p-0.5 transition-all"
+            data-testid="button-modify-assignment"
+          >
             {assignedInitials.map((initials, idx) => (
               <div
                 key={idx}
@@ -56,7 +60,7 @@ export default function ReceiptItemRow({
                 {initials}
               </div>
             ))}
-          </div>
+          </button>
         ) : (
           <Button
             size="sm"
