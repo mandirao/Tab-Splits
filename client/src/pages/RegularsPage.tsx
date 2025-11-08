@@ -9,9 +9,23 @@ interface Person {
   id: string;
   name: string;
   initials: string;
+  color: string;
   phone?: string;
   email?: string;
 }
+
+const PERSON_COLORS = [
+  'hsl(330, 75%, 65%)',
+  'hsl(340, 80%, 60%)',
+  'hsl(25, 90%, 62%)',
+  'hsl(15, 85%, 65%)',
+  'hsl(45, 95%, 65%)',
+  'hsl(185, 65%, 70%)',
+  'hsl(195, 70%, 65%)',
+  'hsl(280, 55%, 68%)',
+  'hsl(270, 60%, 70%)',
+  'hsl(35, 85%, 68%)',
+];
 
 export default function RegularsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -21,10 +35,10 @@ export default function RegularsPage() {
   const [newPersonEmail, setNewPersonEmail] = useState("");
 
   const [people, setPeople] = useState<Person[]>([
-    { id: "1", name: "John Doe", initials: "JD", phone: "+1 555-0123", email: "john@example.com" },
-    { id: "2", name: "Sarah Miller", initials: "SM", phone: "+1 555-0456" },
-    { id: "3", name: "Alex Brown", initials: "AB", phone: "+1 555-0789", email: "alex@example.com" },
-    { id: "4", name: "Emma Wilson", initials: "EW", phone: "+1 555-0321" }
+    { id: "1", name: "John Doe", initials: "JD", color: PERSON_COLORS[0], phone: "+1 555-0123", email: "john@example.com" },
+    { id: "2", name: "Sarah Miller", initials: "SM", color: PERSON_COLORS[1], phone: "+1 555-0456" },
+    { id: "3", name: "Alex Brown", initials: "AB", color: PERSON_COLORS[2], phone: "+1 555-0789", email: "alex@example.com" },
+    { id: "4", name: "Emma Wilson", initials: "EW", color: PERSON_COLORS[3], phone: "+1 555-0321" }
   ]);
 
   const filteredPeople = people.filter(p => 
@@ -40,12 +54,17 @@ export default function RegularsPage() {
       .slice(0, 2);
   };
 
+  const getNextColor = () => {
+    return PERSON_COLORS[people.length % PERSON_COLORS.length];
+  };
+
   const handleAddPerson = () => {
     if (newPersonName.trim()) {
       const newPerson: Person = {
         id: Date.now().toString(),
         name: newPersonName.trim(),
         initials: getInitials(newPersonName.trim()),
+        color: getNextColor(),
         phone: newPersonPhone.trim() || undefined,
         email: newPersonEmail.trim() || undefined
       };

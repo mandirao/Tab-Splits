@@ -21,7 +21,21 @@ interface Person {
   id: string;
   name: string;
   initials: string;
+  color: string;
 }
+
+const PERSON_COLORS = [
+  'hsl(330, 75%, 65%)',  // Pink
+  'hsl(340, 80%, 60%)',  // Hot Pink
+  'hsl(25, 90%, 62%)',   // Orange
+  'hsl(15, 85%, 65%)',   // Coral
+  'hsl(45, 95%, 65%)',   // Yellow
+  'hsl(185, 65%, 70%)',  // Cyan
+  'hsl(195, 70%, 65%)',  // Sky Blue
+  'hsl(280, 55%, 68%)',  // Purple
+  'hsl(270, 60%, 70%)',  // Lavender
+  'hsl(35, 85%, 68%)',   // Peach
+];
 
 export default function ReceiptDetailPage() {
   const [, setLocation] = useLocation();
@@ -32,10 +46,10 @@ export default function ReceiptDetailPage() {
   const [tipAmount, setTipAmount] = useState(25.50);
 
   const mockPeople: Person[] = [
-    { id: "1", name: "John Doe", initials: "JD" },
-    { id: "2", name: "Sarah Miller", initials: "SM" },
-    { id: "3", name: "Alex Brown", initials: "AB" },
-    { id: "4", name: "Emma Wilson", initials: "EW" }
+    { id: "1", name: "John Doe", initials: "JD", color: PERSON_COLORS[0] },
+    { id: "2", name: "Sarah Miller", initials: "SM", color: PERSON_COLORS[1] },
+    { id: "3", name: "Alex Brown", initials: "AB", color: PERSON_COLORS[2] },
+    { id: "4", name: "Emma Wilson", initials: "EW", color: PERSON_COLORS[3] }
   ];
 
   const [items, setItems] = useState<ReceiptItem[]>([
@@ -80,6 +94,10 @@ export default function ReceiptDetailPage() {
 
   const getInitialsForPerson = (personId: string) => {
     return mockPeople.find(p => p.id === personId)?.initials || "";
+  };
+
+  const getColorForPerson = (personId: string) => {
+    return mockPeople.find(p => p.id === personId)?.color || PERSON_COLORS[0];
   };
 
   return (
@@ -128,6 +146,7 @@ export default function ReceiptDetailPage() {
                 key={item.id}
                 {...item}
                 assignedInitials={item.assignedTo.map(getInitialsForPerson)}
+                assignedColors={item.assignedTo.map(getColorForPerson)}
                 onAssign={() => handleAssignClick(item.id)}
                 onEdit={() => console.log('Edit item', item.id)}
               />
@@ -200,6 +219,7 @@ export default function ReceiptDetailPage() {
                 key={person.id}
                 name={person.name}
                 initials={person.initials}
+                color={person.color}
                 selected={selectedPeople.includes(person.id)}
                 onSelect={() => togglePersonSelection(person.id)}
               />

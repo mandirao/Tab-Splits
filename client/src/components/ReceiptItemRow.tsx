@@ -8,6 +8,7 @@ interface ReceiptItemRowProps {
   quantity: number;
   price: number;
   assignedInitials: string[];
+  assignedColors?: string[];
   onAssign?: () => void;
   onEdit?: () => void;
 }
@@ -17,6 +18,7 @@ export default function ReceiptItemRow({
   quantity,
   price,
   assignedInitials,
+  assignedColors = [],
   onAssign,
   onEdit
 }: ReceiptItemRowProps) {
@@ -47,7 +49,8 @@ export default function ReceiptItemRow({
             {assignedInitials.map((initials, idx) => (
               <div
                 key={idx}
-                className="w-7 h-7 rounded-full bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center ring-2 ring-background"
+                className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center ring-2 ring-background"
+                style={{ backgroundColor: assignedColors[idx] || 'hsl(var(--primary))' }}
                 data-testid={`badge-initials-${idx}`}
               >
                 {initials}

@@ -12,6 +12,7 @@ export default function PersonSummaryCardExample() {
       <PersonSummaryCard
         name="John Doe"
         initials="JD"
+        color="hsl(330, 75%, 65%)"
         items={mockItems}
         subtotal={27.00}
         taxShare={2.43}

@@ -44,7 +44,10 @@ export default function HomePage() {
     <div className="flex flex-col h-screen bg-background">
       <header className="flex-shrink-0 p-4 border-b bg-card">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold">SplitTab</h1>
+          <div>
+            <h1 className="text-2xl font-bold">SplitTab</h1>
+            <p className="text-xs text-muted-foreground">by Amuse-Bouche</p>
+          </div>
         </div>
         
         <div className="relative">

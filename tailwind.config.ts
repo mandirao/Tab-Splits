@@ -81,6 +81,18 @@ export default {
           busy: "rgb(239 68 68)",
           offline: "rgb(156 163 175)",
         },
+        person: {
+          "1": "hsl(var(--person-1) / <alpha-value>)",
+          "2": "hsl(var(--person-2) / <alpha-value>)",
+          "3": "hsl(var(--person-3) / <alpha-value>)",
+          "4": "hsl(var(--person-4) / <alpha-value>)",
+          "5": "hsl(var(--person-5) / <alpha-value>)",
+          "6": "hsl(var(--person-6) / <alpha-value>)",
+          "7": "hsl(var(--person-7) / <alpha-value>)",
+          "8": "hsl(var(--person-8) / <alpha-value>)",
+          "9": "hsl(var(--person-9) / <alpha-value>)",
+          "10": "hsl(var(--person-10) / <alpha-value>)",
+        },
       },
       fontFamily: {
         sans: ["var(--font-sans)"],

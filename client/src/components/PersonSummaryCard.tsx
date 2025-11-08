@@ -11,6 +11,7 @@ interface PersonSummaryItem {
 interface PersonSummaryCardProps {
   name: string;
   initials: string;
+  color?: string;
   items: PersonSummaryItem[];
   subtotal: number;
   taxShare: number;
@@ -22,6 +23,7 @@ interface PersonSummaryCardProps {
 export default function PersonSummaryCard({
   name,
   initials,
+  color = 'hsl(var(--primary))',
   items,
   subtotal,
   taxShare,
@@ -33,7 +35,10 @@ export default function PersonSummaryCard({
     <Card data-testid="card-person-summary">
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground text-sm font-semibold flex items-center justify-center">
+          <div 
+            className="w-10 h-10 rounded-full text-white text-sm font-semibold flex items-center justify-center"
+            style={{ backgroundColor: color }}
+          >
             {initials}
           </div>
           <h3 className="font-semibold text-lg" data-testid="text-person-name">{name}</h3>

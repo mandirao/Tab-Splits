@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 interface PersonChipProps {
   name: string;
   initials: string;
+  color?: string;
   selected?: boolean;
   onSelect?: () => void;
   onRemove?: () => void;
@@ -13,6 +14,7 @@ interface PersonChipProps {
 export default function PersonChip({
   name,
   initials,
+  color = 'hsl(var(--primary))',
   selected = false,
   onSelect,
   onRemove,
@@ -31,7 +33,10 @@ export default function PersonChip({
       onClick={onSelect}
       data-testid="chip-person"
     >
-      <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center flex-shrink-0">
+      <div 
+        className="w-6 h-6 rounded-full text-white text-xs font-semibold flex items-center justify-center flex-shrink-0"
+        style={{ backgroundColor: color }}
+      >
         {initials}
       </div>
       <span className="font-medium text-sm">{name}</span>

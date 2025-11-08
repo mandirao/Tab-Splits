@@ -4,6 +4,13 @@ import PersonSummaryCard from "@/components/PersonSummaryCard";
 import { ArrowLeft } from "lucide-react";
 import { useLocation } from "wouter";
 
+const PERSON_COLORS = [
+  'hsl(330, 75%, 65%)',
+  'hsl(340, 80%, 60%)',
+  'hsl(25, 90%, 62%)',
+  'hsl(15, 85%, 65%)',
+];
+
 export default function SummaryPage() {
   const [, setLocation] = useLocation();
 
@@ -12,6 +19,7 @@ export default function SummaryPage() {
       id: "1",
       name: "John Doe",
       initials: "JD",
+      color: PERSON_COLORS[0],
       items: [
         { name: "Margherita Pizza", quantity: 1, price: 12.00 },
         { name: "House Wine", quantity: 1, price: 8.00 }
@@ -25,6 +33,7 @@ export default function SummaryPage() {
       id: "2",
       name: "Sarah Miller",
       initials: "SM",
+      color: PERSON_COLORS[1],
       items: [
         { name: "Margherita Pizza", quantity: 1, price: 12.00 }
       ],
@@ -37,6 +46,7 @@ export default function SummaryPage() {
       id: "3",
       name: "Alex Brown",
       initials: "AB",
+      color: PERSON_COLORS[2],
       items: [
         { name: "Caesar Salad", quantity: 1, price: 12.50 }
       ],
@@ -49,6 +59,7 @@ export default function SummaryPage() {
       id: "4",
       name: "Emma Wilson",
       initials: "EW",
+      color: PERSON_COLORS[3],
       items: [
         { name: "House Wine", quantity: 1, price: 8.00 }
       ],

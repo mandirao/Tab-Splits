@@ -5,6 +5,7 @@ import { Phone, Mail, X } from "lucide-react";
 interface RegularPersonCardProps {
   name: string;
   initials: string;
+  color?: string;
   phone?: string;
   email?: string;
   onSelect?: () => void;
@@ -14,6 +15,7 @@ interface RegularPersonCardProps {
 export default function RegularPersonCard({
   name,
   initials,
+  color = 'hsl(var(--primary))',
   phone,
   email,
   onSelect,
@@ -27,7 +29,10 @@ export default function RegularPersonCard({
     >
       <CardContent className="p-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground font-semibold flex items-center justify-center flex-shrink-0">
+          <div 
+            className="w-12 h-12 rounded-full text-white font-semibold flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: color }}
+          >
             {initials}
           </div>
           <div className="flex-1 min-w-0">
