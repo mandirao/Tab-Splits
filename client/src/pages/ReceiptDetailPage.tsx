@@ -56,16 +56,19 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     color: PERSON_COLORS[idx % PERSON_COLORS.length]
   }));
 
-  const subtotal = receipt ? parseFloat(receipt.subtotal) : 0;
-  const tax = receipt ? parseFloat(receipt.tax) : 0;
-  const tipAmount = receipt ? parseFloat(receipt.tip) : subtotal * 0.2;
+  const subtotal = receipt ? (parseFloat(receipt.subtotal) || 0) : 0;
+  const tax = receipt ? (parseFloat(receipt.tax) || 0) : 0;
+  const tipAmount = receipt ? (parseFloat(receipt.tip) || 0) : subtotal * 0.2;
   const total = subtotal + tax + tipAmount;
 
   useEffect(() => {
-    if (receipt && tipPercentage !== (parseFloat(receipt.tip) / subtotal * 100)) {
-      setTipPercentage((parseFloat(receipt.tip) / subtotal) * 100);
+    if (receipt && subtotal > 0) {
+      const calculatedTipPercentage = ((parseFloat(receipt.tip) || 0) / subtotal) * 100;
+      if (isFinite(calculatedTipPercentage) && tipPercentage !== calculatedTipPercentage) {
+        setTipPercentage(calculatedTipPercentage);
+      }
     }
-  }, [receipt]);
+  }, [receipt, subtotal]);
 
   const updateReceiptMutation = useMutation({
     mutationFn: async (data: { tip: number }) => {
@@ -183,7 +186,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                 id={item.id}
                 name={item.name}
                 quantity={item.quantity || 1}
-                price={parseFloat(item.price)}
+                price={parseFloat(item.price) || 0}
                 assignedInitials={(item.assignedTo as string[] || []).map(getInitialsForPerson)}
                 assignedColors={(item.assignedTo as string[] || []).map(getColorForPerson)}
                 onAssign={() => handleAssignClick(item.id)}
