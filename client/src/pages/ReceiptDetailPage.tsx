@@ -573,17 +573,24 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             <span className="text-muted-foreground">Tax</span>
             <span data-testid="text-receipt-tax">${displayTotals.tax.toFixed(2)}</span>
           </div>
-          <button
-            className="flex justify-between items-center text-sm w-full hover-elevate active-elevate-2 rounded-md -mx-2 px-2 py-1"
-            onClick={() => setTipBottomSheetOpen(true)}
-            data-testid="button-edit-tip"
-          >
-            <span className="text-muted-foreground">Tip ({tipPercentage.toFixed(0)}%)</span>
-            <div className="flex items-center gap-2">
+          {selectedTab === "all" ? (
+            <button
+              className="flex justify-between items-center text-sm w-full hover-elevate active-elevate-2 rounded-md -mx-2 px-2 py-1"
+              onClick={() => setTipBottomSheetOpen(true)}
+              data-testid="button-edit-tip"
+            >
+              <span className="text-muted-foreground">Tip ({tipPercentage.toFixed(0)}%)</span>
+              <div className="flex items-center gap-2">
+                <span data-testid="text-receipt-tip">${displayTotals.tip.toFixed(2)}</span>
+                <Pencil className="h-3 w-3 text-muted-foreground" />
+              </div>
+            </button>
+          ) : (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Tip ({tipPercentage.toFixed(0)}%)</span>
               <span data-testid="text-receipt-tip">${displayTotals.tip.toFixed(2)}</span>
-              <Pencil className="h-3 w-3 text-muted-foreground" />
             </div>
-          </button>
+          )}
           <div className="flex justify-between text-xl font-bold pt-2 border-t">
             <span>Total</span>
             <span data-testid="text-receipt-total">${displayTotals.total.toFixed(2)}</span>
