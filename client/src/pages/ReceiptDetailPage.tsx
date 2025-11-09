@@ -371,6 +371,48 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         return assignedPeople.includes(selectedTab);
       });
 
+  // Calculate adjusted quantity for person-specific tabs
+  const getAdjustedQuantity = (item: ReceiptItem, personId: string) => {
+    const assignedPeople = (item.assignedTo as string[]) || [];
+    const originalQuantity = item.quantity || 1;
+    
+    if (assignedPeople.length === 0) {
+      return originalQuantity;
+    }
+    
+    return originalQuantity / assignedPeople.length;
+  };
+
+  // Format quantity for display (handle fractions)
+  const formatQuantity = (quantity: number): string => {
+    if (Number.isInteger(quantity)) {
+      return quantity.toString();
+    }
+    
+    const whole = Math.floor(quantity);
+    const fractionalPart = quantity - whole;
+    
+    // Try common denominators (2, 3, 4, 5, 6, 8)
+    const denominators = [2, 3, 4, 5, 6, 8];
+    
+    for (const denom of denominators) {
+      const numer = Math.round(fractionalPart * denom);
+      const reconstructed = numer / denom;
+      
+      // Check if this fraction exactly represents the value (very tight tolerance)
+      if (Math.abs(reconstructed - fractionalPart) < 1e-9 && numer > 0 && numer < denom) {
+        if (whole === 0) {
+          return `${numer}/${denom}`;
+        } else {
+          return `${whole} ${numer}/${denom}`;
+        }
+      }
+    }
+    
+    // Fall back to decimal if no simple fraction works
+    return quantity.toFixed(2);
+  };
+
   if (!receipt) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -483,19 +525,34 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             </h2>
           </CardHeader>
           <CardContent className="divide-y">
-            {filteredItems.map((item) => (
-              <ReceiptItemRow
-                key={item.id}
-                id={item.id}
-                name={item.name}
-                quantity={item.quantity || 1}
-                price={parseFloat(item.price) || 0}
-                assignedInitials={(item.assignedTo as string[] || []).map(getInitialsForPerson)}
-                assignedColors={(item.assignedTo as string[] || []).map(getColorForPerson)}
-                onAssign={() => handleAssignClick(item.id)}
-                onEdit={() => handleEditClick(item.id)}
-              />
-            ))}
+            {filteredItems.map((item) => {
+              const assignedPeople = (item.assignedTo as string[]) || [];
+              const isPersonTab = selectedTab !== "all" && selectedTab !== "unassigned";
+              
+              let displayQuantity: string | undefined;
+              let displayPrice = parseFloat(item.price) || 0;
+              
+              if (isPersonTab && assignedPeople.length > 0) {
+                const adjustedQty = getAdjustedQuantity(item, selectedTab);
+                displayQuantity = formatQuantity(adjustedQty);
+                displayPrice = displayPrice / assignedPeople.length;
+              }
+              
+              return (
+                <ReceiptItemRow
+                  key={item.id}
+                  id={item.id}
+                  name={item.name}
+                  quantity={item.quantity || 1}
+                  price={displayPrice}
+                  assignedInitials={assignedPeople.map(getInitialsForPerson)}
+                  assignedColors={assignedPeople.map(getColorForPerson)}
+                  onAssign={() => handleAssignClick(item.id)}
+                  onEdit={() => handleEditClick(item.id)}
+                  displayQuantity={displayQuantity}
+                />
+              );
+            })}
           </CardContent>
         </Card>
       </main>

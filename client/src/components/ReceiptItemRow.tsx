@@ -11,6 +11,7 @@ interface ReceiptItemRowProps {
   assignedColors?: string[];
   onAssign?: () => void;
   onEdit?: () => void;
+  displayQuantity?: string;
 }
 
 export default function ReceiptItemRow({
@@ -20,9 +21,12 @@ export default function ReceiptItemRow({
   assignedInitials,
   assignedColors = [],
   onAssign,
-  onEdit
+  onEdit,
+  displayQuantity
 }: ReceiptItemRowProps) {
   const isAssigned = assignedInitials.length > 0;
+  const quantityDisplay = displayQuantity || quantity.toString();
+  const showQuantityBadge = quantity > 1 || displayQuantity;
 
   return (
     <div 
@@ -31,9 +35,9 @@ export default function ReceiptItemRow({
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2">
-          {quantity > 1 && (
+          {showQuantityBadge && (
             <Badge variant="outline" className="text-xs px-1.5" data-testid="badge-quantity">
-              {quantity}x
+              {quantityDisplay}x
             </Badge>
           )}
           <span className="font-medium text-sm" data-testid="text-item-name">{name}</span>
