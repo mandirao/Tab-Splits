@@ -149,6 +149,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deletePerson(id: string): Promise<void> {
+    const items = await db.select().from(receiptItems);
+    const hasAssignedItems = items.some(item => 
+      (item.assignedTo as string[] || []).includes(id)
+    );
+    
+    if (hasAssignedItems) {
+      throw new Error("Cannot delete person who has items assigned to them");
+    }
+    
     await db.delete(people).where(eq(people.id, id));
   }
 }

@@ -8,7 +8,17 @@ import ReceiptItemRow from "@/components/ReceiptItemRow";
 import TipCalculator from "@/components/TipCalculator";
 import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
-import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil } from "lucide-react";
+import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -51,6 +61,8 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [tipPercentage, setTipPercentage] = useState(20);
   const [selectedTab, setSelectedTab] = useState<string>("all");
   const [tipBottomSheetOpen, setTipBottomSheetOpen] = useState(false);
+  const [managePeopleBottomSheetOpen, setManagePeopleBottomSheetOpen] = useState(false);
+  const [personToDelete, setPersonToDelete] = useState<string | null>(null);
 
   const { data: receipt } = useQuery<Receipt>({
     queryKey: ["/api/receipts", receiptId],
@@ -154,6 +166,26 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         description: error.message,
         variant: "destructive" 
       });
+    }
+  });
+
+  const deletePersonMutation = useMutation({
+    mutationFn: async (personId: string) => {
+      return await apiRequest(`/api/people/${personId}`, "DELETE");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/people"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
+      setPersonToDelete(null);
+      toast({ title: "Person removed from receipt" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Cannot remove person", 
+        description: error.message || "This person has items assigned to them. Unassign their items first.",
+        variant: "destructive" 
+      });
+      setPersonToDelete(null);
     }
   });
 
@@ -282,6 +314,33 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       const shareUrl = `${window.location.origin}/share/${activeShareToken}`;
       const qrDataUrl = await QRCodeLib.toDataURL(shareUrl);
       setQrCodeDataUrl(qrDataUrl);
+    }
+  };
+
+  const handleManagePeopleClick = () => {
+    setManagePeopleBottomSheetOpen(true);
+  };
+
+  const handleDeletePerson = (personId: string) => {
+    const hasAssignedItems = items.some(item => 
+      (item.assignedTo as string[] || []).includes(personId)
+    );
+    
+    if (hasAssignedItems) {
+      toast({
+        title: "Cannot remove person",
+        description: "This person has items assigned to them. Unassign their items first.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setPersonToDelete(personId);
+  };
+
+  const confirmDeletePerson = () => {
+    if (personToDelete) {
+      deletePersonMutation.mutate(personToDelete);
     }
   };
 
@@ -451,10 +510,16 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         </div>
         
         <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="flex items-center gap-1">
-            <Users className="h-3 w-3" />
-            {peopleWithColors.length} people
-          </Badge>
+          <button 
+            onClick={handleManagePeopleClick}
+            className="hover-elevate active-elevate-2 rounded-full"
+            data-testid="button-manage-people"
+          >
+            <Badge variant="secondary" className="flex items-center gap-1 cursor-pointer">
+              <Users className="h-3 w-3" />
+              {peopleWithColors.length} people
+            </Badge>
+          </button>
           <Badge variant="outline">{items.length} items</Badge>
           <Badge variant={items.every(i => (i.assignedTo as string[] || []).length > 0) ? "default" : "secondary"}>
             {items.filter(i => (i.assignedTo as string[] || []).length > 0).length}/{items.length} assigned
@@ -850,6 +915,164 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           onTipAmountChange={handleTipChange}
         />
       </BottomSheet>
+
+      <BottomSheet
+        open={managePeopleBottomSheetOpen}
+        onClose={() => {
+          setManagePeopleBottomSheetOpen(false);
+          setShowAddPersonForm(false);
+          setNewPersonName("");
+          setNewPersonPhone("");
+        }}
+        title="Manage People"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Add or remove people from this receipt
+          </p>
+
+          {peopleWithColors.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">People on this receipt</h3>
+              {peopleWithColors.map((person) => {
+                const hasAssignedItems = items.some(item => 
+                  (item.assignedTo as string[] || []).includes(person.id)
+                );
+                
+                return (
+                  <div
+                    key={person.id}
+                    className="flex items-center justify-between p-3 rounded-lg border"
+                    data-testid={`person-item-${person.id}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-8 h-8 rounded-full text-white text-sm font-semibold flex items-center justify-center"
+                        style={{ backgroundColor: person.color }}
+                      >
+                        {person.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">{person.name}</p>
+                        {person.phone && (
+                          <p className="text-xs text-muted-foreground">{person.phone}</p>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => handleDeletePerson(person.id)}
+                      disabled={hasAssignedItems}
+                      data-testid={`button-delete-person-${person.id}`}
+                      className={hasAssignedItems ? "opacity-50 cursor-not-allowed" : ""}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {!showAddPersonForm ? (
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={() => setShowAddPersonForm(true)}
+              data-testid="button-show-add-person-form-manage"
+            >
+              + Add New Person
+            </Button>
+          ) : (
+            <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+              {'contacts' in navigator && 'ContactsManager' in window && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleSelectFromContacts}
+                  data-testid="button-select-from-contacts-manage"
+                >
+                  Select from Contacts
+                </Button>
+              )}
+              
+              <div className="space-y-2">
+                <Label htmlFor="manage-person-name">Name *</Label>
+                <Input
+                  id="manage-person-name"
+                  type="text"
+                  value={newPersonName}
+                  onChange={(e) => setNewPersonName(e.target.value)}
+                  placeholder="e.g. John Doe"
+                  data-testid="input-manage-person-name"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newPersonName.trim()) {
+                      handleAddNewPerson();
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="manage-person-phone">Phone Number (Optional)</Label>
+                <Input
+                  id="manage-person-phone"
+                  type="tel"
+                  value={newPersonPhone}
+                  onChange={(e) => setNewPersonPhone(e.target.value)}
+                  placeholder="e.g. (555) 123-4567"
+                  data-testid="input-manage-person-phone"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowAddPersonForm(false);
+                    setNewPersonName("");
+                    setNewPersonPhone("");
+                  }}
+                  data-testid="button-cancel-add-person-manage"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={handleAddNewPerson}
+                  disabled={!newPersonName.trim()}
+                  data-testid="button-add-person-manage"
+                >
+                  Add Person
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </BottomSheet>
+
+      <AlertDialog open={personToDelete !== null} onOpenChange={(open) => !open && setPersonToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove person from receipt?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove {personToDelete && getPersonById(personToDelete)?.name} from this receipt. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-person">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDeletePerson}
+              data-testid="button-confirm-delete-person"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
