@@ -415,8 +415,8 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
 
   // Determine which totals to display in sticky summary
   const isPersonTab = selectedTab !== "all" && selectedTab !== "unassigned";
-  const displayTotals = isPersonTab && personTotals.has(selectedTab)
-    ? personTotals.get(selectedTab)!
+  const displayTotals = isPersonTab
+    ? (personTotals.get(selectedTab) || { subtotal: 0, tax: 0, tip: 0, total: 0 })
     : { subtotal, tax, tip: tipAmount, total };
 
   if (!receipt) {
