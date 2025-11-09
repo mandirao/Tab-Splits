@@ -413,6 +413,12 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     return quantity.toFixed(2);
   };
 
+  // Determine which totals to display in sticky summary
+  const isPersonTab = selectedTab !== "all" && selectedTab !== "unassigned";
+  const displayTotals = isPersonTab && personTotals.has(selectedTab)
+    ? personTotals.get(selectedTab)!
+    : { subtotal, tax, tip: tipAmount, total };
+
   if (!receipt) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -561,11 +567,11 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         <div className="space-y-3">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Subtotal</span>
-            <span data-testid="text-receipt-subtotal">${subtotal.toFixed(2)}</span>
+            <span data-testid="text-receipt-subtotal">${displayTotals.subtotal.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Tax</span>
-            <span data-testid="text-receipt-tax">${tax.toFixed(2)}</span>
+            <span data-testid="text-receipt-tax">${displayTotals.tax.toFixed(2)}</span>
           </div>
           <button
             className="flex justify-between items-center text-sm w-full hover-elevate active-elevate-2 rounded-md -mx-2 px-2 py-1"
@@ -574,13 +580,13 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           >
             <span className="text-muted-foreground">Tip ({tipPercentage.toFixed(0)}%)</span>
             <div className="flex items-center gap-2">
-              <span data-testid="text-receipt-tip">${tipAmount.toFixed(2)}</span>
+              <span data-testid="text-receipt-tip">${displayTotals.tip.toFixed(2)}</span>
               <Pencil className="h-3 w-3 text-muted-foreground" />
             </div>
           </button>
           <div className="flex justify-between text-xl font-bold pt-2 border-t">
             <span>Total</span>
-            <span data-testid="text-receipt-total">${total.toFixed(2)}</span>
+            <span data-testid="text-receipt-total">${displayTotals.total.toFixed(2)}</span>
           </div>
         </div>
       </div>
