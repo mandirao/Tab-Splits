@@ -20,6 +20,12 @@ export async function apiRequest(
   });
 
   await throwIfResNotOk(res);
+  
+  // Handle 204 No Content - no body to parse
+  if (res.status === 204) {
+    return null;
+  }
+  
   return await res.json();
 }
 

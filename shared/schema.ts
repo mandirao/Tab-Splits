@@ -32,11 +32,18 @@ export const people = pgTable("people", {
   isRegular: integer("is_regular").notNull().default(0),
 });
 
+export const receiptPeople = pgTable("receipt_people", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  receiptId: varchar("receipt_id").notNull().references(() => receipts.id),
+  personId: varchar("person_id").notNull().references(() => people.id),
+});
+
 const numericStringSchema = z.string().regex(/^\d+(\.\d{1,2})?$/, "Must be a valid numeric string");
 
 export const insertReceiptSchema = createInsertSchema(receipts).omit({ id: true });
 export const insertReceiptItemSchema = createInsertSchema(receiptItems).omit({ id: true });
 export const insertPersonSchema = createInsertSchema(people).omit({ id: true });
+export const insertReceiptPersonSchema = createInsertSchema(receiptPeople).omit({ id: true });
 
 export const updateReceiptSchema = z.object({
   restaurantName: z.string().optional(),
@@ -67,3 +74,5 @@ export type InsertReceiptItem = z.infer<typeof insertReceiptItemSchema>;
 export type ReceiptItem = typeof receiptItems.$inferSelect;
 export type InsertPerson = z.infer<typeof insertPersonSchema>;
 export type Person = typeof people.$inferSelect;
+export type InsertReceiptPerson = z.infer<typeof insertReceiptPersonSchema>;
+export type ReceiptPerson = typeof receiptPeople.$inferSelect;

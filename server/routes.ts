@@ -153,6 +153,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Receipt People routes
+  app.get("/api/receipts/:id/people", async (req, res) => {
+    try {
+      const people = await storage.getReceiptPeople(req.params.id);
+      res.json(people);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/receipts/:id/people", async (req, res) => {
+    try {
+      const { personId } = req.body;
+      if (!personId) {
+        return res.status(400).json({ message: "personId is required" });
+      }
+      const receiptPerson = await storage.addPersonToReceipt(req.params.id, personId);
+      res.json(receiptPerson);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/receipts/:id/people/:personId", async (req, res) => {
+    try {
+      await storage.removePersonFromReceipt(req.params.id, req.params.personId);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Share routes
   app.post("/api/receipts/:id/generate-share-token", async (req, res) => {
     try {

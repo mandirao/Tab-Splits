@@ -5,9 +5,12 @@ import {
   type InsertReceiptItem,
   type Person,
   type InsertPerson,
+  type ReceiptPerson,
+  type InsertReceiptPerson,
   receipts,
   receiptItems,
-  people
+  people,
+  receiptPeople
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
@@ -35,6 +38,11 @@ export interface IStorage {
   getRegulars(): Promise<Person[]>;
   updatePerson(id: string, person: Partial<InsertPerson>): Promise<Person>;
   deletePerson(id: string): Promise<void>;
+
+  // Receipt People operations
+  addPersonToReceipt(receiptId: string, personId: string): Promise<ReceiptPerson>;
+  removePersonFromReceipt(receiptId: string, personId: string): Promise<void>;
+  getReceiptPeople(receiptId: string): Promise<Person[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -159,6 +167,56 @@ export class DatabaseStorage implements IStorage {
     }
     
     await db.delete(people).where(eq(people.id, id));
+  }
+
+  // Receipt People operations
+  async addPersonToReceipt(receiptId: string, personId: string): Promise<ReceiptPerson> {
+    const [result] = await db
+      .insert(receiptPeople)
+      .values({ receiptId, personId })
+      .returning();
+    return result;
+  }
+
+  async removePersonFromReceipt(receiptId: string, personId: string): Promise<void> {
+    // Check if person has items assigned on this receipt
+    const items = await db
+      .select()
+      .from(receiptItems)
+      .where(eq(receiptItems.receiptId, receiptId));
+    
+    const hasAssignedItems = items.some(item => 
+      (item.assignedTo as string[] || []).includes(personId)
+    );
+    
+    if (hasAssignedItems) {
+      throw new Error("Cannot remove person who has items assigned on this receipt");
+    }
+    
+    await db
+      .delete(receiptPeople)
+      .where(
+        and(
+          eq(receiptPeople.receiptId, receiptId),
+          eq(receiptPeople.personId, personId)
+        )
+      );
+  }
+
+  async getReceiptPeople(receiptId: string): Promise<Person[]> {
+    const result = await db
+      .select({
+        id: people.id,
+        name: people.name,
+        phone: people.phone,
+        email: people.email,
+        isRegular: people.isRegular
+      })
+      .from(receiptPeople)
+      .innerJoin(people, eq(receiptPeople.personId, people.id))
+      .where(eq(receiptPeople.receiptId, receiptId));
+    
+    return result;
   }
 }
 

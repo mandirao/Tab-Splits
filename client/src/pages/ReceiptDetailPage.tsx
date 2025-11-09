@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -72,14 +72,23 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     queryKey: ["/api/receipts", receiptId, "items"],
   });
 
+  // Fetch people on this specific receipt
+  const { data: receiptPeople = [] } = useQuery<Person[]>({
+    queryKey: ["/api/receipts", receiptId, "people"],
+  });
+
+  // Fetch all people for assignment dropdown (global list)
   const { data: allPeople = [] } = useQuery<Person[]>({
     queryKey: ["/api/people"],
   });
 
-  const peopleWithColors: PersonWithColor[] = allPeople.map((person, idx) => ({
-    ...person,
-    color: PERSON_COLORS[idx % PERSON_COLORS.length]
-  }));
+  // People on this receipt with colors (for assignment UI, manage people sheet, and counter)
+  const peopleWithColors: PersonWithColor[] = useMemo(() => {
+    return receiptPeople.map((person, idx) => ({
+      ...person,
+      color: PERSON_COLORS[idx % PERSON_COLORS.length]
+    }));
+  }, [receiptPeople]);
 
   const subtotal = receipt ? (parseFloat(receipt.subtotal) || 0) : 0;
   const tax = receipt ? (parseFloat(receipt.tax) || 0) : 0;
@@ -150,15 +159,20 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
 
   const createPersonMutation = useMutation({
     mutationFn: async (data: { name: string; phone?: string }) => {
-      return await apiRequest("/api/people", "POST", data);
+      // Create the person
+      const person = await apiRequest("/api/people", "POST", data);
+      // Add them to this receipt
+      await apiRequest(`/api/receipts/${receiptId}/people`, "POST", { personId: person.id });
+      return person;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/people"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "people"] });
       setSelectedPeople(prev => [...prev, data.id]);
       setNewPersonName("");
       setNewPersonPhone("");
       setShowAddPersonForm(false);
-      toast({ title: "Person added" });
+      toast({ title: "Person added to receipt" });
     },
     onError: (error: any) => {
       toast({ 
@@ -171,10 +185,10 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
 
   const deletePersonMutation = useMutation({
     mutationFn: async (personId: string) => {
-      return await apiRequest(`/api/people/${personId}`, "DELETE");
+      return await apiRequest(`/api/receipts/${receiptId}/people/${personId}`, "DELETE");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/people"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "people"] });
       queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
       setPersonToDelete(null);
       toast({ title: "Person removed from receipt" });
