@@ -26,6 +26,8 @@ export default function ReceiptItemRow({
 }: ReceiptItemRowProps) {
   const isAssigned = assignedInitials.length > 0;
   const quantityDisplay = displayQuantity || quantity.toString();
+  const isFraction = quantityDisplay.includes('/');
+  const quantityText = isFraction ? quantityDisplay : `${quantityDisplay}x`;
 
   return (
     <div 
@@ -35,7 +37,7 @@ export default function ReceiptItemRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2">
           <Badge variant="outline" className="text-xs px-1.5" data-testid="badge-quantity">
-            {quantityDisplay}x
+            {quantityText}
           </Badge>
           <span className="font-medium text-sm" data-testid="text-item-name">{name}</span>
         </div>
