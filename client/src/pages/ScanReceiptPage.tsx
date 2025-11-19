@@ -202,7 +202,7 @@ export default function ScanReceiptPage() {
                 </div>
                 
                 <div className="space-y-3">
-                  <label htmlFor="camera-input" className="block">
+                  <div className="relative">
                     <input
                       id="camera-input"
                       ref={cameraInputRef}
@@ -210,34 +210,34 @@ export default function ScanReceiptPage() {
                       accept="image/*"
                       capture="environment"
                       onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-                      className="hidden"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                       data-testid="input-camera"
                     />
-                    <div className="w-full h-14 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 px-4 py-2 cursor-pointer"
+                    <div className="w-full h-14 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground shadow hover:bg-primary/90 px-4 py-2"
                       data-testid="button-take-photo"
                     >
                       <Camera className="h-5 w-5" />
                       Take Photo
                     </div>
-                  </label>
+                  </div>
                   
-                  <label htmlFor="upload-input" className="block">
+                  <div className="relative">
                     <input
                       id="upload-input"
                       ref={uploadInputRef}
                       type="file"
                       accept="image/*"
                       onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-                      className="hidden"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                       data-testid="input-upload"
                     />
-                    <div className="w-full h-14 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground px-4 py-2 cursor-pointer"
+                    <div className="w-full h-14 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground px-4 py-2"
                       data-testid="button-upload-image"
                     >
                       <Upload className="h-5 w-5" />
                       Upload Image
                     </div>
-                  </label>
+                  </div>
                 </div>
               </div>
             ) : (
