@@ -183,7 +183,7 @@ export default function ScanReceiptPage() {
         type="file"
         accept="image/*"
         onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-        className="absolute opacity-0 pointer-events-none"
+        className="sr-only"
         data-testid="input-upload"
       />
       <input
@@ -193,7 +193,7 @@ export default function ScanReceiptPage() {
         accept="image/*"
         capture="environment"
         onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-        className="absolute opacity-0 pointer-events-none"
+        className="sr-only"
         data-testid="input-camera"
       />
       
