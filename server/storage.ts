@@ -7,10 +7,13 @@ import {
   type InsertPerson,
   type ReceiptPerson,
   type InsertReceiptPerson,
+  type Payment,
+  type InsertPayment,
   receipts,
   receiptItems,
   people,
-  receiptPeople
+  receiptPeople,
+  payments
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
@@ -43,6 +46,12 @@ export interface IStorage {
   addPersonToReceipt(receiptId: string, personId: string): Promise<ReceiptPerson>;
   removePersonFromReceipt(receiptId: string, personId: string): Promise<void>;
   getReceiptPeople(receiptId: string): Promise<Person[]>;
+
+  // Payment operations
+  createPayment(payment: InsertPayment): Promise<Payment>;
+  getPayments(receiptId: string): Promise<Payment[]>;
+  deletePayment(id: string): Promise<void>;
+  calculateSettlement(receiptId: string): Promise<Array<{ from: Person; to: Person; amount: string }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -217,6 +226,130 @@ export class DatabaseStorage implements IStorage {
       .where(eq(receiptPeople.receiptId, receiptId));
     
     return result;
+  }
+
+  // Payment operations
+  async createPayment(payment: InsertPayment): Promise<Payment> {
+    const [result] = await db.insert(payments).values(payment).returning();
+    return result;
+  }
+
+  async getPayments(receiptId: string): Promise<Payment[]> {
+    return await db
+      .select()
+      .from(payments)
+      .where(eq(payments.receiptId, receiptId));
+  }
+
+  async deletePayment(id: string): Promise<void> {
+    await db.delete(payments).where(eq(payments.id, id));
+  }
+
+  async calculateSettlement(receiptId: string): Promise<Array<{ from: Person; to: Person; amount: string }>> {
+    const receipt = await this.getReceipt(receiptId);
+    if (!receipt) {
+      throw new Error("Receipt not found");
+    }
+
+    const items = await this.getReceiptItems(receiptId);
+    const receiptPayments = await this.getPayments(receiptId);
+    const receiptPeopleList = await this.getReceiptPeople(receiptId);
+
+    // Calculate what each person owes based on their items
+    const owedByPerson = new Map<string, number>();
+    
+    // Initialize everyone to 0
+    receiptPeopleList.forEach(person => {
+      owedByPerson.set(person.id, 0);
+    });
+
+    const subtotalNum = parseFloat(receipt.subtotal);
+    const taxNum = parseFloat(receipt.tax);
+    const tipNum = parseFloat(receipt.tip);
+    const totalNum = parseFloat(receipt.total);
+
+    // Calculate each person's subtotal
+    items.forEach(item => {
+      const assignedTo = (item.assignedTo as string[]) || [];
+      if (assignedTo.length > 0) {
+        const itemPrice = parseFloat(item.price) * item.quantity;
+        const pricePerPerson = itemPrice / assignedTo.length;
+        
+        assignedTo.forEach(personId => {
+          const current = owedByPerson.get(personId) || 0;
+          owedByPerson.set(personId, current + pricePerPerson);
+        });
+      }
+    });
+
+    // Calculate proportional tax and tip for each person
+    const taxTipMultiplier = subtotalNum > 0 ? (taxNum + tipNum) / subtotalNum : 0;
+    owedByPerson.forEach((subtotal, personId) => {
+      const taxTip = subtotal * taxTipMultiplier;
+      owedByPerson.set(personId, subtotal + taxTip);
+    });
+
+    // Calculate what each person paid
+    const paidByPerson = new Map<string, number>();
+    receiptPeopleList.forEach(person => {
+      paidByPerson.set(person.id, 0);
+    });
+
+    receiptPayments.forEach(payment => {
+      const current = paidByPerson.get(payment.personId) || 0;
+      paidByPerson.set(payment.personId, current + parseFloat(payment.amount));
+    });
+
+    // Calculate balances (positive = overpaid, negative = underpaid)
+    const balances = new Map<string, number>();
+    receiptPeopleList.forEach(person => {
+      const owed = owedByPerson.get(person.id) || 0;
+      const paid = paidByPerson.get(person.id) || 0;
+      balances.set(person.id, paid - owed);
+    });
+
+    // Simplify debts - find who owes who
+    const settlements: Array<{ from: Person; to: Person; amount: string }> = [];
+    const creditors: Array<{ person: Person; amount: number }> = [];
+    const debtors: Array<{ person: Person; amount: number }> = [];
+
+    balances.forEach((balance, personId) => {
+      const person = receiptPeopleList.find(p => p.id === personId);
+      if (!person) return;
+
+      if (balance > 0.01) {
+        creditors.push({ person, amount: balance });
+      } else if (balance < -0.01) {
+        debtors.push({ person, amount: -balance });
+      }
+    });
+
+    // Match debtors with creditors
+    let creditorIndex = 0;
+    let debtorIndex = 0;
+
+    while (creditorIndex < creditors.length && debtorIndex < debtors.length) {
+      const creditor = creditors[creditorIndex];
+      const debtor = debtors[debtorIndex];
+
+      const settlementAmount = Math.min(creditor.amount, debtor.amount);
+
+      if (settlementAmount > 0.01) {
+        settlements.push({
+          from: debtor.person,
+          to: creditor.person,
+          amount: settlementAmount.toFixed(2)
+        });
+      }
+
+      creditor.amount -= settlementAmount;
+      debtor.amount -= settlementAmount;
+
+      if (creditor.amount < 0.01) creditorIndex++;
+      if (debtor.amount < 0.01) debtorIndex++;
+    }
+
+    return settlements;
   }
 }
 

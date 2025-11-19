@@ -5,6 +5,7 @@ import {
   insertReceiptSchema, 
   insertReceiptItemSchema, 
   insertPersonSchema,
+  insertPaymentSchema,
   updateReceiptSchema,
   updateReceiptItemSchema,
   updatePersonSchema
@@ -327,6 +328,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       res.json({ receipt: redactedReceipt, items, people: redactedPeople });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Payment routes
+  app.post("/api/receipts/:receiptId/payments", async (req, res) => {
+    try {
+      const validatedData = insertPaymentSchema.parse({
+        ...req.body,
+        receiptId: req.params.receiptId
+      });
+      const payment = await storage.createPayment(validatedData);
+      res.json(payment);
+    } catch (error: any) {
+      res.status(400).json({ message: fromError(error).toString() });
+    }
+  });
+
+  app.get("/api/receipts/:receiptId/payments", async (req, res) => {
+    try {
+      const payments = await storage.getPayments(req.params.receiptId);
+      res.json(payments);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/payments/:id", async (req, res) => {
+    try {
+      await storage.deletePayment(req.params.id);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/receipts/:receiptId/settlement", async (req, res) => {
+    try {
+      const settlement = await storage.calculateSettlement(req.params.receiptId);
+      res.json(settlement);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
