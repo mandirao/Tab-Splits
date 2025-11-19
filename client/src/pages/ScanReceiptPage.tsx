@@ -109,7 +109,9 @@ export default function ScanReceiptPage() {
       const subtotalDiff = Math.abs(itemsSubtotal - response.subtotal);
       const totalDiff = Math.abs(expectedTotal - response.total);
 
-      if (subtotalDiff > 0.50 || totalDiff > 0.50) {
+      const hasWarning = subtotalDiff > 0.50 || totalDiff > 0.50;
+      
+      if (hasWarning) {
         console.warn("Math validation failed:", {
           itemsSubtotal,
           reportedSubtotal: response.subtotal,
@@ -118,16 +120,9 @@ export default function ScanReceiptPage() {
           reportedTotal: response.total,
           totalDiff
         });
-        
-        toast({
-          title: "Warning: Possible missing items",
-          description: `Scanned ${response.items.length} items. Totals don't match - please verify all items were captured.`,
-          variant: "destructive",
-          duration: 8000,
-        });
       }
 
-      await createReceiptMutation.mutateAsync({
+      const receipt = await createReceiptMutation.mutateAsync({
         restaurantName: response.restaurantName,
         items: response.items,
         subtotal: response.subtotal,
@@ -135,6 +130,17 @@ export default function ScanReceiptPage() {
         tip: response.tip,
         total: response.total
       });
+
+      if (hasWarning) {
+        sessionStorage.setItem(`receipt-${receipt.id}-warning`, JSON.stringify({
+          scannedImage: previewUrl,
+          itemCount: response.items.length,
+          subtotalDiff: subtotalDiff.toFixed(2),
+          totalDiff: totalDiff.toFixed(2)
+        }));
+      }
+      
+      return receipt;
       
     } catch (error: any) {
       console.error("Scan Error:", error);

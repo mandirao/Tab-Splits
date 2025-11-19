@@ -8,7 +8,7 @@ import ReceiptItemRow from "@/components/ReceiptItemRow";
 import TipCalculator from "@/components/TipCalculator";
 import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
-import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus } from "lucide-react";
+import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +19,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -73,6 +79,25 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [showAddPaymentForm, setShowAddPaymentForm] = useState(false);
   const [selectedPayerPersonId, setSelectedPayerPersonId] = useState<string>("");
   const [paymentAmount, setPaymentAmount] = useState<string>("");
+  const [validationWarning, setValidationWarning] = useState<{
+    scannedImage: string;
+    itemCount: number;
+    subtotalDiff: string;
+    totalDiff: string;
+  } | null>(null);
+  const [showScannedImage, setShowScannedImage] = useState(false);
+
+  useEffect(() => {
+    const warningData = sessionStorage.getItem(`receipt-${receiptId}-warning`);
+    if (warningData) {
+      setValidationWarning(JSON.parse(warningData));
+    }
+  }, [receiptId]);
+
+  const dismissWarning = () => {
+    sessionStorage.removeItem(`receipt-${receiptId}-warning`);
+    setValidationWarning(null);
+  };
 
   const { data: receipt } = useQuery<Receipt>({
     queryKey: ["/api/receipts", receiptId],
@@ -643,6 +668,42 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           </Badge>
         </div>
       </header>
+
+      {/* Validation Warning Banner */}
+      {validationWarning && (
+        <div className="bg-destructive/10 border-b border-destructive/20 p-3">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold text-sm text-destructive">Possible Missing Items</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Scanned {validationWarning.itemCount} items, but totals don't match (diff: ${Math.max(parseFloat(validationWarning.subtotalDiff), parseFloat(validationWarning.totalDiff)).toFixed(2)}). Please verify all items were captured.
+              </p>
+            </div>
+            <div className="flex gap-2 flex-shrink-0">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowScannedImage(true)}
+                className="h-7 px-2"
+                data-testid="button-view-scanned-image"
+              >
+                <ImageIcon className="h-3 w-3 mr-1" />
+                View Image
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={dismissWarning}
+                className="h-7 px-2"
+                data-testid="button-dismiss-warning"
+              >
+                Confirmed
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Horizontal Tabs */}
       <div className="flex-shrink-0 border-b bg-card overflow-x-auto scrollbar-hide">
@@ -1315,7 +1376,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                       <div className="flex items-center gap-2">
                         <div 
                           className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold"
-                          style={{ backgroundColor: debt.from.color || PERSON_COLORS[0] }}
+                          style={{ backgroundColor: getColorForPerson(debt.from.id) }}
                         >
                           {debt.from.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                         </div>
@@ -1330,7 +1391,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                         <span className="font-medium">{debt.to.name}</span>
                         <div 
                           className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold"
-                          style={{ backgroundColor: debt.to.color || PERSON_COLORS[1] }}
+                          style={{ backgroundColor: getColorForPerson(debt.to.id) }}
                         >
                           {debt.to.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                         </div>
@@ -1364,6 +1425,23 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showScannedImage} onOpenChange={setShowScannedImage}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Scanned Receipt Image</DialogTitle>
+          </DialogHeader>
+          {validationWarning && (
+            <div className="relative">
+              <img 
+                src={validationWarning.scannedImage} 
+                alt="Scanned receipt" 
+                className="w-full h-auto rounded-lg"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
