@@ -76,6 +76,13 @@ export default function ScanReceiptPage() {
     const priceRegex = /\$?(\d+\.?\d*)/;
     const quantityRegex = /^(\d+)x?\s+/i;
     
+    const skipKeywords = [
+      'server', 'table', 'order', 'guest', 'check', 'receipt', 'thank',
+      'welcome', 'phone', 'address', 'street', 'card', 'visa', 'master',
+      'cash', 'change', 'tender', 'balance', 'approved', 'merchant',
+      'date', 'time', 'store', 'location', 'www', 'http', '@', '.com'
+    ];
+    
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].toLowerCase();
       
@@ -92,10 +99,22 @@ export default function ScanReceiptPage() {
         const match = lines[i].match(priceRegex);
         if (match) total = parseFloat(match[1]);
       } else {
-        const priceMatch = lines[i].match(/\$?(\d+\.?\d*)$/);
+        if (skipKeywords.some(keyword => line.includes(keyword))) {
+          continue;
+        }
+        
+        if (/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(lines[i])) {
+          continue;
+        }
+        
+        if (/\d{3}[-.]\d{3}[-.]\d{4}/.test(lines[i])) {
+          continue;
+        }
+        
+        const priceMatch = lines[i].match(/\$?(\d+\.\d{2})$/);
         if (priceMatch && priceMatch[1]) {
           const price = parseFloat(priceMatch[1]);
-          let itemName = lines[i].replace(/\$?(\d+\.?\d*)$/, '').trim();
+          let itemName = lines[i].replace(/\$?(\d+\.\d{2})$/, '').trim();
           let quantity = 1;
           
           const qtyMatch = itemName.match(quantityRegex);
@@ -104,7 +123,7 @@ export default function ScanReceiptPage() {
             itemName = itemName.replace(quantityRegex, '').trim();
           }
           
-          if (itemName && itemName.length >= 2 && price >= 0.01 && price < 1000) {
+          if (itemName && itemName.length >= 3 && price >= 0.50 && price < 500) {
             items.push({
               name: itemName,
               quantity,
