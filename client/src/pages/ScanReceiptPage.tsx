@@ -203,24 +203,36 @@ export default function ScanReceiptPage() {
                 </div>
                 
                 <div className="space-y-3">
-                  <input
-                    ref={cameraInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-                    className="w-full h-14 cursor-pointer file:h-14 file:w-full file:cursor-pointer file:border-0 file:bg-primary file:text-primary-foreground file:rounded-md file:font-medium file:transition-colors hover:file:bg-primary/90"
-                    data-testid="input-camera"
-                  />
+                  <label className="block cursor-pointer">
+                    <div className="flex items-center justify-center gap-2 w-full h-14 bg-primary text-primary-foreground rounded-md font-medium transition-colors hover:bg-primary/90">
+                      <Camera className="h-5 w-5" />
+                      <span>Take Photo</span>
+                    </div>
+                    <input
+                      ref={cameraInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                      className="sr-only"
+                      data-testid="input-camera"
+                    />
+                  </label>
                   
-                  <input
-                    ref={uploadInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-                    className="w-full h-14 cursor-pointer file:h-14 file:w-full file:cursor-pointer file:border file:border-input file:bg-background file:text-foreground file:rounded-md file:font-medium file:transition-colors hover:file:bg-accent hover:file:text-accent-foreground"
-                    data-testid="input-upload"
-                  />
+                  <label className="block cursor-pointer">
+                    <div className="flex items-center justify-center gap-2 w-full h-14 border border-input bg-background text-foreground rounded-md font-medium transition-colors hover:bg-accent hover:text-accent-foreground">
+                      <Upload className="h-5 w-5" />
+                      <span>Upload Image</span>
+                    </div>
+                    <input
+                      ref={uploadInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                      className="sr-only"
+                      data-testid="input-upload"
+                    />
+                  </label>
                 </div>
               </div>
             ) : (
