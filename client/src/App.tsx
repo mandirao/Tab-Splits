@@ -9,6 +9,7 @@ import SummaryPage from "@/pages/SummaryPage";
 import RegularsPage from "@/pages/RegularsPage";
 import ScanReceiptPage from "@/pages/ScanReceiptPage";
 import SharedReceiptPage from "@/pages/SharedReceiptPage";
+import DebugFileInput from "@/pages/DebugFileInput";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -16,6 +17,7 @@ function Router() {
     <Switch>
       <Route path="/" component={HomePage} />
       <Route path="/scan" component={ScanReceiptPage} />
+      <Route path="/debug-upload" component={DebugFileInput} />
       <Route path="/receipt/:id" component={ReceiptDetailPage} />
       <Route path="/receipt/:id/summary" component={SummaryPage} />
       <Route path="/regulars" component={RegularsPage} />
