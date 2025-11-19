@@ -64,14 +64,6 @@ export default function ScanReceiptPage() {
     setPreviewUrl(url);
   };
 
-  const handleCameraClick = () => {
-    cameraInputRef.current?.click();
-  };
-
-  const handleUploadClick = () => {
-    uploadInputRef.current?.click();
-  };
-
   const extractReceiptData = async (text: string) => {
     const lines = text.split('\n').map(line => line.trim()).filter(line => line);
     
@@ -209,44 +201,43 @@ export default function ScanReceiptPage() {
                   </p>
                 </div>
                 
-                <input
-                  ref={cameraInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-                  className="hidden"
-                  data-testid="input-camera"
-                />
-                
-                <input
-                  ref={uploadInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-                  className="hidden"
-                  data-testid="input-upload"
-                />
-                
                 <div className="space-y-3">
-                  <Button 
-                    className="w-full h-14" 
-                    onClick={handleCameraClick}
-                    data-testid="button-take-photo"
-                  >
-                    <Camera className="h-5 w-5 mr-2" />
-                    Take Photo
-                  </Button>
+                  <label htmlFor="camera-input" className="block">
+                    <input
+                      id="camera-input"
+                      ref={cameraInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                      className="hidden"
+                      data-testid="input-camera"
+                    />
+                    <div className="w-full h-14 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 px-4 py-2 cursor-pointer"
+                      data-testid="button-take-photo"
+                    >
+                      <Camera className="h-5 w-5" />
+                      Take Photo
+                    </div>
+                  </label>
                   
-                  <Button 
-                    variant="outline"
-                    className="w-full h-14" 
-                    onClick={handleUploadClick}
-                    data-testid="button-upload-image"
-                  >
-                    <Upload className="h-5 w-5 mr-2" />
-                    Upload Image
-                  </Button>
+                  <label htmlFor="upload-input" className="block">
+                    <input
+                      id="upload-input"
+                      ref={uploadInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                      className="hidden"
+                      data-testid="input-upload"
+                    />
+                    <div className="w-full h-14 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground px-4 py-2 cursor-pointer"
+                      data-testid="button-upload-image"
+                    >
+                      <Upload className="h-5 w-5" />
+                      Upload Image
+                    </div>
+                  </label>
                 </div>
               </div>
             ) : (
