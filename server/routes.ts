@@ -36,7 +36,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             content: [
               {
                 type: "text",
-                text: `Analyze this restaurant receipt image and extract the following information in JSON format:
+                text: `Analyze this restaurant receipt image and extract ALL information in JSON format:
 {
   "restaurantName": "name of restaurant",
   "items": [
@@ -48,14 +48,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   "total": 0.00
 }
 
-Rules:
-- Only include actual food/drink items in the items array
-- Skip service charges, order numbers, dates, phone numbers, addresses
-- Use the exact item names from the receipt
-- Parse quantities if shown (e.g., "2x Burger" = quantity: 2)
-- All prices should be numbers, not strings
-- If tip is not on receipt, set it to 0
-- Calculate total as subtotal + tax + tip if not shown
+CRITICAL REQUIREMENTS:
+1. Extract EVERY SINGLE food/drink item - do not skip any items
+2. Count items carefully and double-check you captured them all
+3. Skip ONLY: service charges, order numbers, dates, phone numbers, addresses, headers/footers
+4. Use exact item names from the receipt
+5. Parse quantities if shown (e.g., "2x Burger" = quantity: 2)
+6. All prices must be numbers, not strings
+7. If tip is not on receipt, set it to 0
+8. Verify: sum of (item.price * item.quantity) should equal subtotal
+9. Verify: subtotal + tax + tip should equal total
 
 Return ONLY the JSON object, no additional text.`
               },
@@ -68,7 +70,7 @@ Return ONLY the JSON object, no additional text.`
             ]
           }
         ],
-        max_tokens: 1000,
+        max_tokens: 2000,
       });
 
       const content = completion.choices[0]?.message?.content;

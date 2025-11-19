@@ -102,6 +102,31 @@ export default function ScanReceiptPage() {
         return;
       }
 
+      const itemsSubtotal = response.items.reduce((sum: number, item: any) => 
+        sum + (item.price * item.quantity), 0
+      );
+      const expectedTotal = response.subtotal + response.tax + response.tip;
+      const subtotalDiff = Math.abs(itemsSubtotal - response.subtotal);
+      const totalDiff = Math.abs(expectedTotal - response.total);
+
+      if (subtotalDiff > 0.50 || totalDiff > 0.50) {
+        console.warn("Math validation failed:", {
+          itemsSubtotal,
+          reportedSubtotal: response.subtotal,
+          subtotalDiff,
+          expectedTotal,
+          reportedTotal: response.total,
+          totalDiff
+        });
+        
+        toast({
+          title: "Warning: Possible missing items",
+          description: `Scanned ${response.items.length} items. Totals don't match - please verify all items were captured.`,
+          variant: "destructive",
+          duration: 8000,
+        });
+      }
+
       await createReceiptMutation.mutateAsync({
         restaurantName: response.restaurantName,
         items: response.items,
