@@ -92,10 +92,10 @@ export default function ScanReceiptPage() {
         const match = lines[i].match(priceRegex);
         if (match) total = parseFloat(match[1]);
       } else {
-        const priceMatch = lines[i].match(/\$?(\d+\.?\d+)$/);
-        if (priceMatch) {
+        const priceMatch = lines[i].match(/\$?(\d+\.?\d*)$/);
+        if (priceMatch && priceMatch[1]) {
           const price = parseFloat(priceMatch[1]);
-          let itemName = lines[i].replace(/\$?(\d+\.?\d+)$/, '').trim();
+          let itemName = lines[i].replace(/\$?(\d+\.?\d*)$/, '').trim();
           let quantity = 1;
           
           const qtyMatch = itemName.match(quantityRegex);
@@ -104,7 +104,7 @@ export default function ScanReceiptPage() {
             itemName = itemName.replace(quantityRegex, '').trim();
           }
           
-          if (itemName && price > 0 && price < 1000) {
+          if (itemName && itemName.length >= 2 && price >= 0.01 && price < 1000) {
             items.push({
               name: itemName,
               quantity,
@@ -149,14 +149,27 @@ export default function ScanReceiptPage() {
         }
       });
       
+      console.log("OCR Raw Text:", result.data.text);
+      
       const extractedData = await extractReceiptData(result.data.text);
       
+      console.log("Extracted Data:", extractedData);
+      
       if (extractedData.items.length === 0) {
+        const receipt = await apiRequest("/api/receipts", "POST", {
+          restaurantName: "Manual Entry",
+          subtotal: "0.00",
+          tax: "0.00",
+          tip: "0.00",
+          total: "0.00"
+        });
+        
+        queryClient.invalidateQueries({ queryKey: ["/api/receipts"] });
         toast({
           title: "No items detected",
-          description: "Could not find any items in the receipt. Please enter them manually.",
-          variant: "destructive"
+          description: "Taking you to manual entry...",
         });
+        setLocation(`/receipt/${receipt.id}`);
         return;
       }
       
