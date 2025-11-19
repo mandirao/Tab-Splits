@@ -8,7 +8,7 @@ import ReceiptItemRow from "@/components/ReceiptItemRow";
 import TipCalculator from "@/components/TipCalculator";
 import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
-import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,7 +22,13 @@ import {
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Receipt, ReceiptItem, Person } from "@shared/schema";
+import type { Receipt, ReceiptItem, Person, Payment } from "@shared/schema";
+
+interface Settlement {
+  from: Person;
+  to: Person;
+  amount: string;
+}
 import { useToast } from "@/hooks/use-toast";
 import QRCodeLib from "qrcode";
 
@@ -63,6 +69,10 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [tipBottomSheetOpen, setTipBottomSheetOpen] = useState(false);
   const [managePeopleBottomSheetOpen, setManagePeopleBottomSheetOpen] = useState(false);
   const [personToDelete, setPersonToDelete] = useState<string | null>(null);
+  const [paymentsBottomSheetOpen, setPaymentsBottomSheetOpen] = useState(false);
+  const [showAddPaymentForm, setShowAddPaymentForm] = useState(false);
+  const [selectedPayerPersonId, setSelectedPayerPersonId] = useState<string>("");
+  const [paymentAmount, setPaymentAmount] = useState<string>("");
 
   const { data: receipt } = useQuery<Receipt>({
     queryKey: ["/api/receipts", receiptId],
@@ -80,6 +90,16 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   // Fetch all people for assignment dropdown (global list)
   const { data: allPeople = [] } = useQuery<Person[]>({
     queryKey: ["/api/people"],
+  });
+
+  // Fetch payments for this receipt
+  const { data: payments = [] } = useQuery<Payment[]>({
+    queryKey: ["/api/receipts", receiptId, "payments"],
+  });
+
+  // Fetch settlement calculation
+  const { data: settlement = [] } = useQuery<Settlement[]>({
+    queryKey: ["/api/receipts", receiptId, "settlement"],
   });
 
   // People on this receipt with colors (for assignment UI, manage people sheet, and counter)
@@ -229,6 +249,45 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     onError: (error: any) => {
       toast({ 
         title: "Failed to generate share link", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    }
+  });
+
+  const createPaymentMutation = useMutation({
+    mutationFn: async (data: { personId: string; amount: string }) => {
+      return await apiRequest(`/api/receipts/${receiptId}/payments`, "POST", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "payments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "settlement"] });
+      setShowAddPaymentForm(false);
+      setSelectedPayerPersonId("");
+      setPaymentAmount("");
+      toast({ title: "Payment added" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to add payment", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    }
+  });
+
+  const deletePaymentMutation = useMutation({
+    mutationFn: async (paymentId: string) => {
+      return await apiRequest(`/api/payments/${paymentId}`, "DELETE");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "payments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "settlement"] });
+      toast({ title: "Payment deleted" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to delete payment", 
         description: error.message,
         variant: "destructive" 
       });
@@ -388,6 +447,40 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     });
   };
 
+  const handlePaymentsClick = () => {
+    setPaymentsBottomSheetOpen(true);
+  };
+
+  const handleAddPayment = () => {
+    if (!selectedPayerPersonId || !paymentAmount) {
+      toast({
+        title: "Missing information",
+        description: "Please select a person and enter an amount",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const amount = parseFloat(paymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({
+        title: "Invalid amount",
+        description: "Please enter a valid positive amount",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    createPaymentMutation.mutate({
+      personId: selectedPayerPersonId,
+      amount: amount.toFixed(2)
+    });
+  };
+
+  const handleDeletePayment = (paymentId: string) => {
+    deletePaymentMutation.mutate(paymentId);
+  };
+
   const togglePersonSelection = (personId: string) => {
     setSelectedPeople(prev => 
       prev.includes(personId)
@@ -513,14 +606,24 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <h1 className="text-xl font-bold flex-1 text-center">{receipt.restaurantName || "Receipt"}</h1>
-          <Button 
-            size="icon" 
-            variant="ghost"
-            onClick={handleShareClick}
-            data-testid="button-share-receipt"
-          >
-            <Share2 className="h-5 w-5" />
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              size="icon" 
+              variant="ghost"
+              onClick={handlePaymentsClick}
+              data-testid="button-open-payments"
+            >
+              <DollarSign className="h-5 w-5" />
+            </Button>
+            <Button 
+              size="icon" 
+              variant="ghost"
+              onClick={handleShareClick}
+              data-testid="button-share-receipt"
+            >
+              <Share2 className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
         
         <div className="flex items-center gap-2">
@@ -1064,6 +1167,180 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               </div>
             </div>
           )}
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        open={paymentsBottomSheetOpen}
+        onClose={() => {
+          setPaymentsBottomSheetOpen(false);
+          setShowAddPaymentForm(false);
+          setSelectedPayerPersonId("");
+          setPaymentAmount("");
+        }}
+        title="Payments & Settlement"
+      >
+        <div className="space-y-6">
+          <div>
+            <h3 className="font-semibold mb-3">Payments Made</h3>
+            {payments.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                No payments recorded yet
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {payments.map((payment) => {
+                  const payer = getPersonById(payment.personId);
+                  return (
+                    <div
+                      key={payment.id}
+                      className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
+                      data-testid={`payment-${payment.id}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {payer && (
+                          <div 
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+                            style={{ backgroundColor: payer.color }}
+                          >
+                            {getInitialsForPerson(payer.id)}
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-medium">{payer?.name || "Unknown"}</p>
+                          <p className="text-sm text-muted-foreground">Paid ${parseFloat(payment.amount).toFixed(2)}</p>
+                        </div>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleDeletePayment(payment.id)}
+                        data-testid={`button-delete-payment-${payment.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {!showAddPaymentForm ? (
+              <Button
+                variant="outline"
+                className="w-full mt-3"
+                onClick={() => setShowAddPaymentForm(true)}
+                data-testid="button-show-add-payment-form"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Payment
+              </Button>
+            ) : (
+              <div className="mt-3 p-4 border rounded-lg bg-muted/30 space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="payer-select">Who paid?</Label>
+                  <select
+                    id="payer-select"
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    value={selectedPayerPersonId}
+                    onChange={(e) => setSelectedPayerPersonId(e.target.value)}
+                    data-testid="select-payer"
+                  >
+                    <option value="">Select a person</option>
+                    {peopleWithColors.map((person) => (
+                      <option key={person.id} value={person.id}>
+                        {person.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="payment-amount">Amount paid</Label>
+                  <Input
+                    id="payment-amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    data-testid="input-payment-amount"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      setShowAddPaymentForm(false);
+                      setSelectedPayerPersonId("");
+                      setPaymentAmount("");
+                    }}
+                    data-testid="button-cancel-add-payment"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    onClick={handleAddPayment}
+                    disabled={!selectedPayerPersonId || !paymentAmount}
+                    data-testid="button-add-payment"
+                  >
+                    Add Payment
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="border-t pt-4">
+            <h3 className="font-semibold mb-3">Settlement</h3>
+            {settlement.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                {payments.length === 0 
+                  ? "Add payments to see settlement" 
+                  : "All settled! Everyone paid their fair share."}
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {settlement.map((debt, index) => (
+                  <div
+                    key={index}
+                    className="p-3 border rounded-lg bg-muted/30"
+                    data-testid={`settlement-${index}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+                          style={{ backgroundColor: debt.from.color || PERSON_COLORS[0] }}
+                        >
+                          {debt.from.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                        </div>
+                        <span className="font-medium">{debt.from.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">owes</span>
+                        <span className="font-semibold text-primary">${debt.amount}</span>
+                        <span className="text-sm text-muted-foreground">to</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{debt.to.name}</span>
+                        <div 
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+                          style={{ backgroundColor: debt.to.color || PERSON_COLORS[1] }}
+                        >
+                          {debt.to.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </BottomSheet>
 
