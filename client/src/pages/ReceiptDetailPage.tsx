@@ -86,11 +86,18 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     totalDiff: string;
   } | null>(null);
   const [showScannedImage, setShowScannedImage] = useState(false);
+  const [scannedImageUrl, setScannedImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const warningData = sessionStorage.getItem(`receipt-${receiptId}-warning`);
     if (warningData) {
       setValidationWarning(JSON.parse(warningData));
+    }
+    
+    // Check if a scanned image exists for this receipt
+    const imageUrl = sessionStorage.getItem(`scanned_image_${receiptId}`);
+    if (imageUrl) {
+      setScannedImageUrl(imageUrl);
     }
   }, [receiptId]);
 
@@ -632,6 +639,16 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           </Button>
           <h1 className="text-xl font-bold flex-1 text-center">{receipt.restaurantName || "Receipt"}</h1>
           <div className="flex gap-2">
+            {scannedImageUrl && (
+              <Button 
+                size="icon" 
+                variant="ghost"
+                onClick={() => setShowScannedImage(true)}
+                data-testid="button-view-receipt-image"
+              >
+                <ImageIcon className="h-5 w-5" />
+              </Button>
+            )}
             <Button 
               size="icon" 
               variant="ghost"
@@ -1431,10 +1448,10 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           <DialogHeader>
             <DialogTitle>Scanned Receipt Image</DialogTitle>
           </DialogHeader>
-          {validationWarning && (
+          {scannedImageUrl && (
             <div className="relative">
               <img 
-                src={validationWarning.scannedImage} 
+                src={scannedImageUrl} 
                 alt="Scanned receipt" 
                 className="w-full h-auto rounded-lg"
               />
