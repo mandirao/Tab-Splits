@@ -131,6 +131,9 @@ export default function ScanReceiptPage() {
         total: response.total
       });
 
+      // Always save the scanned image for reference
+      sessionStorage.setItem(`scanned_image_${receipt.id}`, previewUrl);
+
       if (hasWarning) {
         sessionStorage.setItem(`receipt-${receipt.id}-warning`, JSON.stringify({
           scannedImage: previewUrl,

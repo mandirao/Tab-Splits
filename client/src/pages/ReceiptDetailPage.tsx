@@ -89,15 +89,25 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [scannedImageUrl, setScannedImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const warningData = sessionStorage.getItem(`receipt-${receiptId}-warning`);
-    if (warningData) {
-      setValidationWarning(JSON.parse(warningData));
-    }
-    
     // Check if a scanned image exists for this receipt
     const imageUrl = sessionStorage.getItem(`scanned_image_${receiptId}`);
     if (imageUrl) {
       setScannedImageUrl(imageUrl);
+    } else {
+      setScannedImageUrl(null);
+    }
+    
+    // Check for validation warning
+    const warningData = sessionStorage.getItem(`receipt-${receiptId}-warning`);
+    if (warningData) {
+      const parsed = JSON.parse(warningData);
+      setValidationWarning(parsed);
+      // Also set the scanned image if not already set
+      if (!imageUrl && parsed.scannedImage) {
+        setScannedImageUrl(parsed.scannedImage);
+      }
+    } else {
+      setValidationWarning(null);
     }
   }, [receiptId]);
 

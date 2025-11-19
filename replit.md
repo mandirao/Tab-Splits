@@ -68,15 +68,28 @@ Preferred communication style: Simple, everyday language.
 ### Receipt Scanning Feature
 
 **OCR Integration:**
-- Tesseract.js for client-side optical character recognition
-- Browser-based processing to avoid server load and keep costs down
-- Basic text parsing to extract items, prices, and totals from receipt images
-- Manual fallback editing available for inaccurate scans
+- OpenAI Vision API (GPT-4o) for highly accurate receipt text extraction
+- Uses Replit AI Integrations for seamless API key management (charges to Replit credits)
+- Intelligent parsing of restaurant name, items (name/quantity/price), subtotal, tax, tip, and total
+- Scanned images stored in browser sessionStorage with key `scanned_image_${receiptId}`
+
+**Validation System:**
+- Automatic math validation compares extracted items vs. receipt totals
+- Triggers warning if item subtotal differs from reported subtotal by >$0.50
+- Persistent validation warning banner displays on receipt detail page until acknowledged
+- Warning data stored in sessionStorage with key `receipt-${receiptId}-warning`
+- Includes discrepancy amounts, item count, and reference to scanned image
+
+**Image Viewing:**
+- Header button (image icon) shows scanned receipt anytime after scanning
+- "View Image" button in validation warning banner for comparison during correction
+- Full-size dialog displays original receipt for manual verification
+- Enables users to spot and add missing items OCR failed to capture
 
 **Trade-offs:**
-- Client-side OCR chosen over cloud services (Google Vision, AWS Textract) to eliminate API costs and improve privacy
-- Accuracy depends on receipt quality and format - intentionally basic implementation
-- Processing happens on-device which may be slower but provides immediate feedback
+- OpenAI Vision chosen for superior accuracy over Tesseract.js (client-side OCR)
+- API costs offset by eliminating manual data entry time
+- SessionStorage approach keeps images temporary (cleared on browser close) for privacy
 
 ### Person Assignment System
 
