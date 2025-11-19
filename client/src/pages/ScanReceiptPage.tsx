@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Camera, Upload, Loader2 } from "lucide-react";
+import { ArrowLeft, Camera, Upload, Loader2, RotateCw, RotateCcw } from "lucide-react";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -12,6 +12,7 @@ export default function ScanReceiptPage() {
   const { toast } = useToast();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
+  const [rotation, setRotation] = useState<number>(0); // 0, 90, 180, 270
   const [isProcessing, setIsProcessing] = useState(false);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -61,6 +62,50 @@ export default function ScanReceiptPage() {
     setSelectedFile(file);
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
+    setRotation(0); // Reset rotation when new file is selected
+  };
+
+  const rotateLeft = () => {
+    setRotation((prev) => (prev - 90 + 360) % 360);
+  };
+
+  const rotateRight = () => {
+    setRotation((prev) => (prev + 90) % 360);
+  };
+
+  // Function to rotate image on canvas and return base64
+  const getRotatedImageBase64 = async (): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Could not get canvas context'));
+          return;
+        }
+
+        // Set canvas dimensions based on rotation
+        if (rotation === 90 || rotation === 270) {
+          canvas.width = img.height;
+          canvas.height = img.width;
+        } else {
+          canvas.width = img.width;
+          canvas.height = img.height;
+        }
+
+        // Translate and rotate
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate((rotation * Math.PI) / 180);
+        ctx.drawImage(img, -img.width / 2, -img.height / 2);
+
+        // Convert to base64
+        const base64 = canvas.toDataURL('image/jpeg', 0.95);
+        resolve(base64.split(',')[1]);
+      };
+      img.onerror = reject;
+      img.src = previewUrl;
+    });
   };
 
   const handleScanReceipt = async () => {
@@ -68,15 +113,8 @@ export default function ScanReceiptPage() {
     
     setIsProcessing(true);
     try {
-      const base64Image = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64 = reader.result as string;
-          resolve(base64.split(',')[1]);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(selectedFile);
-      });
+      // Use rotated image if rotation is applied
+      const base64Image = await getRotatedImageBase64();
 
       const response = await apiRequest("/api/scan-receipt", "POST", {
         image: base64Image
@@ -131,12 +169,13 @@ export default function ScanReceiptPage() {
         total: response.total
       });
 
-      // Always save the scanned image for reference
-      sessionStorage.setItem(`scanned_image_${receipt.id}`, previewUrl);
+      // Always save the rotated image for reference
+      const rotatedImageDataUrl = `data:image/jpeg;base64,${base64Image}`;
+      sessionStorage.setItem(`scanned_image_${receipt.id}`, rotatedImageDataUrl);
 
       if (hasWarning) {
         sessionStorage.setItem(`receipt-${receipt.id}-warning`, JSON.stringify({
-          scannedImage: previewUrl,
+          scannedImage: rotatedImageDataUrl,
           itemCount: response.items.length,
           subtotalDiff: subtotalDiff.toFixed(2),
           totalDiff: totalDiff.toFixed(2)
@@ -224,9 +263,36 @@ export default function ScanReceiptPage() {
                   <img 
                     src={previewUrl} 
                     alt="Receipt preview" 
-                    className="w-full h-auto max-h-96 object-contain"
+                    className="w-full h-auto max-h-96 object-contain transition-transform duration-300"
+                    style={{ transform: `rotate(${rotation}deg)` }}
                     data-testid="img-receipt-preview"
                   />
+                </div>
+                
+                <div className="flex items-center justify-center gap-2 pb-2">
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={rotateLeft}
+                    disabled={isProcessing}
+                    data-testid="button-rotate-left"
+                    title="Rotate left"
+                  >
+                    <RotateCcw className="h-5 w-5" />
+                  </Button>
+                  <span className="text-sm text-muted-foreground px-2">
+                    {rotation === 0 ? "Portrait" : `${rotation}°`}
+                  </span>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={rotateRight}
+                    disabled={isProcessing}
+                    data-testid="button-rotate-right"
+                    title="Rotate right"
+                  >
+                    <RotateCw className="h-5 w-5" />
+                  </Button>
                 </div>
                 
                 <div className="flex gap-3">
@@ -236,6 +302,7 @@ export default function ScanReceiptPage() {
                     onClick={() => {
                       setSelectedFile(null);
                       setPreviewUrl("");
+                      setRotation(0);
                     }}
                     disabled={isProcessing}
                     data-testid="button-retake"
