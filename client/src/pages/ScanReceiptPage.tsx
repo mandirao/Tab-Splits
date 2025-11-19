@@ -6,7 +6,6 @@ import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import Tesseract from 'tesseract.js';
 
 export default function ScanReceiptPage() {
   const [, setLocation] = useLocation();
@@ -64,119 +63,30 @@ export default function ScanReceiptPage() {
     setPreviewUrl(url);
   };
 
-  const extractReceiptData = async (text: string) => {
-    const lines = text.split('\n').map(line => line.trim()).filter(line => line);
-    
-    const items: Array<{ name: string; quantity: number; price: number }> = [];
-    let subtotal = 0;
-    let tax = 0;
-    let tip = 0;
-    let total = 0;
-    
-    const priceRegex = /\$?(\d+\.?\d*)/;
-    const quantityRegex = /^(\d+)x?\s+/i;
-    
-    const skipKeywords = [
-      'server', 'table', 'order', 'guest', 'check', 'receipt', 'thank',
-      'welcome', 'phone', 'address', 'street', 'card', 'visa', 'master',
-      'cash', 'change', 'tender', 'balance', 'approved', 'merchant',
-      'date', 'time', 'store', 'location', 'www', 'http', '@', '.com'
-    ];
-    
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].toLowerCase();
-      
-      if (line.includes('subtotal') || line.includes('sub total')) {
-        const match = lines[i].match(priceRegex);
-        if (match) subtotal = parseFloat(match[1]);
-      } else if (line.includes('tax')) {
-        const match = lines[i].match(priceRegex);
-        if (match) tax = parseFloat(match[1]);
-      } else if (line.includes('tip') || line.includes('gratuity')) {
-        const match = lines[i].match(priceRegex);
-        if (match) tip = parseFloat(match[1]);
-      } else if (line.includes('total') && !line.includes('subtotal')) {
-        const match = lines[i].match(priceRegex);
-        if (match) total = parseFloat(match[1]);
-      } else {
-        if (skipKeywords.some(keyword => line.includes(keyword))) {
-          continue;
-        }
-        
-        if (/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(lines[i])) {
-          continue;
-        }
-        
-        if (/\d{3}[-.]\d{3}[-.]\d{4}/.test(lines[i])) {
-          continue;
-        }
-        
-        const priceMatch = lines[i].match(/\$?(\d+\.\d{2})$/);
-        if (priceMatch && priceMatch[1]) {
-          const price = parseFloat(priceMatch[1]);
-          let itemName = lines[i].replace(/\$?(\d+\.\d{2})$/, '').trim();
-          let quantity = 1;
-          
-          const qtyMatch = itemName.match(quantityRegex);
-          if (qtyMatch) {
-            quantity = parseInt(qtyMatch[1]);
-            itemName = itemName.replace(quantityRegex, '').trim();
-          }
-          
-          if (itemName && itemName.length >= 3 && price >= 0.50 && price < 500) {
-            items.push({
-              name: itemName,
-              quantity,
-              price
-            });
-          }
-        }
-      }
-    }
-    
-    if (total === 0 && subtotal > 0) {
-      total = subtotal + tax + tip;
-    }
-    
-    if (subtotal === 0 && items.length > 0) {
-      subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    }
-    
-    if (total === 0) {
-      total = subtotal + tax + tip;
-    }
-    
-    return {
-      items: items.slice(0, 20),
-      subtotal,
-      tax,
-      tip,
-      total
-    };
-  };
-
   const handleScanReceipt = async () => {
     if (!selectedFile) return;
     
     setIsProcessing(true);
     try {
-      const result = await Tesseract.recognize(selectedFile, 'eng', {
-        logger: (m) => {
-          if (m.status === 'recognizing text') {
-            console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
-          }
-        }
+      const base64Image = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64 = reader.result as string;
+          resolve(base64.split(',')[1]);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(selectedFile);
       });
+
+      const response = await apiRequest("/api/scan-receipt", "POST", {
+        image: base64Image
+      });
+
+      console.log("Vision API Response:", response);
       
-      console.log("OCR Raw Text:", result.data.text);
-      
-      const extractedData = await extractReceiptData(result.data.text);
-      
-      console.log("Extracted Data:", extractedData);
-      
-      if (extractedData.items.length === 0) {
+      if (!response.items || response.items.length === 0) {
         const receipt = await apiRequest("/api/receipts", "POST", {
-          restaurantName: "Manual Entry",
+          restaurantName: response.restaurantName || "Manual Entry",
           subtotal: "0.00",
           tax: "0.00",
           tip: "0.00",
@@ -191,14 +101,21 @@ export default function ScanReceiptPage() {
         setLocation(`/receipt/${receipt.id}`);
         return;
       }
-      
-      await createReceiptMutation.mutateAsync(extractedData);
+
+      await createReceiptMutation.mutateAsync({
+        restaurantName: response.restaurantName,
+        items: response.items,
+        subtotal: response.subtotal,
+        tax: response.tax,
+        tip: response.tip,
+        total: response.total
+      });
       
     } catch (error: any) {
-      console.error("OCR Error:", error);
+      console.error("Scan Error:", error);
       toast({
         title: "Scan failed",
-        description: "Could not read the receipt. Please try a clearer image.",
+        description: error.message || "Could not read the receipt. Please try again.",
         variant: "destructive"
       });
     } finally {

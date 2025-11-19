@@ -11,8 +11,85 @@ import {
   updatePersonSchema
 } from "@shared/schema";
 import { fromError } from "zod-validation-error";
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Receipt scanning with OpenAI Vision
+  app.post("/api/scan-receipt", async (req, res) => {
+    try {
+      const { image } = req.body;
+      
+      if (!image) {
+        return res.status(400).json({ message: "No image provided" });
+      }
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `Analyze this restaurant receipt image and extract the following information in JSON format:
+{
+  "restaurantName": "name of restaurant",
+  "items": [
+    {"name": "item name", "quantity": 1, "price": 12.99}
+  ],
+  "subtotal": 0.00,
+  "tax": 0.00,
+  "tip": 0.00,
+  "total": 0.00
+}
+
+Rules:
+- Only include actual food/drink items in the items array
+- Skip service charges, order numbers, dates, phone numbers, addresses
+- Use the exact item names from the receipt
+- Parse quantities if shown (e.g., "2x Burger" = quantity: 2)
+- All prices should be numbers, not strings
+- If tip is not on receipt, set it to 0
+- Calculate total as subtotal + tax + tip if not shown
+
+Return ONLY the JSON object, no additional text.`
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:image/jpeg;base64,${image}`
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 1000,
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error("No response from vision model");
+      }
+
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("Could not parse JSON from response");
+      }
+
+      const data = JSON.parse(jsonMatch[0]);
+      res.json(data);
+      
+    } catch (error: any) {
+      console.error("Vision API Error:", error);
+      res.status(500).json({ message: error.message || "Failed to scan receipt" });
+    }
+  });
+
   // Receipt routes
   app.post("/api/receipts", async (req, res) => {
     try {
