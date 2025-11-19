@@ -71,6 +71,8 @@ Preferred communication style: Simple, everyday language.
 - OpenAI Vision API (GPT-4o) for highly accurate receipt text extraction
 - Uses Replit AI Integrations for seamless API key management (charges to Replit credits)
 - Intelligent parsing of restaurant name, items (name/quantity/price), subtotal, tax, tip, and total
+- Image rotation controls (rotate left/right 90°) before scanning to ensure vertical orientation
+- Canvas-based image rotation applies transformation before sending to OCR for better accuracy
 - Scanned images stored in browser sessionStorage with key `scanned_image_${receiptId}`
 
 **Validation System:**
