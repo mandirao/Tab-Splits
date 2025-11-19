@@ -176,26 +176,6 @@ export default function ScanReceiptPage() {
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      {/* File inputs at root level - outside Card to avoid touch event issues on Android Chrome */}
-      <input
-        id="receipt-upload"
-        ref={uploadInputRef}
-        type="file"
-        accept="image/*"
-        onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-        className="sr-only"
-        data-testid="input-upload"
-      />
-      <input
-        id="receipt-camera"
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-        className="sr-only"
-        data-testid="input-camera"
-      />
       
       <header className="flex-shrink-0 p-4 border-b bg-card">
         <div className="flex items-center gap-3">
@@ -223,32 +203,45 @@ export default function ScanReceiptPage() {
                 </div>
                 
                 <div className="space-y-3">
-                  <label htmlFor="receipt-camera" className="block">
+                  <div className="relative">
                     <Button 
                       type="button"
-                      className="w-full h-14 cursor-pointer" 
-                      asChild
+                      className="w-full h-14 pointer-events-none" 
+                      data-testid="button-take-photo"
                     >
-                      <span data-testid="button-take-photo">
-                        <Camera className="h-5 w-5 mr-2" />
-                        Take Photo
-                      </span>
+                      <Camera className="h-5 w-5 mr-2" />
+                      Take Photo
                     </Button>
-                  </label>
+                    <input
+                      ref={cameraInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      data-testid="input-camera"
+                    />
+                  </div>
                   
-                  <label htmlFor="receipt-upload" className="block">
+                  <div className="relative">
                     <Button 
                       type="button"
                       variant="outline"
-                      className="w-full h-14 cursor-pointer" 
-                      asChild
+                      className="w-full h-14 pointer-events-none" 
+                      data-testid="button-upload-image"
                     >
-                      <span data-testid="button-upload-image">
-                        <Upload className="h-5 w-5 mr-2" />
-                        Upload Image
-                      </span>
+                      <Upload className="h-5 w-5 mr-2" />
+                      Upload Image
                     </Button>
-                  </label>
+                    <input
+                      ref={uploadInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      data-testid="input-upload"
+                    />
+                  </div>
                 </div>
               </div>
             ) : (
