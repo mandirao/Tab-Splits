@@ -202,42 +202,26 @@ export default function ScanReceiptPage() {
                 </div>
                 
                 <div className="space-y-3">
-                  <div className="relative">
-                    <input
-                      id="camera-input"
-                      ref={cameraInputRef}
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                      data-testid="input-camera"
-                    />
-                    <div className="w-full h-14 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground shadow hover:bg-primary/90 px-4 py-2"
-                      data-testid="button-take-photo"
-                    >
-                      <Camera className="h-5 w-5" />
-                      Take Photo
-                    </div>
-                  </div>
+                  <input
+                    id="camera-input"
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                    className="w-full h-14 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer"
+                    data-testid="input-camera"
+                  />
                   
-                  <div className="relative">
-                    <input
-                      id="upload-input"
-                      ref={uploadInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                      data-testid="input-upload"
-                    />
-                    <div className="w-full h-14 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground px-4 py-2"
-                      data-testid="button-upload-image"
-                    >
-                      <Upload className="h-5 w-5" />
-                      Upload Image
-                    </div>
-                  </div>
+                  <input
+                    id="upload-input"
+                    ref={uploadInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                    className="w-full h-14 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer"
+                    data-testid="input-upload"
+                  />
                 </div>
               </div>
             ) : (
