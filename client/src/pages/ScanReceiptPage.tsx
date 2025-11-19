@@ -14,7 +14,8 @@ export default function ScanReceiptPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
 
   const createReceiptMutation = useMutation({
     mutationFn: async (data: { 
@@ -64,7 +65,11 @@ export default function ScanReceiptPage() {
   };
 
   const handleCameraClick = () => {
-    fileInputRef.current?.click();
+    cameraInputRef.current?.click();
+  };
+
+  const handleUploadClick = () => {
+    uploadInputRef.current?.click();
   };
 
   const extractReceiptData = async (text: string) => {
@@ -205,13 +210,22 @@ export default function ScanReceiptPage() {
                 </div>
                 
                 <input
-                  ref={fileInputRef}
+                  ref={cameraInputRef}
                   type="file"
                   accept="image/*"
                   capture="environment"
                   onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
                   className="hidden"
-                  data-testid="input-file"
+                  data-testid="input-camera"
+                />
+                
+                <input
+                  ref={uploadInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                  className="hidden"
+                  data-testid="input-upload"
                 />
                 
                 <div className="space-y-3">
@@ -227,7 +241,7 @@ export default function ScanReceiptPage() {
                   <Button 
                     variant="outline"
                     className="w-full h-14" 
-                    onClick={handleCameraClick}
+                    onClick={handleUploadClick}
                     data-testid="button-upload-image"
                   >
                     <Upload className="h-5 w-5 mr-2" />
