@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ReceiptCard from "@/components/ReceiptCard";
-import { Camera, Upload, Search } from "lucide-react";
+import { Camera, Search } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import type { Receipt, ReceiptItem } from "@shared/schema";
@@ -101,25 +101,14 @@ export default function HomePage() {
       </main>
 
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t">
-        <div className="flex gap-3">
-          <Button 
-            className="flex-1 h-12" 
-            onClick={() => setLocation("/scan")}
-            data-testid="button-camera"
-          >
-            <Camera className="h-5 w-5 mr-2" />
-            Scan Receipt
-          </Button>
-          <Button 
-            variant="outline" 
-            size="icon" 
-            className="h-12 w-12"
-            onClick={() => setLocation("/scan")}
-            data-testid="button-upload"
-          >
-            <Upload className="h-5 w-5" />
-          </Button>
-        </div>
+        <Button 
+          className="w-full h-12" 
+          onClick={() => setLocation("/scan")}
+          data-testid="button-camera"
+        >
+          <Camera className="h-5 w-5 mr-2" />
+          Split new tab
+        </Button>
       </div>
     </div>
   );
