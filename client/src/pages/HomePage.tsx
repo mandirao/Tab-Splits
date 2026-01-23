@@ -65,7 +65,7 @@ export default function HomePage() {
 
   const deleteReceiptMutation = useMutation({
     mutationFn: async (receiptId: string) => {
-      await apiRequest("DELETE", `/api/receipts/${receiptId}`);
+      await apiRequest(`/api/receipts/${receiptId}`, "DELETE");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/receipts"] });

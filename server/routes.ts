@@ -136,9 +136,12 @@ Return ONLY the JSON object, no additional text.`
 
   app.delete("/api/receipts/:id", async (req, res) => {
     try {
+      console.log(`Deleting receipt: ${req.params.id}`);
       await storage.deleteReceipt(req.params.id);
+      console.log(`Successfully deleted receipt: ${req.params.id}`);
       res.status(204).send();
     } catch (error: any) {
+      console.error(`Error deleting receipt ${req.params.id}:`, error);
       res.status(500).json({ message: error.message });
     }
   });
