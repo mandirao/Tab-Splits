@@ -2,7 +2,16 @@
 
 ## Overview
 
-SplitTab is a mobile-first bill splitting application that helps groups divide restaurant bills fairly and efficiently. The app allows users to scan receipts, assign items to different people, calculate individual shares including tax and tip, and share payment summaries. Built with a focus on simplicity and ease of use at the dining table, it follows Apple Human Interface Guidelines for an intuitive iOS-like experience.
+SplitTab is a mobile-first bill splitting application that helps groups divide restaurant bills fairly and efficiently. The app allows users to scan receipts, manually add items, assign items to different people, calculate individual shares including tax and tip, and share payment summaries. Built with a focus on simplicity and ease of use at the dining table, it follows Apple Human Interface Guidelines for an intuitive iOS-like experience.
+
+### Key Features
+- Receipt scanning via OCR (OpenAI Vision API)
+- Manual item addition and deletion
+- Running total verification (items vs receipt subtotal)
+- Person assignment with colorful visual indicators
+- Proportional tax/tip calculation
+- Payment tracking and settlement calculation
+- Secure public receipt sharing via QR code or SMS
 
 ## User Preferences
 

@@ -88,6 +88,8 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   } | null>(null);
   const [showScannedImage, setShowScannedImage] = useState(false);
   const [scannedImageUrl, setScannedImageUrl] = useState<string | null>(null);
+  const [addItemBottomSheetOpen, setAddItemBottomSheetOpen] = useState(false);
+  const [newItemData, setNewItemData] = useState({ name: "", quantity: 1, price: "" });
 
   useEffect(() => {
     // Check if a scanned image exists for this receipt
@@ -337,6 +339,42 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     }
   });
 
+  const createItemMutation = useMutation({
+    mutationFn: async (data: { name: string; quantity: number; price: string }) => {
+      return await apiRequest(`/api/receipts/${receiptId}/items`, "POST", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
+      setAddItemBottomSheetOpen(false);
+      setNewItemData({ name: "", quantity: 1, price: "" });
+      toast({ title: "Item added" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to add item", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    }
+  });
+
+  const deleteItemMutation = useMutation({
+    mutationFn: async (itemId: string) => {
+      return await apiRequest(`/api/items/${itemId}`, "DELETE");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
+      toast({ title: "Item deleted" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to delete item", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    }
+  });
+
   const handleTipChange = (amount: number) => {
     updateReceiptMutation.mutate({ tip: amount });
   };
@@ -554,6 +592,37 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     deletePaymentMutation.mutate(paymentId);
   };
 
+  const handleAddItem = () => {
+    if (!newItemData.name.trim() || !newItemData.price) {
+      toast({
+        title: "Missing information",
+        description: "Please enter item name and price",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const price = parseFloat(newItemData.price);
+    if (isNaN(price) || price < 0) {
+      toast({
+        title: "Invalid price",
+        description: "Please enter a valid price",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    createItemMutation.mutate({
+      name: newItemData.name.trim(),
+      quantity: newItemData.quantity,
+      price: price.toFixed(2)
+    });
+  };
+
+  const handleDeleteItem = (itemId: string) => {
+    deleteItemMutation.mutate(itemId);
+  };
+
   const togglePersonSelection = (personId: string) => {
     setSelectedPeople(prev => 
       prev.includes(personId)
@@ -599,6 +668,15 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
 
   // Check if there are unassigned items
   const hasUnassignedItems = items.some(item => (item.assignedTo as string[] || []).length === 0);
+
+  // Calculate running total of all items
+  const itemsSubtotal = items.reduce((sum, item) => {
+    return sum + (parseFloat(item.price) || 0);
+  }, 0);
+  
+  // Check if items match receipt subtotal
+  const subtotalDifference = Math.abs(itemsSubtotal - subtotal);
+  const totalsMatch = subtotalDifference < 0.01;
 
   // Filter items based on selected tab
   const filteredItems = selectedTab === "all" 
@@ -718,6 +796,16 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             <Badge variant="secondary" className="flex items-center gap-1 cursor-pointer">
               <Users className="h-3 w-3" />
               {peopleWithColors.length} people
+            </Badge>
+          </button>
+          <button 
+            onClick={() => setAddItemBottomSheetOpen(true)}
+            className="hover-elevate active-elevate-2 rounded-full"
+            data-testid="button-add-item"
+          >
+            <Badge variant="outline" className="flex items-center gap-1 cursor-pointer">
+              <Plus className="h-3 w-3" />
+              Add Item
             </Badge>
           </button>
           <Badge variant="outline">{items.length} items</Badge>
@@ -856,6 +944,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                   assignedColors={assignedPeople.map(getColorForPerson)}
                   onAssign={() => handleAssignClick(item.id)}
                   onEdit={() => handleEditClick(item.id)}
+                  onDelete={() => handleDeleteItem(item.id)}
                   displayQuantity={displayQuantity}
                 />
               );
@@ -866,6 +955,22 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
 
       <div className="fixed bottom-0 left-0 right-0 bg-card border-t p-4">
         <div className="space-y-3">
+          {/* Running total comparison - only show on "all" tab */}
+          {selectedTab === "all" && (
+            <div className={`flex justify-between text-sm p-2 rounded-md ${totalsMatch ? 'bg-green-100 dark:bg-green-900/30' : 'bg-amber-100 dark:bg-amber-900/30'}`}>
+              <span className="text-muted-foreground">Items Total</span>
+              <div className="flex items-center gap-2">
+                <span data-testid="text-items-subtotal">${itemsSubtotal.toFixed(2)}</span>
+                {totalsMatch ? (
+                  <Check className="h-4 w-4 text-green-600" />
+                ) : (
+                  <span className="text-xs text-amber-600 dark:text-amber-400">
+                    ({itemsSubtotal > subtotal ? '+' : ''}${(itemsSubtotal - subtotal).toFixed(2)})
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Subtotal</span>
             <span data-testid="text-receipt-subtotal">${displayTotals.subtotal.toFixed(2)}</span>
@@ -1511,6 +1616,80 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <BottomSheet
+        open={addItemBottomSheetOpen}
+        onClose={() => {
+          setAddItemBottomSheetOpen(false);
+          setNewItemData({ name: "", quantity: 1, price: "" });
+        }}
+        title="Add Item"
+        footer={
+          <Button 
+            className="w-full" 
+            onClick={handleAddItem}
+            disabled={!newItemData.name.trim() || !newItemData.price || createItemMutation.isPending}
+            data-testid="button-save-new-item"
+          >
+            {createItemMutation.isPending ? "Adding..." : "Add Item"}
+          </Button>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Add a missing item to the receipt
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="new-item-name">Item Name</Label>
+            <Input
+              id="new-item-name"
+              type="text"
+              value={newItemData.name}
+              onChange={(e) => setNewItemData(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="e.g. Caesar Salad"
+              data-testid="input-new-item-name"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  const priceInput = document.getElementById('new-item-price');
+                  priceInput?.focus();
+                }
+              }}
+            />
+          </div>
+          <div className="flex gap-3">
+            <div className="space-y-2 flex-1">
+              <Label htmlFor="new-item-quantity">Qty</Label>
+              <Input
+                id="new-item-quantity"
+                type="number"
+                min="1"
+                value={newItemData.quantity}
+                onChange={(e) => setNewItemData(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
+                data-testid="input-new-item-quantity"
+              />
+            </div>
+            <div className="space-y-2 flex-[2]">
+              <Label htmlFor="new-item-price">Price ($)</Label>
+              <Input
+                id="new-item-price"
+                type="text"
+                inputMode="decimal"
+                value={newItemData.price}
+                onChange={(e) => setNewItemData(prev => ({ ...prev, price: e.target.value }))}
+                placeholder="0.00"
+                data-testid="input-new-item-price"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newItemData.name.trim() && newItemData.price) {
+                    e.preventDefault();
+                    handleAddItem();
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </BottomSheet>
 
       <Dialog open={showScannedImage} onOpenChange={setShowScannedImage}>
         <DialogContent className="max-w-3xl">

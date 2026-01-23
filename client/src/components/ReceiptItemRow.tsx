@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Edit2, UserPlus } from "lucide-react";
+import { Edit2, UserPlus, Trash2 } from "lucide-react";
 
 interface ReceiptItemRowProps {
   id: string;
@@ -11,6 +11,7 @@ interface ReceiptItemRowProps {
   assignedColors?: string[];
   onAssign?: () => void;
   onEdit?: () => void;
+  onDelete?: () => void;
   displayQuantity?: string;
 }
 
@@ -22,6 +23,7 @@ export default function ReceiptItemRow({
   assignedColors = [],
   onAssign,
   onEdit,
+  onDelete,
   displayQuantity
 }: ReceiptItemRowProps) {
   const isAssigned = assignedInitials.length > 0;
@@ -83,6 +85,17 @@ export default function ReceiptItemRow({
         >
           <Edit2 className="h-4 w-4" />
         </Button>
+        
+        {onDelete && (
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={onDelete}
+            data-testid="button-delete-item"
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        )}
       </div>
     </div>
   );
