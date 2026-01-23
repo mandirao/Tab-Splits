@@ -8,7 +8,7 @@ import ReceiptItemRow from "@/components/ReceiptItemRow";
 import TipCalculator from "@/components/TipCalculator";
 import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
-import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon } from "lucide-react";
+import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -69,6 +69,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [newPersonPhone, setNewPersonPhone] = useState("");
   const [shareBottomSheetOpen, setShareBottomSheetOpen] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
+  const [urlCopied, setUrlCopied] = useState(false);
   const [activeShareToken, setActiveShareToken] = useState<string | null>(null);
   const [tipPercentage, setTipPercentage] = useState(20);
   const [selectedTab, setSelectedTab] = useState<string>("all");
@@ -1065,6 +1066,34 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                     <img src={qrCodeDataUrl} alt="QR Code" className="w-64 h-64" data-testid="img-qr-code" />
                   </div>
                 )}
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="font-semibold text-sm mb-3">Copy Link</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Quick copy the link to share anywhere
+                </p>
+                <Button
+                  variant="outline"
+                  className="w-full justify-between"
+                  onClick={async () => {
+                    const shareUrl = `${window.location.origin}/share/${activeShareToken}`;
+                    await navigator.clipboard.writeText(shareUrl);
+                    setUrlCopied(true);
+                    toast({ title: "Link copied to clipboard!" });
+                    setTimeout(() => setUrlCopied(false), 2000);
+                  }}
+                  data-testid="button-copy-url"
+                >
+                  <span className="truncate mr-2 text-muted-foreground">
+                    {`${window.location.origin}/share/${activeShareToken}`}
+                  </span>
+                  {urlCopied ? (
+                    <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                  ) : (
+                    <Copy className="h-4 w-4 flex-shrink-0" />
+                  )}
+                </Button>
               </div>
 
               <div className="border-t pt-4">
