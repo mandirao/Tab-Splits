@@ -5,8 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import type { ReceiptItem } from "@shared/schema";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Image } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -318,8 +319,36 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
   return (
     <div className="min-h-screen bg-background">
       <header className="p-4 border-b bg-card sticky top-0 z-10">
-        <h1 className="text-xl font-bold text-center">{receipt.restaurantName || "Receipt"}</h1>
-        <p className="text-sm text-center text-muted-foreground mt-1">Shared Receipt</p>
+        <div className="flex items-center justify-between">
+          <div className="w-10" />
+          <div className="text-center flex-1">
+            <h1 className="text-xl font-bold">{receipt.restaurantName || "Receipt"}</h1>
+            <p className="text-sm text-muted-foreground mt-1">Shared Receipt</p>
+          </div>
+          {receipt.imageUrl && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button size="icon" variant="ghost" data-testid="button-view-receipt-image">
+                  <Image className="h-5 w-5" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-auto">
+                <DialogHeader>
+                  <DialogTitle>Original Receipt</DialogTitle>
+                </DialogHeader>
+                <div className="flex items-center justify-center">
+                  <img 
+                    src={receipt.imageUrl} 
+                    alt="Original receipt" 
+                    className="max-w-full max-h-[70vh] object-contain rounded-lg"
+                    data-testid="img-receipt-scan"
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+          {!receipt.imageUrl && <div className="w-10" />}
+        </div>
       </header>
 
       <main className="p-4 pb-24 space-y-4">

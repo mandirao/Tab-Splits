@@ -12,6 +12,7 @@ import {
 } from "@shared/schema";
 import { fromError } from "zod-validation-error";
 import OpenAI from "openai";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -19,6 +20,9 @@ const openai = new OpenAI({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Register object storage routes for file uploads
+  registerObjectStorageRoutes(app);
+  
   // Receipt scanning with OpenAI Vision
   app.post("/api/scan-receipt", async (req, res) => {
     try {

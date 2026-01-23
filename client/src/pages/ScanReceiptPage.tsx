@@ -172,6 +172,50 @@ export default function ScanReceiptPage() {
       // Always save the rotated image for reference
       const rotatedImageDataUrl = `data:image/jpeg;base64,${base64Image}`;
       sessionStorage.setItem(`scanned_image_${receipt.id}`, rotatedImageDataUrl);
+      
+      // Upload image to object storage for sharing
+      try {
+        // Convert base64 to blob
+        const byteCharacters = atob(base64Image);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'image/jpeg' });
+        const file = new File([blob], `receipt-${receipt.id}.jpg`, { type: 'image/jpeg' });
+        
+        // Request presigned URL
+        const urlRes = await fetch("/api/uploads/request-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: file.name,
+            size: file.size,
+            contentType: file.type,
+          }),
+        });
+        
+        if (urlRes.ok) {
+          const { uploadURL, objectPath } = await urlRes.json();
+          
+          // Upload file directly to presigned URL
+          const uploadRes = await fetch(uploadURL, {
+            method: "PUT",
+            body: file,
+            headers: { "Content-Type": file.type },
+          });
+          
+          if (uploadRes.ok) {
+            // Update receipt with image URL
+            await apiRequest(`/api/receipts/${receipt.id}`, "PATCH", {
+              imageUrl: objectPath
+            });
+          }
+        }
+      } catch (uploadError) {
+        console.warn("Failed to upload receipt image to storage:", uploadError);
+      }
 
       if (hasWarning) {
         sessionStorage.setItem(`receipt-${receipt.id}-warning`, JSON.stringify({
