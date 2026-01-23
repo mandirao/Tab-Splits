@@ -1,10 +1,22 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import ReceiptCard from "@/components/ReceiptCard";
 import { Camera, Search } from "lucide-react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Receipt, ReceiptItem } from "@shared/schema";
 
 interface ReceiptWithDetails extends Receipt {
@@ -14,6 +26,9 @@ interface ReceiptWithDetails extends Receipt {
 export default function HomePage() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [receiptToDelete, setReceiptToDelete] = useState<Receipt | null>(null);
+  const { toast } = useToast();
 
   const { data: receipts = [], isLoading } = useQuery<Receipt[]>({
     queryKey: ["/api/receipts"],
@@ -47,6 +62,36 @@ export default function HomePage() {
   const filteredReceipts = receipts.filter(r => 
     !searchQuery || r.restaurantName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const deleteReceiptMutation = useMutation({
+    mutationFn: async (receiptId: string) => {
+      await apiRequest("DELETE", `/api/receipts/${receiptId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts"] });
+      toast({ title: "Tab deleted successfully" });
+      setDeleteDialogOpen(false);
+      setReceiptToDelete(null);
+    },
+    onError: () => {
+      toast({ 
+        title: "Failed to delete tab", 
+        description: "Please try again",
+        variant: "destructive" 
+      });
+    }
+  });
+
+  const handleDeleteClick = (receipt: Receipt) => {
+    setReceiptToDelete(receipt);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (receiptToDelete) {
+      deleteReceiptMutation.mutate(receiptToDelete.id);
+    }
+  };
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -88,6 +133,7 @@ export default function HomePage() {
                 peopleCount={getPeopleCountForReceipt(receipt.id)}
                 itemCount={getItemCountForReceipt(receipt.id)}
                 onClick={() => setLocation(`/receipt/${receipt.id}`)}
+                onDelete={() => handleDeleteClick(receipt)}
               />
             ))}
             {filteredReceipts.length === 0 && !isLoading && (
@@ -110,6 +156,28 @@ export default function HomePage() {
           Split new tab
         </Button>
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this tab?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete "{receiptToDelete?.restaurantName || 'this tab'}" and all its data including items, people assignments, and payments. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteReceiptMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteReceiptMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
