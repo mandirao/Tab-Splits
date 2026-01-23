@@ -396,23 +396,53 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   };
 
   const handleSelectFromContacts = async () => {
-    if ('contacts' in navigator && 'ContactsManager' in window) {
-      try {
-        const props = ['name', 'tel'];
-        const opts = { multiple: false };
-        const contacts = await (navigator as any).contacts.select(props, opts);
-        
-        if (contacts && contacts.length > 0) {
-          const contact = contacts[0];
-          if (contact.name && contact.name.length > 0) {
-            setNewPersonName(contact.name[0]);
-          }
-          if (contact.tel && contact.tel.length > 0) {
-            setNewPersonPhone(contact.tel[0]);
-          }
+    const supportsContacts = 'contacts' in navigator && 'ContactsManager' in window;
+    
+    if (!supportsContacts) {
+      toast({
+        title: "Contacts not supported",
+        description: "Your browser doesn't support the contacts feature. Please enter the name manually.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      const props = ['name', 'tel'];
+      const opts = { multiple: false };
+      const contacts = await (navigator as any).contacts.select(props, opts);
+      
+      if (contacts && contacts.length > 0) {
+        const contact = contacts[0];
+        if (contact.name && contact.name.length > 0) {
+          setNewPersonName(contact.name[0]);
         }
-      } catch (error) {
-        console.error('Error selecting contact:', error);
+        if (contact.tel && contact.tel.length > 0) {
+          setNewPersonPhone(contact.tel[0]);
+        }
+      }
+    } catch (error: any) {
+      console.error('Error selecting contact:', error);
+      
+      if (error?.name === 'InvalidStateError') {
+        toast({
+          title: "Please try again",
+          description: "Tap the button again to select a contact",
+          variant: "destructive"
+        });
+      } else if (error?.name === 'SecurityError') {
+        toast({
+          title: "Contacts access denied",
+          description: "Please allow contacts access in your browser settings",
+          variant: "destructive"
+        });
+      } else if (error?.name === 'TypeError') {
+        toast({
+          title: "Contacts not available",
+          description: "This feature requires a secure connection (HTTPS)",
+          variant: "destructive"
+        });
+      } else {
         toast({
           title: "Could not access contacts",
           description: "Please enter the name manually",
