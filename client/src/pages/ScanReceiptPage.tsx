@@ -225,38 +225,44 @@ export default function ScanReceiptPage() {
                 </div>
                 
                 <div className="space-y-3">
-                  <div className="relative w-full h-14 bg-primary text-primary-foreground rounded-md font-medium transition-colors hover:bg-primary/90 overflow-hidden">
-                    <div className="absolute inset-0 flex items-center justify-center gap-2 pointer-events-none z-0">
-                      <Camera className="h-5 w-5" />
-                      <span>Take Photo</span>
-                    </div>
-                    <input
-                      ref={cameraInputRef}
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-                      className="absolute inset-0 w-full h-full cursor-pointer z-10"
-                      style={{ fontSize: '200px', opacity: 0.01 }}
-                      data-testid="input-camera"
-                    />
-                  </div>
+                  <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                    className="hidden"
+                    data-testid="input-camera"
+                  />
+                  <input
+                    ref={uploadInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                    className="hidden"
+                    data-testid="input-upload"
+                  />
                   
-                  <div className="relative w-full h-14 border border-input bg-background text-foreground rounded-md font-medium transition-colors hover:bg-accent hover:text-accent-foreground overflow-hidden">
-                    <div className="absolute inset-0 flex items-center justify-center gap-2 pointer-events-none z-0">
-                      <Upload className="h-5 w-5" />
-                      <span>Upload Image</span>
-                    </div>
-                    <input
-                      ref={uploadInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-                      className="absolute inset-0 w-full h-full cursor-pointer z-10"
-                      style={{ fontSize: '200px', opacity: 0.01 }}
-                      data-testid="input-upload"
-                    />
-                  </div>
+                  <Button
+                    type="button"
+                    className="w-full h-14"
+                    onClick={() => cameraInputRef.current?.click()}
+                    data-testid="button-take-photo"
+                  >
+                    <Camera className="h-5 w-5 mr-2" />
+                    Take Photo
+                  </Button>
+                  
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full h-14"
+                    onClick={() => uploadInputRef.current?.click()}
+                    data-testid="button-upload-image"
+                  >
+                    <Upload className="h-5 w-5 mr-2" />
+                    Upload Image
+                  </Button>
                 </div>
               </div>
             ) : (
