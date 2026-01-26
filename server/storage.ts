@@ -222,6 +222,7 @@ export class DatabaseStorage implements IStorage {
         name: people.name,
         phone: people.phone,
         email: people.email,
+        venmoUsername: people.venmoUsername,
         isRegular: people.isRegular
       })
       .from(receiptPeople)
