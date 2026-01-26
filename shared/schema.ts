@@ -13,6 +13,7 @@ export const receipts = pgTable("receipts", {
   total: numeric("total", { precision: 10, scale: 2 }).notNull(),
   imageUrl: text("image_url"),
   shareToken: varchar("share_token").unique(),
+  paidById: varchar("paid_by_id"),
 });
 
 export const receiptItems = pgTable("receipt_items", {
@@ -29,6 +30,7 @@ export const people = pgTable("people", {
   name: text("name").notNull(),
   phone: text("phone"),
   email: text("email"),
+  venmoUsername: text("venmo_username"),
   isRegular: integer("is_regular").notNull().default(0),
 });
 
@@ -61,6 +63,7 @@ export const updateReceiptSchema = z.object({
   tip: numericStringSchema.optional(),
   total: numericStringSchema.optional(),
   imageUrl: z.string().optional(),
+  paidById: z.string().nullable().optional(),
 }).strict();
 
 export const updateReceiptItemSchema = z.object({
@@ -74,6 +77,7 @@ export const updatePersonSchema = z.object({
   name: z.string().optional(),
   phone: z.string().optional(),
   email: z.string().optional(),
+  venmoUsername: z.string().nullable().optional(),
   isRegular: z.number().int().min(0).max(1).optional(),
 }).strict();
 
