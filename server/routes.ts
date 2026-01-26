@@ -395,6 +395,8 @@ Return ONLY the JSON object, no additional text.`
         assigned.forEach(id => assignedPersonIds.add(id));
       });
       
+      const paidByPerson = receipt.paidById ? allPeople.find(p => p.id === receipt.paidById) : null;
+      
       const redactedPeople = allPeople
         .filter(person => assignedPersonIds.has(person.id))
         .map(person => ({
@@ -410,7 +412,10 @@ Return ONLY the JSON object, no additional text.`
         tax: receipt.tax,
         tip: receipt.tip,
         total: receipt.total,
-        imageUrl: receipt.imageUrl
+        imageUrl: receipt.imageUrl,
+        paidById: receipt.paidById,
+        paidByName: paidByPerson?.name || null,
+        paidByVenmo: paidByPerson?.venmoUsername || null
       };
       
       res.json({ receipt: redactedReceipt, items, people: redactedPeople });
