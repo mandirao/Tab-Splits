@@ -90,6 +90,8 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [scannedImageUrl, setScannedImageUrl] = useState<string | null>(null);
   const [addItemBottomSheetOpen, setAddItemBottomSheetOpen] = useState(false);
   const [newItemData, setNewItemData] = useState({ name: "", quantity: 1, price: "" });
+  const [paidByBottomSheetOpen, setPaidByBottomSheetOpen] = useState(false);
+  const [venmoInput, setVenmoInput] = useState("");
 
   useEffect(() => {
     // Check if a scanned image exists for this receipt
@@ -184,6 +186,41 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId] });
+    }
+  });
+
+  const updatePaidByMutation = useMutation({
+    mutationFn: async (data: { paidById: string | null }) => {
+      return await apiRequest(`/api/receipts/${receiptId}`, "PATCH", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId] });
+      toast({ title: "Payer updated" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to update payer", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    }
+  });
+
+  const updatePersonVenmoMutation = useMutation({
+    mutationFn: async ({ personId, venmoUsername }: { personId: string; venmoUsername: string }) => {
+      return await apiRequest(`/api/people/${personId}`, "PATCH", { venmoUsername });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "people"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/people"] });
+      toast({ title: "Venmo username saved" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to save Venmo username", 
+        description: error.message,
+        variant: "destructive" 
+      });
     }
   });
 
@@ -1004,6 +1041,49 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         </div>
       </div>
 
+      {/* Paid By Section */}
+      <div className="bg-card rounded-lg p-4 shadow-sm border">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <DollarSign className="h-5 w-5 text-primary" />
+            <div>
+              <p className="text-sm text-muted-foreground">Paid by</p>
+              {receipt?.paidById ? (
+                <p className="font-medium" data-testid="text-paid-by-name">
+                  {peopleWithColors.find(p => p.id === receipt.paidById)?.name || "Unknown"}
+                </p>
+              ) : (
+                <p className="text-muted-foreground">Not set</p>
+              )}
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setPaidByBottomSheetOpen(true);
+              const payer = peopleWithColors.find(p => p.id === receipt?.paidById);
+              setVenmoInput(payer?.venmoUsername || "");
+            }}
+            data-testid="button-edit-paid-by"
+          >
+            {receipt?.paidById ? "Change" : "Set Payer"}
+          </Button>
+        </div>
+        {receipt?.paidById && (
+          <div className="mt-3 pt-3 border-t">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Venmo Username</p>
+                <p className="font-medium" data-testid="text-venmo-username">
+                  {peopleWithColors.find(p => p.id === receipt.paidById)?.venmoUsername || "Not set"}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       <BottomSheet
         open={assignBottomSheetOpen}
         onClose={() => {
@@ -1688,6 +1768,117 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               />
             </div>
           </div>
+        </div>
+      </BottomSheet>
+
+      {/* Paid By Bottom Sheet */}
+      <BottomSheet
+        open={paidByBottomSheetOpen}
+        onClose={() => {
+          setPaidByBottomSheetOpen(false);
+          setVenmoInput("");
+        }}
+        title="Who Paid the Bill?"
+        footer={
+          <div className="flex gap-2">
+            {receipt?.paidById && (
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  updatePaidByMutation.mutate({ paidById: null });
+                  setPaidByBottomSheetOpen(false);
+                  setVenmoInput("");
+                }}
+                data-testid="button-clear-paid-by"
+              >
+                Clear
+              </Button>
+            )}
+            <Button
+              className="flex-1"
+              onClick={() => setPaidByBottomSheetOpen(false)}
+              data-testid="button-done-paid-by"
+            >
+              Done
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Select who covered the bill so everyone can pay them back
+          </p>
+          
+          <div className="space-y-2">
+            {peopleWithColors.map((person) => {
+              const isSelected = receipt?.paidById === person.id;
+              return (
+                <button
+                  key={person.id}
+                  className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                    isSelected 
+                      ? 'border-primary bg-primary/10' 
+                      : 'border-border hover-elevate'
+                  }`}
+                  onClick={() => {
+                    updatePaidByMutation.mutate({ paidById: person.id });
+                    setVenmoInput(person.venmoUsername || "");
+                  }}
+                  data-testid={`button-select-payer-${person.id}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white font-medium text-sm"
+                      style={{ backgroundColor: person.color }}
+                    >
+                      {person.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                    </div>
+                    <span className="font-medium">{person.name}</span>
+                  </div>
+                  {isSelected && (
+                    <Check className="h-5 w-5 text-primary" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {receipt?.paidById && (
+            <div className="pt-4 border-t space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="venmo-username">Venmo Username</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="venmo-username"
+                    type="text"
+                    placeholder="@username or username"
+                    value={venmoInput}
+                    onChange={(e) => setVenmoInput(e.target.value)}
+                    data-testid="input-venmo-username"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (receipt.paidById && venmoInput.trim()) {
+                        updatePersonVenmoMutation.mutate({
+                          personId: receipt.paidById,
+                          venmoUsername: venmoInput.trim().replace(/^@/, '')
+                        });
+                      }
+                    }}
+                    disabled={!venmoInput.trim() || updatePersonVenmoMutation.isPending}
+                    data-testid="button-save-venmo"
+                  >
+                    {updatePersonVenmoMutation.isPending ? "..." : "Save"}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Others can pay via Venmo when viewing the shared receipt
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </BottomSheet>
 

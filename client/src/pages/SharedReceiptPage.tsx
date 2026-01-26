@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import type { ReceiptItem } from "@shared/schema";
-import { ArrowLeft, Image } from "lucide-react";
+import { ArrowLeft, Image, DollarSign } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -25,6 +25,9 @@ interface RedactedReceipt {
   tip: string;
   total: string;
   imageUrl: string | null;
+  paidById: string | null;
+  paidByName: string | null;
+  paidByVenmo: string | null;
 }
 
 interface SharedReceiptPayload {
@@ -435,11 +438,50 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
                       <span>${totals.total.toFixed(2)}</span>
                     </div>
                   </div>
+                  {/* Pay with Venmo button - only for the viewer's own total */}
+                  {receipt.paidByVenmo && 
+                   verifiedPersonId === personId && 
+                   receipt.paidById !== personId && (
+                    <Button
+                      className="w-full mt-3"
+                      onClick={() => {
+                        const venmoUsername = encodeURIComponent(receipt.paidByVenmo || "");
+                        const amount = totals.total.toFixed(2);
+                        const note = encodeURIComponent(`SplitTab - ${receipt.restaurantName || 'Receipt'}`);
+                        const venmoUrl = `venmo://paycharge?txn=pay&recipients=${venmoUsername}&amount=${amount}&note=${note}`;
+                        window.location.href = venmoUrl;
+                      }}
+                      data-testid={`button-pay-venmo-${personId}`}
+                    >
+                      Pay ${totals.total.toFixed(2)} via Venmo
+                    </Button>
+                  )}
                 </div>
               );
             })}
           </CardContent>
         </Card>
+
+        {/* Paid By Info */}
+        {receipt.paidByName && (
+          <Card className="bg-primary/5 border-primary/20">
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-3">
+                <DollarSign className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="font-medium">
+                    {receipt.paidByName} paid the bill
+                  </p>
+                  {receipt.paidByVenmo && (
+                    <p className="text-sm text-muted-foreground">
+                      Venmo: @{receipt.paidByVenmo}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader className="pb-3">

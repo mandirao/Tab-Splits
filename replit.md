@@ -13,6 +13,8 @@ SplitTab is a mobile-first bill splitting application that helps groups divide r
 - Payment tracking and settlement calculation
 - Secure public receipt sharing via QR code or SMS
 - Scanned receipt image viewing on shared tabs for independent verification
+- "Paid by" selector to mark who paid the bill with Venmo username
+- One-tap Venmo payment from shared receipt (opens Venmo app with correct amount)
 
 ## User Preferences
 
