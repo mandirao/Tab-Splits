@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import HomePage from "@/pages/HomePage";
 import ReceiptDetailPage from "@/pages/ReceiptDetailPage";
 import SummaryPage from "@/pages/SummaryPage";
+import OrganizerViewPage from "@/pages/OrganizerViewPage";
 import RegularsPage from "@/pages/RegularsPage";
 import ScanReceiptPage from "@/pages/ScanReceiptPage";
 import SharedReceiptPage from "@/pages/SharedReceiptPage";
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/debug-upload" component={DebugFileInput} />
       <Route path="/receipt/:id" component={ReceiptDetailPage} />
       <Route path="/receipt/:id/summary" component={SummaryPage} />
+      <Route path="/receipt/:id/view" component={OrganizerViewPage} />
       <Route path="/regulars" component={RegularsPage} />
       <Route path="/share/:token" component={SharedReceiptPage} />
       <Route component={NotFound} />

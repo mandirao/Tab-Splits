@@ -808,7 +808,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             <Button 
               size="icon" 
               variant="ghost"
-              onClick={() => setLocation(`/receipt/${receiptId}/summary`)}
+              onClick={() => setLocation(`/receipt/${receiptId}/view`)}
               data-testid="button-view-summary"
             >
               <PieChart className="h-5 w-5" />
