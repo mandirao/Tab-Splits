@@ -8,7 +8,7 @@ import ReceiptItemRow from "@/components/ReceiptItemRow";
 import TipCalculator from "@/components/TipCalculator";
 import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
-import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check } from "lucide-react";
+import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -805,6 +805,14 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                 <ImageIcon className="h-5 w-5" />
               </Button>
             )}
+            <Button 
+              size="icon" 
+              variant="ghost"
+              onClick={() => setLocation(`/receipt/${receiptId}/summary`)}
+              data-testid="button-view-summary"
+            >
+              <PieChart className="h-5 w-5" />
+            </Button>
             <Button 
               size="icon" 
               variant="ghost"
