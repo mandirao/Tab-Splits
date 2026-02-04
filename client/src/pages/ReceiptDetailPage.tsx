@@ -80,6 +80,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [showAddPaymentForm, setShowAddPaymentForm] = useState(false);
   const [selectedPayerPersonId, setSelectedPayerPersonId] = useState<string>("");
   const [paymentAmount, setPaymentAmount] = useState<string>("");
+  const [payerVenmoInput, setPayerVenmoInput] = useState<string>("");
   const [validationWarning, setValidationWarning] = useState<{
     scannedImage: string;
     itemCount: number;
@@ -619,6 +620,14 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       return;
     }
 
+    // If Venmo username was provided, update the person's Venmo
+    if (payerVenmoInput.trim()) {
+      updatePersonVenmoMutation.mutate({
+        personId: selectedPayerPersonId,
+        venmoUsername: payerVenmoInput.trim()
+      });
+    }
+    
     createPaymentMutation.mutate({
       personId: selectedPayerPersonId,
       amount: amount.toFixed(2)
@@ -1517,8 +1526,9 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           setShowAddPaymentForm(false);
           setSelectedPayerPersonId("");
           setPaymentAmount("");
+          setPayerVenmoInput("");
         }}
-        title="Payments & Settlement"
+        title="Payments"
       >
         <div className="space-y-6">
           <div>
@@ -1569,7 +1579,11 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               <Button
                 variant="outline"
                 className="w-full mt-3"
-                onClick={() => setShowAddPaymentForm(true)}
+                onClick={() => {
+                  setShowAddPaymentForm(true);
+                  setPaymentAmount(total.toFixed(2));
+                  setPayerVenmoInput("");
+                }}
                 data-testid="button-show-add-payment-form"
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -1583,7 +1597,12 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                     id="payer-select"
                     className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     value={selectedPayerPersonId}
-                    onChange={(e) => setSelectedPayerPersonId(e.target.value)}
+                    onChange={(e) => {
+                      const personId = e.target.value;
+                      setSelectedPayerPersonId(personId);
+                      const person = peopleWithColors.find(p => p.id === personId);
+                      setPayerVenmoInput(person?.venmoUsername || "");
+                    }}
                     data-testid="select-payer"
                   >
                     <option value="">Select a person</option>
@@ -1609,6 +1628,22 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="payer-venmo">Venmo username (optional)</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">@</span>
+                    <Input
+                      id="payer-venmo"
+                      type="text"
+                      placeholder="username"
+                      className="pl-7"
+                      value={payerVenmoInput}
+                      onChange={(e) => setPayerVenmoInput(e.target.value.replace(/^@/, ''))}
+                      data-testid="input-payer-venmo"
+                    />
+                  </div>
+                </div>
+
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
@@ -1617,6 +1652,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                       setShowAddPaymentForm(false);
                       setSelectedPayerPersonId("");
                       setPaymentAmount("");
+                      setPayerVenmoInput("");
                     }}
                     data-testid="button-cancel-add-payment"
                   >
@@ -1631,53 +1667,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                     Add Payment
                   </Button>
                 </div>
-              </div>
-            )}
-          </div>
-
-          <div className="border-t pt-4">
-            <h3 className="font-semibold mb-3">Settlement</h3>
-            {settlement.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">
-                {payments.length === 0 
-                  ? "Add payments to see settlement" 
-                  : "All settled! Everyone paid their fair share."}
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {settlement.map((debt, index) => (
-                  <div
-                    key={index}
-                    className="p-3 border rounded-lg bg-muted/30"
-                    data-testid={`settlement-${index}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold"
-                          style={{ backgroundColor: getColorForPerson(debt.from.id) }}
-                        >
-                          {debt.from.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                        </div>
-                        <span className="font-medium">{debt.from.name}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">owes</span>
-                        <span className="font-semibold text-primary">${debt.amount}</span>
-                        <span className="text-sm text-muted-foreground">to</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{debt.to.name}</span>
-                        <div 
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold"
-                          style={{ backgroundColor: getColorForPerson(debt.to.id) }}
-                        >
-                          {debt.to.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
               </div>
             )}
           </div>
