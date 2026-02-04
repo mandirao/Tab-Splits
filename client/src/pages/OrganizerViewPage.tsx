@@ -260,9 +260,16 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
                       <div>
                         <p className="font-medium" data-testid={`text-payer-name-${payment.id}`}>{payer.name}</p>
                         {payer.venmoUsername && (
-                          <p className="text-xs text-muted-foreground" data-testid={`text-payer-venmo-${payment.id}`}>
+                          <button
+                            className="text-xs text-primary hover:underline"
+                            onClick={() => {
+                              const venmoUrl = `venmo://users?username=${encodeURIComponent(payer.venmoUsername || "")}`;
+                              window.location.href = venmoUrl;
+                            }}
+                            data-testid={`button-venmo-${payment.id}`}
+                          >
                             @{payer.venmoUsername}
-                          </p>
+                          </button>
                         )}
                       </div>
                     </div>
