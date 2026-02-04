@@ -93,6 +93,8 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [newItemData, setNewItemData] = useState({ name: "", quantity: 1, price: "" });
   const [paidByBottomSheetOpen, setPaidByBottomSheetOpen] = useState(false);
   const [venmoInput, setVenmoInput] = useState("");
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState("");
 
   useEffect(() => {
     // Check if a scanned image exists for this receipt
@@ -201,6 +203,24 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     onError: (error: any) => {
       toast({ 
         title: "Failed to update payer", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    }
+  });
+
+  const updateReceiptNameMutation = useMutation({
+    mutationFn: async (data: { restaurantName: string }) => {
+      return await apiRequest(`/api/receipts/${receiptId}`, "PATCH", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId] });
+      setEditingName(false);
+      toast({ title: "Name updated" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to update name", 
         description: error.message,
         variant: "destructive" 
       });
@@ -802,7 +822,17 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-xl font-bold flex-1 text-center">{receipt.restaurantName || "Receipt"}</h1>
+          <button 
+            className="text-xl font-bold flex-1 text-center flex items-center justify-center gap-1 hover:text-primary transition-colors"
+            onClick={() => {
+              setNameInput(receipt.restaurantName || "");
+              setEditingName(true);
+            }}
+            data-testid="button-edit-name"
+          >
+            <span>{receipt.restaurantName || "Receipt"}</span>
+            <Pencil className="h-3.5 w-3.5 opacity-50" />
+          </button>
           <div className="flex gap-2">
             {scannedImageUrl && (
               <Button 
@@ -1693,6 +1723,49 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={editingName} onOpenChange={(open) => !open && setEditingName(false)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Tab Name</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="tab-name">Restaurant / Tab Name</Label>
+              <Input
+                id="tab-name"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                placeholder="e.g., Joe's Pizza"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && nameInput.trim()) {
+                    updateReceiptNameMutation.mutate({ restaurantName: nameInput.trim() });
+                  }
+                }}
+                data-testid="input-tab-name"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setEditingName(false)}
+                data-testid="button-cancel-edit-name"
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={() => updateReceiptNameMutation.mutate({ restaurantName: nameInput.trim() })}
+                disabled={!nameInput.trim() || updateReceiptNameMutation.isPending}
+                data-testid="button-save-name"
+              >
+                {updateReceiptNameMutation.isPending ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <BottomSheet
         open={addItemBottomSheetOpen}
