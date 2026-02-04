@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import type { Receipt, ReceiptItem, Person } from "@shared/schema";
+import type { Receipt, ReceiptItem, Person, Payment } from "@shared/schema";
 import { ArrowLeft, Image, DollarSign } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -34,6 +34,10 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
 
   const { data: people = [] } = useQuery<Person[]>({
     queryKey: ["/api/receipts", receiptId, "people"],
+  });
+
+  const { data: payments = [] } = useQuery<Payment[]>({
+    queryKey: ["/api/receipts", receiptId, "payments"],
   });
 
   const peopleWithColors = people.map((person, idx) => ({
@@ -98,8 +102,6 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
     totals.tip = tip * proportion;
     totals.total = totals.subtotal + totals.tax + totals.tip;
   });
-
-  const paidByPerson = receipt.paidById ? getPersonById(receipt.paidById) : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -234,22 +236,42 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
           </CardContent>
         </Card>
 
-        {paidByPerson && (
+        {payments.length > 0 && (
           <Card className="bg-primary/5 border-primary/20">
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-3">
+            <CardHeader className="pb-2">
+              <h2 className="font-semibold text-base flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="font-medium" data-testid="text-paid-by">
-                    {paidByPerson.name} paid the bill
-                  </p>
-                  {paidByPerson.venmoUsername && (
-                    <p className="text-sm text-muted-foreground" data-testid="text-venmo-username">
-                      Venmo: @{paidByPerson.venmoUsername}
-                    </p>
-                  )}
-                </div>
-              </div>
+                Who Paid
+              </h2>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {payments.map((payment) => {
+                const payer = getPersonById(payment.personId);
+                if (!payer) return null;
+                return (
+                  <div key={payment.id} className="flex items-center justify-between" data-testid={`payment-info-${payment.id}`}>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-8 h-8 rounded-full text-white text-xs font-semibold flex items-center justify-center"
+                        style={{ backgroundColor: getColorForPerson(payment.personId) }}
+                      >
+                        {getInitialsForPerson(payment.personId)}
+                      </div>
+                      <div>
+                        <p className="font-medium" data-testid={`text-payer-name-${payment.id}`}>{payer.name}</p>
+                        {payer.venmoUsername && (
+                          <p className="text-xs text-muted-foreground" data-testid={`text-payer-venmo-${payment.id}`}>
+                            @{payer.venmoUsername}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <span className="font-semibold text-primary" data-testid={`text-payment-amount-${payment.id}`}>
+                      ${parseFloat(payment.amount).toFixed(2)}
+                    </span>
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
         )}
