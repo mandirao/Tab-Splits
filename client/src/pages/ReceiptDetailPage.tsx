@@ -1548,7 +1548,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                   assignedColors={assignedPeople.map(getColorForPerson)}
                   onAssign={() => handleAssignClick(item.id)}
                   onEdit={() => handleEditClick(item.id)}
-                  onDelete={() => handleDeleteItem(item.id)}
                   displayQuantity={displayQuantity}
                 />
               );
@@ -1691,14 +1690,31 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         }}
         title="Edit Item"
         footer={
-          <Button 
-            className="w-full" 
-            onClick={handleSaveEdit}
-            disabled={!editItemData.name || !editItemData.price}
-            data-testid="button-save-item-edit"
-          >
-            Save Changes
-          </Button>
+          <div className="flex gap-2 w-full">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-destructive flex-shrink-0"
+              onClick={() => {
+                if (selectedItemId) {
+                  handleDeleteItem(selectedItemId);
+                  setEditBottomSheetOpen(false);
+                  setEditItemData({ name: "", quantity: 1, price: "" });
+                }
+              }}
+              data-testid="button-delete-item"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={handleSaveEdit}
+              disabled={!editItemData.name || !editItemData.price}
+              data-testid="button-save-item-edit"
+            >
+              Save Changes
+            </Button>
+          </div>
         }
       >
         <div className="space-y-4">

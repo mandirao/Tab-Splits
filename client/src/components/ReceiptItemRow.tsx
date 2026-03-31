@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Edit2, UserPlus, Trash2 } from "lucide-react";
+import { UserPlus } from "lucide-react";
 
 interface ReceiptItemRowProps {
   id: string;
@@ -23,7 +23,6 @@ export default function ReceiptItemRow({
   assignedColors = [],
   onAssign,
   onEdit,
-  onDelete,
   displayQuantity
 }: ReceiptItemRowProps) {
   const isAssigned = assignedInitials.length > 0;
@@ -32,11 +31,17 @@ export default function ReceiptItemRow({
   const quantityText = isFraction ? quantityDisplay : `${quantityDisplay}x`;
 
   return (
-    <div 
+    <div
       className={`flex items-center gap-3 py-3 ${!isAssigned ? 'opacity-60' : ''}`}
       data-testid="row-receipt-item"
     >
-      <div className="flex-1 min-w-0">
+      {/* Tappable content area — opens editor */}
+      <div
+        className="flex-1 min-w-0 cursor-pointer hover-elevate rounded-md -mx-1 px-1 py-0.5"
+        onClick={onEdit}
+        data-testid="button-edit-item"
+        role="button"
+      >
         <div className="flex items-baseline gap-2">
           <Badge variant="outline" className="text-xs px-1.5" data-testid="badge-quantity">
             {quantityText}
@@ -47,56 +52,36 @@ export default function ReceiptItemRow({
           ${price.toFixed(2)}
         </span>
       </div>
-      
-      <div className="flex items-center gap-2">
-        {isAssigned ? (
-          <button
-            onClick={onAssign}
-            className="flex -space-x-1 hover-elevate active-elevate-2 rounded-full p-0.5 transition-all"
-            data-testid="button-modify-assignment"
-          >
-            {assignedInitials.map((initials, idx) => (
-              <div
-                key={idx}
-                className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center ring-2 ring-background"
-                style={{ backgroundColor: assignedColors[idx] || 'hsl(var(--primary))' }}
-                data-testid={`badge-initials-${idx}`}
-              >
-                {initials}
-              </div>
-            ))}
-          </button>
-        ) : (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onAssign}
-            data-testid="button-assign"
-          >
-            <UserPlus className="h-4 w-4" />
-          </Button>
-        )}
-        
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={onEdit}
-          data-testid="button-edit-item"
+
+      {/* Assign button */}
+      {isAssigned ? (
+        <button
+          onClick={onAssign}
+          className="flex -space-x-1 hover-elevate active-elevate-2 rounded-full p-0.5 transition-all flex-shrink-0"
+          data-testid="button-modify-assignment"
         >
-          <Edit2 className="h-4 w-4" />
+          {assignedInitials.map((initials, idx) => (
+            <div
+              key={idx}
+              className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center ring-2 ring-background"
+              style={{ backgroundColor: assignedColors[idx] || 'hsl(var(--primary))' }}
+              data-testid={`badge-initials-${idx}`}
+            >
+              {initials}
+            </div>
+          ))}
+        </button>
+      ) : (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onAssign}
+          className="flex-shrink-0"
+          data-testid="button-assign"
+        >
+          <UserPlus className="h-4 w-4" />
         </Button>
-        
-        {onDelete && (
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={onDelete}
-            data-testid="button-delete-item"
-          >
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
-        )}
-      </div>
+      )}
     </div>
   );
 }
