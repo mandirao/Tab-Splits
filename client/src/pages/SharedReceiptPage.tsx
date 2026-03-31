@@ -1,15 +1,11 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState, useRef, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import type { ReceiptItem } from "@shared/schema";
-import { ArrowLeft, Image, DollarSign } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import { Image, DollarSign, ChevronRight } from "lucide-react";
 
 interface RedactedPerson {
   id: string;
@@ -51,96 +47,17 @@ const PERSON_COLORS = [
 
 export default function SharedReceiptPage({ params }: { params: { token: string } }) {
   const shareToken = params?.token || window.location.pathname.split('/').pop();
-  const { toast } = useToast();
-  
+
   const [isVerified, setIsVerified] = useState(false);
   const [verifiedPersonId, setVerifiedPersonId] = useState<string | null>(null);
-  const [phone, setPhone] = useState("");
-  const [showLinkOptions, setShowLinkOptions] = useState(false);
-  const [unmatchedPeople, setUnmatchedPeople] = useState<RedactedPerson[]>([]);
-  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
-  const [newName, setNewName] = useState("");
+  const [selectedTab, setSelectedTab] = useState<string>("all");
 
+  const tabRowRef = useRef<HTMLDivElement>(null);
+
+  // Always fetch — name selection is just a UX gate, not a security gate
   const { data, isLoading, error } = useQuery<SharedReceiptPayload>({
     queryKey: [`/api/share/${shareToken}`],
-    enabled: isVerified,
   });
-
-  const verifyPhoneMutation = useMutation({
-    mutationFn: async (phoneNumber: string) => {
-      return await apiRequest(`/api/share/${shareToken}/verify-phone`, "POST", { phone: phoneNumber });
-    },
-    onSuccess: (result: { verified: boolean; personId?: string; personName?: string; unmatchedPeople?: RedactedPerson[] }) => {
-      if (result.verified) {
-        setIsVerified(true);
-        setVerifiedPersonId(result.personId || null);
-        toast({
-          title: "Access granted",
-          description: `Welcome ${result.personName}!`
-        });
-      } else {
-        setUnmatchedPeople(result.unmatchedPeople || []);
-        setShowLinkOptions(true);
-      }
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Verification failed",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  });
-
-  const linkPhoneMutation = useMutation({
-    mutationFn: async (data: { phone: string; personId?: string; name?: string }) => {
-      return await apiRequest(`/api/share/${shareToken}/link-phone`, "POST", data);
-    },
-    onSuccess: (result: { verified: boolean; personId: string; personName: string }) => {
-      setIsVerified(true);
-      setVerifiedPersonId(result.personId);
-      setShowLinkOptions(false);
-      toast({
-        title: "Access granted",
-        description: `Welcome ${result.personName}!`
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Link failed",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  });
-
-  const handleVerifyPhone = () => {
-    if (!phone.trim()) {
-      toast({
-        title: "Phone number required",
-        description: "Please enter your phone number",
-        variant: "destructive"
-      });
-      return;
-    }
-    verifyPhoneMutation.mutate(phone);
-  };
-
-  const handleLinkToExisting = (personId: string) => {
-    linkPhoneMutation.mutate({ phone, personId });
-  };
-
-  const handleCreateNew = () => {
-    if (!newName.trim()) {
-      toast({
-        title: "Name required",
-        description: "Please enter your name",
-        variant: "destructive"
-      });
-      return;
-    }
-    linkPhoneMutation.mutate({ phone, name: newName });
-  };
 
   const receipt = data?.receipt;
   const items = data?.items || [];
@@ -148,130 +65,94 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
 
   const peopleWithColors = allPeople.map((person, idx) => ({
     ...person,
-    color: PERSON_COLORS[idx % PERSON_COLORS.length]
+    color: PERSON_COLORS[idx % PERSON_COLORS.length],
   }));
 
   const getPersonById = (id: string) => peopleWithColors.find(p => p.id === id);
-  const getInitialsForPerson = (personId: string) => {
-    const person = getPersonById(personId);
-    if (!person) return "";
-    return person.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  };
-  const getColorForPerson = (personId: string) => getPersonById(personId)?.color || PERSON_COLORS[0];
+  const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  const getColorForPerson = (id: string) => getPersonById(id)?.color || PERSON_COLORS[0];
 
-  // Show phone verification screen if not verified
+  // Scroll the active tab into view whenever selectedTab changes
+  useEffect(() => {
+    if (!tabRowRef.current) return;
+    const active = tabRowRef.current.querySelector<HTMLElement>('[data-active="true"]');
+    active?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, [selectedTab]);
+
+  // ── Name picker ──────────────────────────────────────────────────────────────
   if (!isVerified) {
+    const loading = isLoading || !data;
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <h2 className="text-2xl font-bold text-center">Enter Your Phone Number</h2>
-            <p className="text-sm text-muted-foreground text-center">
-              To view this receipt, please verify your phone number
+        <div className="w-full max-w-sm space-y-6">
+          <div className="text-center space-y-1">
+            <h1 className="text-2xl font-bold">
+              {receipt?.restaurantName || (loading ? "Loading…" : "Shared Tab")}
+            </h1>
+            <p className="text-sm text-muted-foreground">Who are you?</p>
+          </div>
+
+          {loading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-14 rounded-lg bg-muted animate-pulse" />
+              ))}
+            </div>
+          ) : error ? (
+            <p className="text-center text-sm text-destructive">
+              This link may be invalid or expired.
             </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {!showLinkOptions ? (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="+1 (555) 123-4567"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleVerifyPhone()}
-                    data-testid="input-verify-phone"
-                  />
-                </div>
-                <Button
-                  className="w-full"
-                  onClick={handleVerifyPhone}
-                  disabled={verifyPhoneMutation.isPending}
-                  data-testid="button-verify-phone"
-                >
-                  {verifyPhoneMutation.isPending ? "Verifying..." : "Continue"}
-                </Button>
-              </>
-            ) : (
-              <>
-                <div className="space-y-3">
-                  <p className="text-sm font-medium">Your phone number is not linked to anyone on this receipt.</p>
-                  
-                  {unmatchedPeople.length > 0 && (
-                    <>
-                      <p className="text-sm text-muted-foreground">Are you one of these people?</p>
-                      <div className="space-y-2">
-                        {unmatchedPeople.map((person) => (
-                          <Button
-                            key={person.id}
-                            variant="outline"
-                            className="w-full justify-start"
-                            onClick={() => handleLinkToExisting(person.id)}
-                            disabled={linkPhoneMutation.isPending}
-                            data-testid={`button-link-person-${person.id}`}
-                          >
-                            {person.name}
-                          </Button>
-                        ))}
-                      </div>
-                      <div className="relative">
-                        <div className="absolute inset-0 flex items-center">
-                          <span className="w-full border-t" />
-                        </div>
-                        <div className="relative flex justify-center text-xs uppercase">
-                          <span className="bg-background px-2 text-muted-foreground">Or</span>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="new-name">Enter your name</Label>
-                    <Input
-                      id="new-name"
-                      type="text"
-                      placeholder="Your name"
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleCreateNew()}
-                      data-testid="input-new-name"
-                    />
-                  </div>
-                  <Button
-                    className="w-full"
-                    onClick={handleCreateNew}
-                    disabled={linkPhoneMutation.isPending}
-                    data-testid="button-create-new-person"
-                  >
-                    {linkPhoneMutation.isPending ? "Linking..." : "Continue with this name"}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full"
+          ) : (
+            <>
+              <div className="space-y-2">
+                {peopleWithColors.map(person => (
+                  <button
+                    key={person.id}
+                    className="w-full flex items-center justify-between p-4 rounded-lg border hover-elevate active-elevate-2 text-left"
                     onClick={() => {
-                      setShowLinkOptions(false);
-                      setPhone("");
-                      setNewName("");
+                      setVerifiedPersonId(person.id);
+                      setSelectedTab(person.id);
+                      setIsVerified(true);
                     }}
-                    data-testid="button-back-to-phone"
+                    data-testid={`button-select-self-${person.id}`}
                   >
-                    Use a different phone number
-                  </Button>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0"
+                        style={{ backgroundColor: person.color }}
+                      >
+                        {getInitials(person.name)}
+                      </div>
+                      <span className="font-medium">{person.name}</span>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                ))}
+              </div>
+
+              <button
+                className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+                onClick={() => {
+                  setVerifiedPersonId(null);
+                  setSelectedTab("all");
+                  setIsVerified(true);
+                }}
+                data-testid="button-browse-all"
+              >
+                Just browsing →
+              </button>
+            </>
+          )}
+        </div>
       </div>
     );
   }
 
+  // ── Loading / error (post-verification) ─────────────────────────────────────
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <p className="text-muted-foreground">Loading receipt...</p>
+        <p className="text-muted-foreground">Loading receipt…</p>
       </div>
     );
   }
@@ -281,203 +162,332 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
       <div className="flex flex-col items-center justify-center h-screen gap-4">
         <p className="text-lg font-semibold">Receipt not found</p>
         <p className="text-sm text-muted-foreground">
-          {error ? "Failed to load the receipt. Please try again." : "This share link may have expired or is invalid"}
+          This share link may have expired or is invalid.
         </p>
       </div>
     );
   }
 
+  // ── Calculations ─────────────────────────────────────────────────────────────
   const subtotal = parseFloat(receipt.subtotal) || 0;
   const tax = parseFloat(receipt.tax) || 0;
   const tip = parseFloat(receipt.tip) || 0;
   const total = subtotal + tax + tip;
 
-  // Calculate per-person totals
   const personTotals = new Map<string, { subtotal: number; tax: number; tip: number; total: number }>();
-
   items.forEach(item => {
     const itemPrice = parseFloat(item.price) || 0;
     const assignedPeople = (item.assignedTo as string[]) || [];
     const qtys = (item.assignedQuantities as Record<string, number>) || {};
-    
     if (assignedPeople.length > 0) {
-      const totalAssignedQty = assignedPeople.reduce((sum, pid) => sum + (qtys[pid] ?? 1), 0);
-      assignedPeople.forEach(personId => {
-        const personQty = qtys[personId] ?? 1;
-        const personShare = totalAssignedQty > 0 ? (personQty / totalAssignedQty) * itemPrice : itemPrice / assignedPeople.length;
-        if (!personTotals.has(personId)) {
-          personTotals.set(personId, { subtotal: 0, tax: 0, tip: 0, total: 0 });
-        }
-        const current = personTotals.get(personId)!;
-        current.subtotal += personShare;
+      const totalQty = assignedPeople.reduce((s, pid) => s + (qtys[pid] ?? 1), 0);
+      assignedPeople.forEach(pid => {
+        const share = totalQty > 0
+          ? ((qtys[pid] ?? 1) / totalQty) * itemPrice
+          : itemPrice / assignedPeople.length;
+        if (!personTotals.has(pid)) personTotals.set(pid, { subtotal: 0, tax: 0, tip: 0, total: 0 });
+        personTotals.get(pid)!.subtotal += share;
       });
     }
   });
-
-  personTotals.forEach((totals, personId) => {
-    const proportion = totals.subtotal / subtotal;
-    totals.tax = tax * proportion;
-    totals.tip = tip * proportion;
-    totals.total = totals.subtotal + totals.tax + totals.tip;
+  personTotals.forEach((t) => {
+    const proportion = subtotal > 0 ? t.subtotal / subtotal : 0;
+    t.tax = tax * proportion;
+    t.tip = tip * proportion;
+    t.total = t.subtotal + t.tax + t.tip;
   });
 
+  // ── Tab filtering ─────────────────────────────────────────────────────────────
+  const isAllTab = selectedTab === "all";
+  const filteredItems = isAllTab
+    ? items
+    : items.filter(item => (item.assignedTo as string[] || []).includes(selectedTab));
+
+  const filteredPersonTotals = isAllTab
+    ? Array.from(personTotals.entries())
+    : Array.from(personTotals.entries()).filter(([id]) => id === selectedTab);
+
+  // For the "my tab" summary totals when a person tab is active
+  const myTotals = !isAllTab ? personTotals.get(selectedTab) : null;
+
+  // ── Main view ─────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background">
-      <header className="p-4 border-b bg-card sticky top-0 z-10">
-        <div className="flex items-center justify-between">
-          <div className="w-10" />
-          <div className="text-center flex-1">
-            <h1 className="text-xl font-bold">{receipt.restaurantName || "Receipt"}</h1>
-            <p className="text-sm text-muted-foreground mt-1">Shared Receipt</p>
+      {/* Header */}
+      <header className="p-4 border-b bg-card sticky top-0 z-50">
+        <div className="flex items-center justify-between gap-2">
+          <div className="w-10 shrink-0" />
+          <div className="text-center flex-1 min-w-0">
+            <h1 className="text-xl font-bold truncate">{receipt.restaurantName || "Receipt"}</h1>
+            <p className="text-sm text-muted-foreground">Shared Tab</p>
           </div>
-          {receipt.imageUrl && (
+          {receipt.imageUrl ? (
             <Dialog>
               <DialogTrigger asChild>
                 <Button size="icon" variant="ghost" data-testid="button-view-receipt-image">
                   <Image className="h-5 w-5" />
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-auto">
+              <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-auto" aria-describedby={undefined}>
                 <DialogHeader>
                   <DialogTitle>Original Receipt</DialogTitle>
                 </DialogHeader>
                 <div className="flex items-center justify-center">
-                  <img 
-                    src={receipt.imageUrl} 
-                    alt="Original receipt" 
+                  <img
+                    src={receipt.imageUrl}
+                    alt="Original receipt"
                     className="max-w-full max-h-[70vh] object-contain rounded-lg"
                     data-testid="img-receipt-scan"
                   />
                 </div>
               </DialogContent>
             </Dialog>
+          ) : (
+            <div className="w-10 shrink-0" />
           )}
-          {!receipt.imageUrl && <div className="w-10" />}
         </div>
       </header>
 
+      {/* Tab row */}
+      <div className="sticky top-[73px] z-40 bg-background border-b">
+        <div
+          ref={tabRowRef}
+          className="flex overflow-x-auto scrollbar-hide px-3 py-2 gap-2"
+        >
+          {/* All tab */}
+          <button
+            data-active={selectedTab === "all"}
+            onClick={() => setSelectedTab("all")}
+            className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors border ${
+              selectedTab === "all"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-border text-muted-foreground hover-elevate"
+            }`}
+            data-testid="tab-all"
+          >
+            All
+          </button>
+
+          {/* Per-person tabs */}
+          {peopleWithColors.map(person => {
+            const isActive = selectedTab === person.id;
+            return (
+              <button
+                key={person.id}
+                data-active={isActive}
+                onClick={() => setSelectedTab(person.id)}
+                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors border ${
+                  isActive
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border text-muted-foreground hover-elevate"
+                }`}
+                data-testid={`tab-person-${person.id}`}
+              >
+                <div
+                  className="w-4 h-4 rounded-full shrink-0"
+                  style={{ backgroundColor: person.color }}
+                />
+                {person.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <main className="p-4 pb-24 space-y-4">
+
+        {/* Items card */}
         <Card>
           <CardHeader className="pb-3">
-            <h2 className="font-semibold text-base">Items</h2>
+            <h2 className="font-semibold text-base">
+              {isAllTab ? "Items" : `${getPersonById(selectedTab)?.name}'s Items`}
+            </h2>
           </CardHeader>
           <CardContent className="divide-y">
-            {items.map((item) => {
-              const isAssigned = (item.assignedTo as string[] || []).length > 0;
-              return (
-                <div 
-                  key={item.id}
-                  className={`flex items-center gap-3 py-3 ${!isAssigned ? 'opacity-60' : ''}`}
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline gap-2">
-                      {(item.quantity || 1) > 1 && (
-                        <Badge variant="outline" className="text-xs px-1.5">
-                          {item.quantity}x
-                        </Badge>
-                      )}
-                      <span className="font-medium text-sm">{item.name}</span>
+            {filteredItems.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-3">No items assigned.</p>
+            ) : (
+              filteredItems.map(item => {
+                const assignedPeople = (item.assignedTo as string[]) || [];
+                const isAssigned = assignedPeople.length > 0;
+                const qtys = (item.assignedQuantities as Record<string, number>) || {};
+                const totalQty = assignedPeople.reduce((s, pid) => s + (qtys[pid] ?? 1), 0);
+
+                // Per-person share for this item (when on a person tab)
+                let displayPrice = parseFloat(item.price) || 0;
+                if (!isAllTab && isAssigned) {
+                  const myQty = qtys[selectedTab] ?? 1;
+                  displayPrice = totalQty > 0
+                    ? (myQty / totalQty) * displayPrice
+                    : displayPrice / assignedPeople.length;
+                }
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`flex items-center gap-3 py-3 ${!isAssigned ? 'opacity-60' : ''}`}
+                    data-testid={`item-row-${item.id}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2">
+                        {(item.quantity || 1) > 1 && (
+                          <Badge variant="outline" className="text-xs px-1.5 shrink-0">
+                            {item.quantity}x
+                          </Badge>
+                        )}
+                        <span className="font-medium text-sm truncate">{item.name}</span>
+                      </div>
+                      <span className="text-base font-semibold">
+                        ${displayPrice.toFixed(2)}
+                        {!isAllTab && assignedPeople.length > 1 && (
+                          <span className="text-xs text-muted-foreground font-normal ml-1">
+                            (your share)
+                          </span>
+                        )}
+                      </span>
                     </div>
-                    <span className="text-base font-semibold">
-                      ${(parseFloat(item.price) || 0).toFixed(2)}
-                    </span>
+
+                    {isAllTab && isAssigned && (
+                      <div className="flex -space-x-1 shrink-0">
+                        {assignedPeople.map((pid, idx) => (
+                          <div
+                            key={idx}
+                            className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center ring-2 ring-background"
+                            style={{ backgroundColor: getColorForPerson(pid) }}
+                          >
+                            {getInitials(getPersonById(pid)?.name || "")}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  
-                  {isAssigned && (
-                    <div className="flex -space-x-1">
-                      {(item.assignedTo as string[]).map((personId, idx) => (
-                        <div
-                          key={idx}
-                          className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center ring-2 ring-background"
-                          style={{ backgroundColor: getColorForPerson(personId) }}
-                        >
-                          {getInitialsForPerson(personId)}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <h2 className="font-semibold text-base">Per Person Summary</h2>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {Array.from(personTotals.entries()).map(([personId, totals]) => {
-              const person = getPersonById(personId);
-              if (!person) return null;
-              
-              return (
-                <div key={personId} className="p-3 border rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div
-                      className="w-8 h-8 rounded-full text-white text-xs font-semibold flex items-center justify-center"
-                      style={{ backgroundColor: getColorForPerson(personId) }}
-                    >
-                      {getInitialsForPerson(personId)}
+        {/* Summary card — person-tab shows a single clean breakdown */}
+        {!isAllTab && myTotals ? (
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-8 h-8 rounded-full text-white text-xs font-semibold flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: getColorForPerson(selectedTab) }}
+                >
+                  {getInitials(getPersonById(selectedTab)?.name || "")}
+                </div>
+                <h2 className="font-semibold text-base">{getPersonById(selectedTab)?.name}'s Total</h2>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span>${myTotals.subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Tax</span>
+                <span>${myTotals.tax.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Tip</span>
+                <span>${myTotals.tip.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-xl font-bold pt-2 border-t">
+                <span>Total</span>
+                <span>${myTotals.total.toFixed(2)}</span>
+              </div>
+
+              {/* Venmo pay button */}
+              {receipt.paidByVenmo &&
+               verifiedPersonId === selectedTab &&
+               receipt.paidById !== selectedTab && (
+                <Button
+                  className="w-full mt-2"
+                  onClick={() => {
+                    const username = encodeURIComponent(receipt.paidByVenmo || "");
+                    const amount = myTotals.total.toFixed(2);
+                    const note = encodeURIComponent(`SplitTab - ${receipt.restaurantName || 'Receipt'}`);
+                    window.location.href = `venmo://paycharge?txn=pay&recipients=${username}&amount=${amount}&note=${note}`;
+                  }}
+                  data-testid={`button-pay-venmo-${selectedTab}`}
+                >
+                  Pay ${myTotals.total.toFixed(2)} via Venmo
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ) : isAllTab ? (
+          /* All tab — per-person summary list */
+          <Card>
+            <CardHeader className="pb-3">
+              <h2 className="font-semibold text-base">Per Person Summary</h2>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {filteredPersonTotals.map(([personId, totals]) => {
+                const person = getPersonById(personId);
+                if (!person) return null;
+                return (
+                  <div key={personId} className="p-3 border rounded-lg space-y-1.5">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div
+                        className="w-8 h-8 rounded-full text-white text-xs font-semibold flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: getColorForPerson(personId) }}
+                      >
+                        {getInitials(person.name)}
+                      </div>
+                      <span className="font-semibold">{person.name}</span>
                     </div>
-                    <span className="font-semibold">{person.name}</span>
-                  </div>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
+                    <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Subtotal</span>
                       <span>${totals.subtotal.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Tax</span>
                       <span>${totals.tax.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Tip</span>
                       <span>${totals.tip.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between font-bold pt-1 border-t">
+                    <div className="flex justify-between font-bold text-sm pt-1 border-t">
                       <span>Total</span>
                       <span>${totals.total.toFixed(2)}</span>
                     </div>
+                    {receipt.paidByVenmo &&
+                     verifiedPersonId === personId &&
+                     receipt.paidById !== personId && (
+                      <Button
+                        className="w-full mt-1"
+                        onClick={() => {
+                          const username = encodeURIComponent(receipt.paidByVenmo || "");
+                          const amount = totals.total.toFixed(2);
+                          const note = encodeURIComponent(`SplitTab - ${receipt.restaurantName || 'Receipt'}`);
+                          window.location.href = `venmo://paycharge?txn=pay&recipients=${username}&amount=${amount}&note=${note}`;
+                        }}
+                        data-testid={`button-pay-venmo-${personId}`}
+                      >
+                        Pay ${totals.total.toFixed(2)} via Venmo
+                      </Button>
+                    )}
                   </div>
-                  {/* Pay with Venmo button - only for the viewer's own total */}
-                  {receipt.paidByVenmo && 
-                   verifiedPersonId === personId && 
-                   receipt.paidById !== personId && (
-                    <Button
-                      className="w-full mt-3"
-                      onClick={() => {
-                        const venmoUsername = encodeURIComponent(receipt.paidByVenmo || "");
-                        const amount = totals.total.toFixed(2);
-                        const note = encodeURIComponent(`SplitTab - ${receipt.restaurantName || 'Receipt'}`);
-                        const venmoUrl = `venmo://paycharge?txn=pay&recipients=${venmoUsername}&amount=${amount}&note=${note}`;
-                        window.location.href = venmoUrl;
-                      }}
-                      data-testid={`button-pay-venmo-${personId}`}
-                    >
-                      Pay ${totals.total.toFixed(2)} via Venmo
-                    </Button>
-                  )}
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
+                );
+              })}
+            </CardContent>
+          </Card>
+        ) : null}
 
-        {/* Paid By Info */}
+        {/* Paid by banner */}
         {receipt.paidByName && (
           <Card className="bg-primary/5 border-primary/20">
             <CardContent className="pt-4">
               <div className="flex items-center gap-3">
-                <DollarSign className="h-5 w-5 text-primary" />
+                <DollarSign className="h-5 w-5 text-primary shrink-0" />
                 <div>
-                  <p className="font-medium">
-                    {receipt.paidByName} paid the bill
-                  </p>
+                  <p className="font-medium">{receipt.paidByName} paid the bill</p>
                   {receipt.paidByVenmo && (
-                    <p className="text-sm text-muted-foreground">
-                      Venmo: @{receipt.paidByVenmo}
-                    </p>
+                    <p className="text-sm text-muted-foreground">Venmo: @{receipt.paidByVenmo}</p>
                   )}
                 </div>
               </div>
@@ -485,6 +495,7 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
           </Card>
         )}
 
+        {/* Receipt total (always visible) */}
         <Card>
           <CardHeader className="pb-3">
             <h2 className="font-semibold text-base">Receipt Total</h2>
