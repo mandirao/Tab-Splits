@@ -65,9 +65,10 @@ interface AddPersonPanelProps {
   receiptPeopleIds: string[];
   allPeople: Person[];
   onAdded: (personId: string) => void;
+  compact?: boolean;
 }
 
-function AddPersonPanel({ receiptId, receiptPeopleIds, allPeople, onAdded }: AddPersonPanelProps) {
+function AddPersonPanel({ receiptId, receiptPeopleIds, allPeople, onAdded, compact }: AddPersonPanelProps) {
   const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const available = allPeople.filter(p => !receiptPeopleIds.includes(p.id));
@@ -147,6 +148,22 @@ function AddPersonPanel({ receiptId, receiptPeopleIds, allPeople, onAdded }: Add
   };
 
   if (!expanded) {
+    if (compact) {
+      return (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => {
+            setExpanded(true);
+            setMode(available.length > 0 ? "past" : "new");
+          }}
+          data-testid="button-show-add-person-panel"
+          title="Add person"
+        >
+          <UserPlus className="h-4 w-4" />
+        </Button>
+      );
+    }
     return (
       <Button
         variant="outline"
@@ -163,7 +180,7 @@ function AddPersonPanel({ receiptId, receiptPeopleIds, allPeople, onAdded }: Add
   }
 
   return (
-    <div className="space-y-3 border rounded-lg p-4 bg-muted/20">
+    <div className={`space-y-3 border rounded-lg p-4 bg-muted/20${compact ? " w-full" : ""}`}>
       {/* Mode tabs */}
       <div className="flex gap-1 bg-muted rounded-md p-1">
         {[
@@ -450,7 +467,7 @@ function AssignmentSheetBody({
           <p className="text-sm text-muted-foreground">
             Select one or more people to assign this item to
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
             {peopleWithColors.map((person: any) => (
               <PersonChip
                 key={person.id}
@@ -461,16 +478,16 @@ function AssignmentSheetBody({
                 onSelect={() => togglePersonSelection(person.id)}
               />
             ))}
+            <AddPersonPanel
+              receiptId={receiptId}
+              receiptPeopleIds={receiptPeopleIds}
+              allPeople={allPeople}
+              onAdded={(id) => setSelectedPeople(prev => [...prev, id])}
+              compact
+            />
           </div>
         </>
       )}
-
-      <AddPersonPanel
-        receiptId={receiptId}
-        receiptPeopleIds={receiptPeopleIds}
-        allPeople={allPeople}
-        onAdded={(id) => setSelectedPeople(prev => [...prev, id])}
-      />
     </div>
   );
 }
