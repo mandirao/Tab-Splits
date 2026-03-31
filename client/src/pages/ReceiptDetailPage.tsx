@@ -592,13 +592,16 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
 
       // Call the OCR API
       const parsed = await apiRequest("/api/scan-receipt", "POST", { image: base64 });
-      if (!parsed.items || parsed.items.length === 0) {
+
+      // Validate items is actually an array with entries
+      const newItems: Array<{ name: string; quantity: number; price: number }> = Array.isArray(parsed.items) ? parsed.items : [];
+      if (newItems.length === 0) {
         throw new Error("No items detected in the image");
       }
 
       // Update receipt fields (name, subtotal, tax, tip, total)
       const receiptUpdate: Record<string, string> = {};
-      if (parsed.restaurantName) receiptUpdate.restaurantName = parsed.restaurantName;
+      if (parsed.restaurantName) receiptUpdate.restaurantName = String(parsed.restaurantName);
       if (parsed.subtotal != null) receiptUpdate.subtotal = Number(parsed.subtotal).toFixed(2);
       if (parsed.tax != null) receiptUpdate.tax = Number(parsed.tax).toFixed(2);
       if (parsed.tip != null) receiptUpdate.tip = Number(parsed.tip).toFixed(2);
@@ -607,17 +610,20 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         await apiRequest(`/api/receipts/${receiptId}`, "PATCH", receiptUpdate);
       }
 
-      // Clear all existing items, then insert fresh ones
-      await apiRequest(`/api/receipts/${receiptId}/items`, "DELETE");
-      for (const item of parsed.items) {
+      // Fetch the live item list so we have current IDs, then delete each one
+      const liveItems: Array<{ id: string }> = await apiRequest(`/api/receipts/${receiptId}/items`, "GET");
+      await Promise.all(liveItems.map((it) => apiRequest(`/api/items/${it.id}`, "DELETE")));
+
+      // Insert all freshly-parsed items
+      for (const item of newItems) {
         await apiRequest(`/api/receipts/${receiptId}/items`, "POST", {
-          name: item.name,
-          quantity: item.quantity ?? 1,
+          name: String(item.name),
+          quantity: Number(item.quantity) > 0 ? Number(item.quantity) : 1,
           price: Number(item.price).toFixed(2),
         });
       }
 
-      return parsed;
+      return { ...parsed, items: newItems };
     },
     onSuccess: (parsed) => {
       queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId] });
