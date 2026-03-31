@@ -84,20 +84,24 @@ export default function SummaryPage({ params }: { params?: { id?: string } }) {
 
       const itemPrice = parseFloat(item.price) || 0;
       const quantity = item.quantity || 1;
+      const qtys = (item.assignedQuantities as Record<string, number>) || {};
       
       if (itemPrice <= 0) return;
-      
-      const pricePerPerson = (itemPrice * quantity) / assignedTo.length;
+
+      const totalAssignedQty = assignedTo.reduce((sum, pid) => sum + (qtys[pid] ?? 1), 0);
 
       assignedTo.forEach(personId => {
         const summary = personSummaries.get(personId);
         if (summary) {
+          const personQty = qtys[personId] ?? 1;
+          const personShare = totalAssignedQty > 0 ? (personQty / totalAssignedQty) * itemPrice : itemPrice / assignedTo.length;
+          const displayQty = totalAssignedQty > 0 ? (personQty / totalAssignedQty) * quantity : quantity / assignedTo.length;
           summary.items.push({
             name: item.name,
-            quantity: assignedTo.length > 1 ? quantity / assignedTo.length : quantity,
-            price: pricePerPerson
+            quantity: displayQty,
+            price: personShare
           });
-          summary.subtotal += pricePerPerson;
+          summary.subtotal += personShare;
         }
       });
     });

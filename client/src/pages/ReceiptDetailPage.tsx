@@ -55,6 +55,199 @@ const PERSON_COLORS = [
   'hsl(35, 85%, 68%)',
 ];
 
+interface AssignmentSheetBodyProps {
+  selectedItemId: string | null;
+  items: any[];
+  peopleWithColors: any[];
+  selectedPeople: string[];
+  assignedQuantities: Record<string, number>;
+  setAssignedQuantities: (q: Record<string, number>) => void;
+  setSelectedPeople: (p: string[]) => void;
+  togglePersonSelection: (id: string) => void;
+  showAddPersonForm: boolean;
+  setShowAddPersonForm: (v: boolean) => void;
+  newPersonName: string;
+  setNewPersonName: (v: string) => void;
+  newPersonPhone: string;
+  setNewPersonPhone: (v: string) => void;
+  handleSelectFromContacts: () => void;
+  handleAddNewPerson: () => void;
+  createPersonMutation: any;
+}
+
+function AssignmentSheetBody({
+  selectedItemId,
+  items,
+  peopleWithColors,
+  selectedPeople,
+  assignedQuantities,
+  setAssignedQuantities,
+  setSelectedPeople,
+  togglePersonSelection,
+  showAddPersonForm,
+  setShowAddPersonForm,
+  newPersonName,
+  setNewPersonName,
+  newPersonPhone,
+  setNewPersonPhone,
+  handleSelectFromContacts,
+  handleAddNewPerson,
+  createPersonMutation,
+}: AssignmentSheetBodyProps) {
+  const selectedItem = items.find((i: any) => i.id === selectedItemId);
+  const itemQty = selectedItem?.quantity ?? 1;
+  const isMultiQty = itemQty > 1;
+  const totalAssigned = selectedPeople.reduce((sum, pid) => sum + (assignedQuantities[pid] ?? 0), 0);
+
+  const updateQty = (personId: string, newQty: number) => {
+    const clamped = Math.max(0, Math.min(newQty, itemQty));
+    const newQtys = { ...assignedQuantities, [personId]: clamped };
+    setAssignedQuantities(newQtys);
+    setSelectedPeople(
+      Object.entries(newQtys).filter(([, q]) => q > 0).map(([pid]) => pid)
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      {isMultiQty ? (
+        <>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">How many did each person have?</p>
+            <span className={`text-sm font-medium ${totalAssigned === itemQty ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+              {totalAssigned}/{itemQty} assigned
+            </span>
+          </div>
+          <div className="space-y-1">
+            {peopleWithColors.map((person: any) => {
+              const qty = assignedQuantities[person.id] ?? 0;
+              return (
+                <div key={person.id} className="flex items-center justify-between py-2">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0"
+                      style={{ backgroundColor: person.color }}
+                    >
+                      {person.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                    </div>
+                    <span className="text-sm font-medium">{person.name}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={() => updateQty(person.id, qty - 1)}
+                      disabled={qty <= 0}
+                      data-testid={`button-qty-minus-${person.id}`}
+                    >
+                      <span className="text-base leading-none select-none">−</span>
+                    </Button>
+                    <span className="w-5 text-center text-sm font-semibold" data-testid={`text-qty-${person.id}`}>{qty}</span>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={() => updateQty(person.id, qty + 1)}
+                      disabled={totalAssigned >= itemQty}
+                      data-testid={`button-qty-plus-${person.id}`}
+                    >
+                      <span className="text-base leading-none select-none">+</span>
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-muted-foreground">
+            Select one or more people to assign this item to
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {peopleWithColors.map((person: any) => (
+              <PersonChip
+                key={person.id}
+                name={person.name}
+                initials={person.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                color={person.color}
+                selected={selectedPeople.includes(person.id)}
+                onSelect={() => togglePersonSelection(person.id)}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {!showAddPersonForm ? (
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => setShowAddPersonForm(true)}
+          data-testid="button-show-add-person-form"
+        >
+          + Add New Person
+        </Button>
+      ) : (
+        <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+          {'contacts' in navigator && 'ContactsManager' in window && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={handleSelectFromContacts}
+              data-testid="button-select-from-contacts"
+            >
+              Select from Contacts
+            </Button>
+          )}
+          <div className="space-y-2">
+            <Label htmlFor="new-person-name">Name *</Label>
+            <Input
+              id="new-person-name"
+              type="text"
+              value={newPersonName}
+              onChange={(e) => setNewPersonName(e.target.value)}
+              placeholder="e.g. John Doe"
+              data-testid="input-new-person-name"
+              onKeyDown={(e) => { if (e.key === 'Enter' && newPersonName.trim()) handleAddNewPerson(); }}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="new-person-phone">Phone Number (Optional)</Label>
+            <Input
+              id="new-person-phone"
+              type="tel"
+              value={newPersonPhone}
+              onChange={(e) => setNewPersonPhone(e.target.value)}
+              placeholder="e.g. (555) 123-4567"
+              data-testid="input-new-person-phone"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={() => { setShowAddPersonForm(false); setNewPersonName(""); setNewPersonPhone(""); }}
+              data-testid="button-cancel-add-person"
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="flex-1"
+              onClick={handleAddNewPerson}
+              disabled={!newPersonName.trim() || createPersonMutation.isPending}
+              data-testid="button-add-person"
+            >
+              {createPersonMutation.isPending ? "Adding..." : "Add Person"}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ReceiptDetailPage({ params }: { params: { id: string } }) {
   const receiptId = params?.id || window.location.pathname.split('/')[2];
   const [, setLocation] = useLocation();
@@ -63,6 +256,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [editBottomSheetOpen, setEditBottomSheetOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
+  const [assignedQuantities, setAssignedQuantities] = useState<Record<string, number>>({});
   const [editItemData, setEditItemData] = useState({ name: "", quantity: 1, price: "" });
   const [showAddPersonForm, setShowAddPersonForm] = useState(false);
   const [newPersonName, setNewPersonName] = useState("");
@@ -246,8 +440,8 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   });
 
   const updateItemMutation = useMutation({
-    mutationFn: async ({ itemId, assignedTo }: { itemId: string; assignedTo: string[] }) => {
-      return await apiRequest(`/api/items/${itemId}`, "PATCH", { assignedTo });
+    mutationFn: async ({ itemId, assignedTo, assignedQuantities }: { itemId: string; assignedTo: string[]; assignedQuantities: Record<string, number> }) => {
+      return await apiRequest(`/api/items/${itemId}`, "PATCH", { assignedTo, assignedQuantities });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
@@ -440,7 +634,10 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const handleAssignClick = (itemId: string) => {
     const item = items.find(i => i.id === itemId);
     setSelectedItemId(itemId);
-    setSelectedPeople((item?.assignedTo as string[]) || []);
+    const existingPeople = (item?.assignedTo as string[]) || [];
+    const existingQtys = (item?.assignedQuantities as Record<string, number>) || {};
+    setSelectedPeople(existingPeople);
+    setAssignedQuantities(existingQtys);
     setAssignBottomSheetOpen(true);
   };
 
@@ -448,12 +645,14 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     if (selectedItemId) {
       updateItemMutation.mutate({
         itemId: selectedItemId,
-        assignedTo: selectedPeople
+        assignedTo: selectedPeople,
+        assignedQuantities
       });
     }
     setAssignBottomSheetOpen(false);
     setSelectedItemId(null);
     setSelectedPeople([]);
+    setAssignedQuantities({});
   };
 
   const handleEditClick = (itemId: string) => {
@@ -711,16 +910,20 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   items.forEach(item => {
     const itemPrice = parseFloat(item.price) || 0;
     const assignedPeople = (item.assignedTo as string[]) || [];
+    const qtys = (item.assignedQuantities as Record<string, number>) || {};
     
     if (assignedPeople.length > 0) {
-      const pricePerPerson = itemPrice / assignedPeople.length;
+      // Use assignedQuantities for proportional split if present, else equal split
+      const totalAssignedQty = assignedPeople.reduce((sum, pid) => sum + (qtys[pid] ?? 1), 0);
       
       assignedPeople.forEach(personId => {
+        const personQty = qtys[personId] ?? 1;
+        const personShare = totalAssignedQty > 0 ? (personQty / totalAssignedQty) * itemPrice : itemPrice / assignedPeople.length;
         if (!personTotals.has(personId)) {
           personTotals.set(personId, { subtotal: 0, tax: 0, tip: 0, total: 0 });
         }
         const current = personTotals.get(personId)!;
-        current.subtotal += pricePerPerson;
+        current.subtotal += personShare;
       });
     }
   });
@@ -757,10 +960,16 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   // Calculate adjusted quantity for person-specific tabs
   const getAdjustedQuantity = (item: ReceiptItem, personId: string) => {
     const assignedPeople = (item.assignedTo as string[]) || [];
+    const qtys = (item.assignedQuantities as Record<string, number>) || {};
     const originalQuantity = item.quantity || 1;
     
     if (assignedPeople.length === 0) {
       return originalQuantity;
+    }
+    
+    // If this item has per-person quantities, return the person's specific quantity
+    if (qtys[personId] !== undefined) {
+      return qtys[personId];
     }
     
     return originalQuantity / assignedPeople.length;
@@ -1014,7 +1223,12 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               if (isPersonTab && assignedPeople.length > 0) {
                 const adjustedQty = getAdjustedQuantity(item, selectedTab);
                 displayQuantity = formatQuantity(adjustedQty);
-                displayPrice = displayPrice / assignedPeople.length;
+                const qtys = (item.assignedQuantities as Record<string, number>) || {};
+                const totalAssignedQty = assignedPeople.reduce((sum, pid) => sum + (qtys[pid] ?? 1), 0);
+                const personQty = qtys[selectedTab] ?? 1;
+                displayPrice = totalAssignedQty > 0
+                  ? (personQty / totalAssignedQty) * displayPrice
+                  : displayPrice / assignedPeople.length;
               }
               
               return (
@@ -1136,6 +1350,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         onClose={() => {
           setAssignBottomSheetOpen(false);
           setSelectedPeople([]);
+          setAssignedQuantities({});
           setShowAddPersonForm(false);
           setNewPersonName("");
           setNewPersonPhone("");
@@ -1151,101 +1366,25 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           </Button>
         }
       >
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Select one or more people to assign this item to
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {peopleWithColors.map((person) => (
-              <PersonChip
-                key={person.id}
-                name={person.name}
-                initials={person.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                color={person.color}
-                selected={selectedPeople.includes(person.id)}
-                onSelect={() => togglePersonSelection(person.id)}
-              />
-            ))}
-          </div>
-
-          {!showAddPersonForm ? (
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={() => setShowAddPersonForm(true)}
-              data-testid="button-show-add-person-form"
-            >
-              + Add New Person
-            </Button>
-          ) : (
-            <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
-              {'contacts' in navigator && 'ContactsManager' in window && (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleSelectFromContacts}
-                  data-testid="button-select-from-contacts"
-                >
-                  Select from Contacts
-                </Button>
-              )}
-              
-              <div className="space-y-2">
-                <Label htmlFor="new-person-name">Name *</Label>
-                <Input
-                  id="new-person-name"
-                  type="text"
-                  value={newPersonName}
-                  onChange={(e) => setNewPersonName(e.target.value)}
-                  placeholder="e.g. John Doe"
-                  data-testid="input-new-person-name"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && newPersonName.trim()) {
-                      handleAddNewPerson();
-                    }
-                  }}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="new-person-phone">Phone Number (Optional)</Label>
-                <Input
-                  id="new-person-phone"
-                  type="tel"
-                  value={newPersonPhone}
-                  onChange={(e) => setNewPersonPhone(e.target.value)}
-                  placeholder="e.g. (555) 123-4567"
-                  data-testid="input-new-person-phone"
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => {
-                    setShowAddPersonForm(false);
-                    setNewPersonName("");
-                    setNewPersonPhone("");
-                  }}
-                  data-testid="button-cancel-add-person"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  className="flex-1"
-                  onClick={handleAddNewPerson}
-                  disabled={!newPersonName.trim() || createPersonMutation.isPending}
-                  data-testid="button-add-person"
-                >
-                  {createPersonMutation.isPending ? "Adding..." : "Add Person"}
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
+        <AssignmentSheetBody
+          selectedItemId={selectedItemId}
+          items={items}
+          peopleWithColors={peopleWithColors}
+          selectedPeople={selectedPeople}
+          assignedQuantities={assignedQuantities}
+          setAssignedQuantities={setAssignedQuantities}
+          setSelectedPeople={setSelectedPeople}
+          togglePersonSelection={togglePersonSelection}
+          showAddPersonForm={showAddPersonForm}
+          setShowAddPersonForm={setShowAddPersonForm}
+          newPersonName={newPersonName}
+          setNewPersonName={setNewPersonName}
+          newPersonPhone={newPersonPhone}
+          setNewPersonPhone={setNewPersonPhone}
+          handleSelectFromContacts={handleSelectFromContacts}
+          handleAddNewPerson={handleAddNewPerson}
+          createPersonMutation={createPersonMutation}
+        />
       </BottomSheet>
 
       <BottomSheet

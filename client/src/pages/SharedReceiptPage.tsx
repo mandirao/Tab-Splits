@@ -298,16 +298,18 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
   items.forEach(item => {
     const itemPrice = parseFloat(item.price) || 0;
     const assignedPeople = (item.assignedTo as string[]) || [];
+    const qtys = (item.assignedQuantities as Record<string, number>) || {};
     
     if (assignedPeople.length > 0) {
-      const pricePerPerson = itemPrice / assignedPeople.length;
-      
+      const totalAssignedQty = assignedPeople.reduce((sum, pid) => sum + (qtys[pid] ?? 1), 0);
       assignedPeople.forEach(personId => {
+        const personQty = qtys[personId] ?? 1;
+        const personShare = totalAssignedQty > 0 ? (personQty / totalAssignedQty) * itemPrice : itemPrice / assignedPeople.length;
         if (!personTotals.has(personId)) {
           personTotals.set(personId, { subtotal: 0, tax: 0, tip: 0, total: 0 });
         }
         const current = personTotals.get(personId)!;
-        current.subtotal += pricePerPerson;
+        current.subtotal += personShare;
       });
     }
   });

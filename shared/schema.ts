@@ -23,6 +23,7 @@ export const receiptItems = pgTable("receipt_items", {
   quantity: integer("quantity").notNull().default(1),
   price: numeric("price", { precision: 10, scale: 2 }).notNull(),
   assignedTo: jsonb("assigned_to").$type<string[]>().default([]),
+  assignedQuantities: jsonb("assigned_quantities").$type<Record<string, number>>().default({}),
 });
 
 export const people = pgTable("people", {
@@ -71,6 +72,7 @@ export const updateReceiptItemSchema = z.object({
   quantity: z.number().int().positive().optional(),
   price: numericStringSchema.optional(),
   assignedTo: z.array(z.string()).optional(),
+  assignedQuantities: z.record(z.string(), z.number()).optional(),
 }).strict();
 
 export const updatePersonSchema = z.object({
