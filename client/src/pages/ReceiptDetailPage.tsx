@@ -1557,6 +1557,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           tipAmount={tipAmount}
           onTipPercentageChange={setTipPercentage}
           onTipAmountChange={handleTipChange}
+          onSave={() => setTipBottomSheetOpen(false)}
         />
       </BottomSheet>
 

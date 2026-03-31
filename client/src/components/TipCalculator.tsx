@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 
 interface TipCalculatorProps {
   subtotal: number;
@@ -9,6 +10,7 @@ interface TipCalculatorProps {
   tipAmount: number;
   onTipPercentageChange: (percentage: number) => void;
   onTipAmountChange: (amount: number) => void;
+  onSave?: () => void;
 }
 
 const QUICK_TIP_PERCENTAGES = [15, 18, 20, 25];
@@ -18,13 +20,13 @@ export default function TipCalculator({
   tipPercentage,
   tipAmount,
   onTipPercentageChange,
-  onTipAmountChange
+  onTipAmountChange,
+  onSave,
 }: TipCalculatorProps) {
   const [customMode, setCustomMode] = useState(
     !QUICK_TIP_PERCENTAGES.includes(Math.round(tipPercentage))
   );
 
-  // Local string state so the user can freely edit without recalculation feedback loops
   const [pctStr, setPctStr] = useState(() =>
     tipPercentage > 0 ? tipPercentage.toFixed(1) : ""
   );
@@ -32,9 +34,12 @@ export default function TipCalculator({
     tipAmount > 0 ? tipAmount.toFixed(2) : ""
   );
 
-  const amountInputRef = useRef<HTMLInputElement>(null);
+  // Which field the user is actively editing — locks the other field to read-only
+  const [activeField, setActiveField] = useState<"pct" | "amt" | null>(null);
 
-  // Sync from parent only when not in the middle of user editing (preset changes)
+  const pctInputRef = useRef<HTMLInputElement>(null);
+  const amtInputRef = useRef<HTMLInputElement>(null);
+
   const lastPresetRef = useRef<number | null>(null);
   useEffect(() => {
     if (lastPresetRef.current !== null) {
@@ -49,6 +54,7 @@ export default function TipCalculator({
 
   const handlePreset = (pct: number) => {
     setCustomMode(false);
+    setActiveField(null);
     lastPresetRef.current = pct;
     onTipPercentageChange(pct);
     onTipAmountChange((subtotal * pct) / 100);
@@ -56,10 +62,10 @@ export default function TipCalculator({
 
   const handleCustomClick = () => {
     setCustomMode(true);
-    setTimeout(() => amountInputRef.current?.focus(), 50);
+    setActiveField("amt");
+    setTimeout(() => amtInputRef.current?.focus(), 50);
   };
 
-  // When user finishes editing the percentage field, update the amount
   const handlePctChange = (raw: string) => {
     setPctStr(raw);
     const pct = parseFloat(raw);
@@ -75,7 +81,6 @@ export default function TipCalculator({
     }
   };
 
-  // When user finishes editing the amount field, update the percentage
   const handleAmtChange = (raw: string) => {
     setAmtStr(raw);
     const amt = parseFloat(raw);
@@ -89,6 +94,22 @@ export default function TipCalculator({
       onTipAmountChange(0);
       onTipPercentageChange(0);
     }
+  };
+
+  const clearPct = () => {
+    setPctStr("");
+    setAmtStr("");
+    onTipPercentageChange(0);
+    onTipAmountChange(0);
+    pctInputRef.current?.focus();
+  };
+
+  const clearAmt = () => {
+    setAmtStr("");
+    setPctStr("");
+    onTipAmountChange(0);
+    onTipPercentageChange(0);
+    amtInputRef.current?.focus();
   };
 
   return (
@@ -123,37 +144,79 @@ export default function TipCalculator({
 
         {customMode && (
           <div className="grid grid-cols-2 gap-3">
+            {/* Percentage field */}
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Percentage</label>
-              <div className="relative">
-                <Input
-                  type="number"
-                  min="0"
-                  value={pctStr}
-                  placeholder="0"
-                  onChange={(e) => handlePctChange(e.target.value)}
-                  className="pr-6"
-                  data-testid="input-tip-percentage"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
-              </div>
+              {activeField === "amt" ? (
+                <div className="flex items-center h-9 rounded-md border bg-muted/50 px-3 text-sm text-muted-foreground select-none">
+                  <span className="flex-1">{pctStr || "—"}</span>
+                  <span className="ml-1">%</span>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Input
+                    ref={pctInputRef}
+                    type="number"
+                    min="0"
+                    value={pctStr}
+                    placeholder="0"
+                    onFocus={() => setActiveField("pct")}
+                    onChange={(e) => handlePctChange(e.target.value)}
+                    className="pr-12"
+                    data-testid="input-tip-percentage"
+                  />
+                  <div className="absolute right-0 top-0 h-full flex items-center gap-0.5 pr-2">
+                    {pctStr !== "" && activeField === "pct" && (
+                      <button
+                        type="button"
+                        onMouseDown={(e) => { e.preventDefault(); clearPct(); }}
+                        className="p-0.5 rounded text-muted-foreground hover:text-foreground"
+                        data-testid="button-clear-pct"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                    <span className="text-sm text-muted-foreground">%</span>
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* Amount field */}
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Amount</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
-                <Input
-                  ref={amountInputRef}
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={amtStr}
-                  placeholder="0.00"
-                  onChange={(e) => handleAmtChange(e.target.value)}
-                  className="pl-6"
-                  data-testid="input-tip-amount"
-                />
-              </div>
+              {activeField === "pct" ? (
+                <div className="flex items-center h-9 rounded-md border bg-muted/50 px-3 text-sm text-muted-foreground select-none">
+                  <span className="mr-1">$</span>
+                  <span className="flex-1">{amtStr || "—"}</span>
+                </div>
+              ) : (
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                  <Input
+                    ref={amtInputRef}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={amtStr}
+                    placeholder="0.00"
+                    onFocus={() => setActiveField("amt")}
+                    onChange={(e) => handleAmtChange(e.target.value)}
+                    className="pl-6 pr-8"
+                    data-testid="input-tip-amount"
+                  />
+                  {amtStr !== "" && activeField === "amt" && (
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); clearAmt(); }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground hover:text-foreground"
+                      data-testid="button-clear-amt"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -163,6 +226,12 @@ export default function TipCalculator({
             <span className="text-muted-foreground">{tipPercentage.toFixed(0)}% of ${subtotal.toFixed(2)}</span>
             <span className="font-medium">${tipAmount.toFixed(2)}</span>
           </div>
+        )}
+
+        {onSave && (
+          <Button className="w-full" onClick={onSave} data-testid="button-save-tip">
+            Save Changes
+          </Button>
         )}
       </CardContent>
     </Card>
