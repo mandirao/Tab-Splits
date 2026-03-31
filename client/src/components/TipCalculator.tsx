@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,25 @@ export default function TipCalculator({
   onTipPercentageChange,
   onTipAmountChange
 }: TipCalculatorProps) {
+  const [customMode, setCustomMode] = useState(
+    !QUICK_TIP_PERCENTAGES.includes(Math.round(tipPercentage))
+  );
+  const amountInputRef = useRef<HTMLInputElement>(null);
+
+  const isPresetActive = (pct: number) =>
+    !customMode && Math.round(tipPercentage) === pct;
+
+  const handlePreset = (pct: number) => {
+    setCustomMode(false);
+    onTipPercentageChange(pct);
+    onTipAmountChange((subtotal * pct) / 100);
+  };
+
+  const handleCustomClick = () => {
+    setCustomMode(true);
+    setTimeout(() => amountInputRef.current?.focus(), 50);
+  };
+
   return (
     <Card data-testid="card-tip-calculator">
       <CardHeader className="pb-3">
@@ -30,56 +50,76 @@ export default function TipCalculator({
             <Button
               key={pct}
               size="sm"
-              variant={tipPercentage === pct ? "default" : "outline"}
+              variant={isPresetActive(pct) ? "default" : "outline"}
               className="flex-1"
-              onClick={() => {
-                onTipPercentageChange(pct);
-                onTipAmountChange((subtotal * pct) / 100);
-              }}
+              onClick={() => handlePreset(pct)}
               data-testid={`button-tip-${pct}`}
             >
               {pct}%
             </Button>
           ))}
+          <Button
+            size="sm"
+            variant={customMode ? "default" : "outline"}
+            className="flex-1"
+            onClick={handleCustomClick}
+            data-testid="button-tip-custom"
+          >
+            Custom
+          </Button>
         </div>
-        
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs text-muted-foreground mb-1 block">Percentage</label>
-            <div className="relative">
-              <Input
-                type="number"
-                value={tipPercentage}
-                onChange={(e) => {
-                  const pct = parseFloat(e.target.value) || 0;
-                  onTipPercentageChange(pct);
-                  onTipAmountChange((subtotal * pct) / 100);
-                }}
-                className="pr-6"
-                data-testid="input-tip-percentage"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+
+        {customMode && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Percentage</label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  min="0"
+                  value={tipPercentage === 0 ? "" : tipPercentage.toFixed(1)}
+                  placeholder="0"
+                  onChange={(e) => {
+                    const pct = parseFloat(e.target.value) || 0;
+                    onTipPercentageChange(pct);
+                    onTipAmountChange((subtotal * pct) / 100);
+                  }}
+                  className="pr-6"
+                  data-testid="input-tip-percentage"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Amount</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                <Input
+                  ref={amountInputRef}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={tipAmount === 0 ? "" : tipAmount.toFixed(2)}
+                  placeholder="0.00"
+                  onChange={(e) => {
+                    const amt = parseFloat(e.target.value) || 0;
+                    onTipAmountChange(amt);
+                    onTipPercentageChange(subtotal > 0 ? (amt / subtotal) * 100 : 0);
+                  }}
+                  className="pl-6"
+                  data-testid="input-tip-amount"
+                />
+              </div>
             </div>
           </div>
-          <div>
-            <label className="text-xs text-muted-foreground mb-1 block">Amount</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
-              <Input
-                type="number"
-                step="0.01"
-                value={tipAmount.toFixed(2)}
-                onChange={(e) => {
-                  const amt = parseFloat(e.target.value) || 0;
-                  onTipAmountChange(amt);
-                  onTipPercentageChange(subtotal > 0 ? (amt / subtotal) * 100 : 0);
-                }}
-                className="pl-6"
-                data-testid="input-tip-amount"
-              />
-            </div>
+        )}
+
+        {!customMode && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">{tipPercentage.toFixed(0)}% of ${subtotal.toFixed(2)}</span>
+            <span className="font-medium">${tipAmount.toFixed(2)}</span>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

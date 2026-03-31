@@ -55,13 +55,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 CRITICAL REQUIREMENTS:
 1. Extract EVERY SINGLE food/drink item - do not skip any items
 2. Count items carefully and double-check you captured them all
-3. Skip ONLY: service charges, order numbers, dates, phone numbers, addresses, headers/footers
-4. Use exact item names from the receipt
-5. Parse quantities if shown (e.g., "2x Burger" = quantity: 2)
-6. All prices must be numbers, not strings
-7. If tip is not on receipt, set it to 0
-8. Verify: sum of (item.price * item.quantity) should equal subtotal
-9. Verify: subtotal + tax + tip should equal total
+3. Use exact item names from the receipt
+4. Parse quantities if shown (e.g., "2x Burger" = quantity: 2)
+5. All prices must be numbers, not strings
+
+AUTO-GRATUITY / INCLUDED TIP DETECTION (very important):
+- Look for line items labeled: "Gratuity", "Auto Gratuity", "Auto-Grat", "Service Charge", "Mandatory Gratuity", "Suggested Gratuity", "Included Tip", or any similar label
+- If found as a LINE ITEM: do NOT include it in the items array. Instead, put its amount in the "tip" field
+- If found in the subtotal section or as a separate charge after subtotal: capture the amount in the "tip" field
+- If the subtotal label says something like "Subtotal (incl. 18% gratuity)" or similar, try to back-calculate the gratuity amount and put it in "tip"
+- If a separate tip/gratuity line AND a customer-added tip both appear, sum them into the "tip" field
+- If no tip or gratuity appears anywhere on the receipt, set tip to 0
+
+ITEMS LIST:
+- Skip ONLY: order numbers, dates, phone numbers, addresses, headers/footers, tax lines, and any gratuity/tip/service charge lines (those go in "tip")
+- Do NOT skip modifiers, add-ons, or substitutions that have a price
+
+MATH VERIFICATION:
+- sum of (item.price * item.quantity) should equal subtotal (before tax/tip)
+- subtotal + tax + tip should equal total
 
 Return ONLY the JSON object, no additional text.`
               },
