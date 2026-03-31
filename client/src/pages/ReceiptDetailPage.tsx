@@ -437,7 +437,7 @@ function AssignmentSheetBody({
   };
 
   const updateShare = (personId: string, value: number) => {
-    const clamped = Math.max(0.5, value);
+    const clamped = Math.max(1, Math.round(value));
     setAssignedQuantities({ ...assignedQuantities, [personId]: clamped });
   };
 
@@ -523,19 +523,19 @@ function AssignmentSheetBody({
                       <Button
                         size="icon"
                         variant="outline"
-                        onClick={() => updateShare(pid, weight - 0.5)}
-                        disabled={weight <= 0.5}
+                        onClick={() => updateShare(pid, weight - 1)}
+                        disabled={weight <= 1}
                         data-testid={`button-share-minus-${pid}`}
                       >
                         <span className="text-base leading-none select-none">−</span>
                       </Button>
                       <span className="w-8 text-center text-sm font-semibold tabular-nums" data-testid={`text-share-${pid}`}>
-                        {weight % 1 === 0 ? weight : weight.toFixed(1)}
+                        {weight}
                       </span>
                       <Button
                         size="icon"
                         variant="outline"
-                        onClick={() => updateShare(pid, weight + 0.5)}
+                        onClick={() => updateShare(pid, weight + 1)}
                         data-testid={`button-share-plus-${pid}`}
                       >
                         <span className="text-base leading-none select-none">+</span>
