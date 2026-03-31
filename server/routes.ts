@@ -100,6 +100,34 @@ Return ONLY the JSON object, no additional text.`
       }
 
       const data = JSON.parse(jsonMatch[0]);
+
+      // Post-processing: if the AI included a gratuity/tip line item despite instructions,
+      // remove it from items and ensure the tip field reflects its value.
+      const GRATUITY_PATTERN = /auto.?grat|gratuity|service.?charge|mandatory.?grat|suggested.?grat|included.?tip|auto.?tip/i;
+      if (Array.isArray(data.items)) {
+        const gratItems: typeof data.items = [];
+        const cleanItems: typeof data.items = [];
+        for (const item of data.items) {
+          if (GRATUITY_PATTERN.test(String(item.name ?? ""))) {
+            gratItems.push(item);
+          } else {
+            cleanItems.push(item);
+          }
+        }
+        if (gratItems.length > 0) {
+          // Sum up the gratuity amounts and merge into tip
+          const gratTotal = gratItems.reduce((sum: number, it: any) => {
+            return sum + (Number(it.price) * (Number(it.quantity) || 1));
+          }, 0);
+          data.items = cleanItems;
+          data.tip = (Number(data.tip ?? 0) + gratTotal);
+          // Recalculate total if all components are present
+          if (data.subtotal != null && data.tax != null) {
+            data.total = Number(data.subtotal) + Number(data.tax) + Number(data.tip);
+          }
+        }
+      }
+
       res.json(data);
       
     } catch (error: any) {
