@@ -150,18 +150,18 @@ function AddPersonPanel({ receiptId, receiptPeopleIds, allPeople, onAdded, compa
   if (!expanded) {
     if (compact) {
       return (
-        <Button
-          variant="ghost"
-          size="icon"
+        <div
+          className="inline-flex items-center gap-2 h-10 px-3 rounded-lg border-2 border-border bg-card cursor-pointer hover-elevate text-sm font-medium"
           onClick={() => {
             setExpanded(true);
             setMode(available.length > 0 ? "past" : "new");
           }}
           data-testid="button-show-add-person-panel"
-          title="Add person"
+          role="button"
         >
           <UserPlus className="h-4 w-4" />
-        </Button>
+          Add Person
+        </div>
       );
     }
     return (
@@ -379,7 +379,6 @@ interface AssignmentSheetBodyProps {
   assignedQuantities: Record<string, number>;
   setAssignedQuantities: (q: Record<string, number>) => void;
   setSelectedPeople: (p: string[]) => void;
-  togglePersonSelection: (id: string) => void;
   receiptId: string;
   receiptPeopleIds: string[];
   allPeople: Person[];
@@ -393,100 +392,161 @@ function AssignmentSheetBody({
   assignedQuantities,
   setAssignedQuantities,
   setSelectedPeople,
-  togglePersonSelection,
   receiptId,
   receiptPeopleIds,
   allPeople,
 }: AssignmentSheetBodyProps) {
-  const selectedItem = items.find((i: any) => i.id === selectedItemId);
-  const itemQty = selectedItem?.quantity ?? 1;
-  const isMultiQty = itemQty > 1;
-  const totalAssigned = selectedPeople.reduce((sum, pid) => sum + (assignedQuantities[pid] ?? 0), 0);
+  // Detect initial split mode: if any assigned person has a saved weight, start in "share" mode
+  const hasSavedShares = selectedPeople.length > 1 &&
+    selectedPeople.some(pid => (assignedQuantities[pid] ?? 0) > 0);
+  const [splitMode, setSplitMode] = useState<"equal" | "share">(hasSavedShares ? "share" : "equal");
 
-  const updateQty = (personId: string, newQty: number) => {
-    const clamped = Math.max(0, Math.min(newQty, itemQty));
-    const newQtys = { ...assignedQuantities, [personId]: clamped };
-    setAssignedQuantities(newQtys);
-    setSelectedPeople(
-      Object.entries(newQtys).filter(([, q]) => q > 0).map(([pid]) => pid)
-    );
+  // Reset split mode when the item changes
+  useEffect(() => {
+    const hasSaved = selectedPeople.length > 1 &&
+      selectedPeople.some(pid => (assignedQuantities[pid] ?? 0) > 0);
+    setSplitMode(hasSaved ? "share" : "equal");
+  }, [selectedItemId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleTogglePerson = (personId: string) => {
+    const isSelected = selectedPeople.includes(personId);
+    if (isSelected) {
+      const next = selectedPeople.filter(pid => pid !== personId);
+      setSelectedPeople(next);
+      const newQtys = { ...assignedQuantities };
+      delete newQtys[personId];
+      setAssignedQuantities(newQtys);
+    } else {
+      const next = [...selectedPeople, personId];
+      setSelectedPeople(next);
+      if (splitMode === "share") {
+        setAssignedQuantities({ ...assignedQuantities, [personId]: 1 });
+      }
+    }
   };
+
+  const handleSplitModeChange = (mode: "equal" | "share") => {
+    setSplitMode(mode);
+    if (mode === "equal") {
+      setAssignedQuantities({});
+    } else {
+      const newQtys: Record<string, number> = {};
+      selectedPeople.forEach(pid => { newQtys[pid] = assignedQuantities[pid] || 1; });
+      setAssignedQuantities(newQtys);
+    }
+  };
+
+  const updateShare = (personId: string, value: number) => {
+    const clamped = Math.max(0.5, value);
+    setAssignedQuantities({ ...assignedQuantities, [personId]: clamped });
+  };
+
+  const totalShares = selectedPeople.reduce((s, pid) => s + (assignedQuantities[pid] ?? 1), 0);
 
   return (
     <div className="space-y-4">
-      {isMultiQty ? (
-        <>
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">How many did each person have?</p>
-            <span className={`text-sm font-medium ${totalAssigned === itemQty ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
-              {totalAssigned}/{itemQty} assigned
-            </span>
+      <p className="text-sm text-muted-foreground">
+        Select who is splitting this item
+      </p>
+
+      {/* People chip selector */}
+      <div className="flex flex-wrap gap-2 items-center">
+        {peopleWithColors.map((person: any) => (
+          <PersonChip
+            key={person.id}
+            name={person.name}
+            initials={person.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+            color={person.color}
+            selected={selectedPeople.includes(person.id)}
+            onSelect={() => handleTogglePerson(person.id)}
+          />
+        ))}
+        <AddPersonPanel
+          receiptId={receiptId}
+          receiptPeopleIds={receiptPeopleIds}
+          allPeople={allPeople}
+          onAdded={(id) => setSelectedPeople((prev: string[]) => [...prev, id])}
+          compact
+        />
+      </div>
+
+      {/* Split mode — only when 2+ people are assigned */}
+      {selectedPeople.length >= 2 && (
+        <div className="space-y-3">
+          {/* Toggle */}
+          <div className="flex gap-1 bg-muted rounded-md p-1">
+            <button
+              className={`flex-1 py-1.5 px-3 rounded text-sm font-medium transition-colors ${
+                splitMode === "equal"
+                  ? "bg-background shadow-sm text-foreground"
+                  : "text-muted-foreground"
+              }`}
+              onClick={() => handleSplitModeChange("equal")}
+              data-testid="button-split-equal"
+            >
+              Split equally
+            </button>
+            <button
+              className={`flex-1 py-1.5 px-3 rounded text-sm font-medium transition-colors ${
+                splitMode === "share"
+                  ? "bg-background shadow-sm text-foreground"
+                  : "text-muted-foreground"
+              }`}
+              onClick={() => handleSplitModeChange("share")}
+              data-testid="button-split-share"
+            >
+              Split by share
+            </button>
           </div>
-          <div className="space-y-1">
-            {peopleWithColors.map((person: any) => {
-              const qty = assignedQuantities[person.id] ?? 0;
-              return (
-                <div key={person.id} className="flex items-center justify-between py-2">
-                  <div className="flex items-center gap-3">
+
+          {/* Share weight controls */}
+          {splitMode === "share" && (
+            <div className="space-y-1">
+              {selectedPeople.map(pid => {
+                const person = peopleWithColors.find((p: any) => p.id === pid);
+                if (!person) return null;
+                const weight = assignedQuantities[pid] ?? 1;
+                const pct = totalShares > 0 ? Math.round((weight / totalShares) * 100) : 0;
+                return (
+                  <div key={pid} className="flex items-center gap-3 py-2">
                     <div
                       className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0"
                       style={{ backgroundColor: person.color }}
                     >
                       {person.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
                     </div>
-                    <span className="text-sm font-medium">{person.name}</span>
+                    <span className="flex-1 text-sm font-medium">{person.name}</span>
+                    <span className="text-xs text-muted-foreground w-9 text-right tabular-nums">
+                      {pct}%
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => updateShare(pid, weight - 0.5)}
+                        disabled={weight <= 0.5}
+                        data-testid={`button-share-minus-${pid}`}
+                      >
+                        <span className="text-base leading-none select-none">−</span>
+                      </Button>
+                      <span className="w-8 text-center text-sm font-semibold tabular-nums" data-testid={`text-share-${pid}`}>
+                        {weight % 1 === 0 ? weight : weight.toFixed(1)}
+                      </span>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => updateShare(pid, weight + 0.5)}
+                        data-testid={`button-share-plus-${pid}`}
+                      >
+                        <span className="text-base leading-none select-none">+</span>
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      onClick={() => updateQty(person.id, qty - 1)}
-                      disabled={qty <= 0}
-                      data-testid={`button-qty-minus-${person.id}`}
-                    >
-                      <span className="text-base leading-none select-none">−</span>
-                    </Button>
-                    <span className="w-5 text-center text-sm font-semibold" data-testid={`text-qty-${person.id}`}>{qty}</span>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      onClick={() => updateQty(person.id, qty + 1)}
-                      disabled={totalAssigned >= itemQty}
-                      data-testid={`button-qty-plus-${person.id}`}
-                    >
-                      <span className="text-base leading-none select-none">+</span>
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      ) : (
-        <>
-          <p className="text-sm text-muted-foreground">
-            Select one or more people to assign this item to
-          </p>
-          <div className="flex flex-wrap gap-2 items-center">
-            {peopleWithColors.map((person: any) => (
-              <PersonChip
-                key={person.id}
-                name={person.name}
-                initials={person.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
-                color={person.color}
-                selected={selectedPeople.includes(person.id)}
-                onSelect={() => togglePersonSelection(person.id)}
-              />
-            ))}
-            <AddPersonPanel
-              receiptId={receiptId}
-              receiptPeopleIds={receiptPeopleIds}
-              allPeople={allPeople}
-              onAdded={(id) => setSelectedPeople(prev => [...prev, id])}
-              compact
-            />
-          </div>
-        </>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -1617,7 +1677,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           assignedQuantities={assignedQuantities}
           setAssignedQuantities={setAssignedQuantities}
           setSelectedPeople={setSelectedPeople}
-          togglePersonSelection={togglePersonSelection}
           receiptId={receiptId}
           receiptPeopleIds={peopleWithColors.map(p => p.id)}
           allPeople={allPeople}
