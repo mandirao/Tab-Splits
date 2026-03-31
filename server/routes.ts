@@ -101,12 +101,12 @@ Return ONLY the JSON object, no additional text.`
 
       const data = JSON.parse(jsonMatch[0]);
 
-      // Post-processing: if the AI included a gratuity/tip line item despite instructions,
-      // remove it from items and ensure the tip field reflects its value.
+      // Post-processing pass 1: Remove any gratuity/service-charge line items.
+      // The AI sometimes includes them in both the items list AND the tip field.
       const GRATUITY_PATTERN = /auto.?grat|gratuity|service.?charge|mandatory.?grat|suggested.?grat|included.?tip|auto.?tip/i;
       if (Array.isArray(data.items)) {
-        const gratItems: typeof data.items = [];
-        const cleanItems: typeof data.items = [];
+        const gratItems: any[] = [];
+        const cleanItems: any[] = [];
         for (const item of data.items) {
           if (GRATUITY_PATTERN.test(String(item.name ?? ""))) {
             gratItems.push(item);
@@ -115,16 +115,34 @@ Return ONLY the JSON object, no additional text.`
           }
         }
         if (gratItems.length > 0) {
-          // Sum up the gratuity amounts and merge into tip
           const gratTotal = gratItems.reduce((sum: number, it: any) => {
             return sum + (Number(it.price) * (Number(it.quantity) || 1));
           }, 0);
           data.items = cleanItems;
-          data.tip = (Number(data.tip ?? 0) + gratTotal);
-          // Recalculate total if all components are present
-          if (data.subtotal != null && data.tax != null) {
-            data.total = Number(data.subtotal) + Number(data.tax) + Number(data.tip);
+          // Subtract the gratuity from the subtotal (it was being double-counted)
+          data.subtotal = Math.max(0, Number(data.subtotal ?? 0) - gratTotal);
+          // Only add to tip if the AI didn't already put it there
+          const currentTip = Number(data.tip ?? 0);
+          if (currentTip < gratTotal - 0.01) {
+            data.tip = currentTip + gratTotal;
           }
+          // Recalculate total
+          data.total = Number(data.subtotal) + Number(data.tax ?? 0) + Number(data.tip);
+        }
+      }
+
+      // Post-processing pass 2: Detect when the auto-gratuity is baked into the printed
+      // subtotal but the AI correctly moved it to the tip field (no line item left).
+      // Indicator: subtotal + tax ≈ total  (tip was already inside the "subtotal" column on the bill)
+      {
+        const s = Number(data.subtotal ?? 0);
+        const x = Number(data.tax ?? 0);
+        const t = Number(data.tip ?? 0);
+        const tot = Number(data.total ?? 0);
+        if (t > 0 && Math.abs((s + x) - tot) < 0.05) {
+          // The printed subtotal includes the auto-gratuity – strip it out
+          data.subtotal = +(s - t).toFixed(2);
+          // Total is already correct as printed; keep it unchanged
         }
       }
 
