@@ -77,7 +77,7 @@ export const updateReceiptItemSchema = z.object({
 
 export const updatePersonSchema = z.object({
   name: z.string().optional(),
-  phone: z.string().optional(),
+  phone: z.string().nullable().optional(),
   email: z.string().optional(),
   venmoUsername: z.string().nullable().optional(),
   isRegular: z.number().int().min(0).max(1).optional(),
