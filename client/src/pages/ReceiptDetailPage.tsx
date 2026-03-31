@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Search, UserPlus, Phone, BookUser } from "lucide-react";
 import ReceiptItemRow from "@/components/ReceiptItemRow";
 import TipCalculator from "@/components/TipCalculator";
 import BottomSheet from "@/components/BottomSheet";
@@ -55,6 +56,304 @@ const PERSON_COLORS = [
   'hsl(35, 85%, 68%)',
 ];
 
+// ─── AddPersonPanel ─────────────────────────────────────────────────────────
+
+type AddPersonMode = "past" | "contacts" | "new";
+
+interface AddPersonPanelProps {
+  receiptId: string;
+  receiptPeopleIds: string[];
+  allPeople: Person[];
+  onAdded: (personId: string) => void;
+}
+
+function AddPersonPanel({ receiptId, receiptPeopleIds, allPeople, onAdded }: AddPersonPanelProps) {
+  const { toast } = useToast();
+  const [expanded, setExpanded] = useState(false);
+  const available = allPeople.filter(p => !receiptPeopleIds.includes(p.id));
+  const [mode, setMode] = useState<AddPersonMode>(available.length > 0 ? "past" : "new");
+  const [search, setSearch] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [pendingContact, setPendingContact] = useState<{ name: string; phone: string } | null>(null);
+  const firstNameRef = useRef<HTMLInputElement>(null);
+
+  const filteredPast = available.filter(p => {
+    const q = search.toLowerCase();
+    return p.name.toLowerCase().includes(q) || (p.phone ?? "").includes(q);
+  });
+
+  const addExistingMutation = useMutation({
+    mutationFn: async (personId: string) => {
+      await apiRequest(`/api/receipts/${receiptId}/people`, "POST", { personId });
+      return personId;
+    },
+    onSuccess: (personId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "people"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/people"] });
+      onAdded(personId);
+      setExpanded(false);
+      setSearch("");
+    },
+    onError: (err: any) => toast({ title: "Could not add person", description: err.message, variant: "destructive" }),
+  });
+
+  const createAndAddMutation = useMutation({
+    mutationFn: async (data: { name: string; phone?: string }) => {
+      const person = await apiRequest("/api/people", "POST", data);
+      await apiRequest(`/api/receipts/${receiptId}/people`, "POST", { personId: person.id });
+      return person;
+    },
+    onSuccess: (person) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/people"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "people"] });
+      onAdded(person.id);
+      setFirstName(""); setLastName(""); setPhone("");
+      setPendingContact(null);
+      setExpanded(false);
+    },
+    onError: (err: any) => toast({ title: "Could not add person", description: err.message, variant: "destructive" }),
+  });
+
+  const isBusy = addExistingMutation.isPending || createAndAddMutation.isPending;
+
+  const handleOpenContacts = async () => {
+    const supported = "contacts" in navigator && "ContactsManager" in window;
+    if (!supported) {
+      toast({ title: "Contacts not available", description: "Your browser doesn't support contact picking. Use New Person instead." });
+      return;
+    }
+    try {
+      const contacts = await (navigator as any).contacts.select(["name", "tel"], { multiple: false });
+      if (contacts?.length > 0) {
+        const c = contacts[0];
+        setPendingContact({
+          name: c.name?.[0] ?? "",
+          phone: c.tel?.[0] ?? "",
+        });
+      }
+    } catch (e: any) {
+      if (e?.name !== "AbortError") {
+        toast({ title: "Could not open contacts", description: "Please try again or enter manually.", variant: "destructive" });
+      }
+    }
+  };
+
+  const handleAddNew = () => {
+    const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
+    if (!name) return;
+    createAndAddMutation.mutate({ name, ...(phone.trim() ? { phone: phone.trim() } : {}) });
+  };
+
+  if (!expanded) {
+    return (
+      <Button
+        variant="outline"
+        className="w-full"
+        onClick={() => {
+          setExpanded(true);
+          setMode(available.length > 0 ? "past" : "new");
+        }}
+        data-testid="button-show-add-person-panel"
+      >
+        <UserPlus className="h-4 w-4 mr-2" /> Add Person
+      </Button>
+    );
+  }
+
+  return (
+    <div className="space-y-3 border rounded-lg p-4 bg-muted/20">
+      {/* Mode tabs */}
+      <div className="flex gap-1 bg-muted rounded-md p-1">
+        {[
+          { id: "past" as const, label: "Past Diners", icon: BookUser },
+          { id: "contacts" as const, label: "Contacts", icon: Phone },
+          { id: "new" as const, label: "New", icon: UserPlus },
+        ].map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => { setMode(id); setSearch(""); setPendingContact(null); }}
+            className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-medium py-1.5 rounded transition-colors ${
+              mode === id
+                ? "bg-background shadow-sm text-foreground"
+                : "text-muted-foreground"
+            }`}
+            data-testid={`button-add-mode-${id}`}
+          >
+            <Icon className="h-3 w-3" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Past Diners */}
+      {mode === "past" && (
+        <div className="space-y-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search by name or phone…"
+              className="pl-8 text-sm"
+              data-testid="input-past-diners-search"
+            />
+          </div>
+          {filteredPast.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-3">
+              {available.length === 0 ? "No past diners in database yet." : "No matches found."}
+            </p>
+          ) : (
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {filteredPast.map(p => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between py-2 px-1"
+                >
+                  <div>
+                    <p className="text-sm font-medium">{p.name}</p>
+                    {p.phone && <p className="text-xs text-muted-foreground">{p.phone}</p>}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => addExistingMutation.mutate(p.id)}
+                    disabled={isBusy}
+                    data-testid={`button-add-past-${p.id}`}
+                  >
+                    Add
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Contacts */}
+      {mode === "contacts" && (
+        <div className="space-y-3">
+          {pendingContact ? (
+            <>
+              <div className="flex items-center gap-3 p-3 rounded-md border bg-background">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm font-semibold text-primary">
+                    {pendingContact.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{pendingContact.name}</p>
+                  {pendingContact.phone && <p className="text-xs text-muted-foreground">{pendingContact.phone}</p>}
+                </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setPendingContact(null)}
+                  data-testid="button-clear-contact"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <Button
+                className="w-full"
+                onClick={() => createAndAddMutation.mutate({
+                  name: pendingContact.name,
+                  ...(pendingContact.phone ? { phone: pendingContact.phone } : {}),
+                })}
+                disabled={!pendingContact.name || isBusy}
+                data-testid="button-add-contact"
+              >
+                {isBusy ? "Adding…" : `Add ${pendingContact.name.split(" ")[0]}`}
+              </Button>
+            </>
+          ) : (
+            <>
+              {"contacts" in navigator && "ContactsManager" in window ? (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleOpenContacts}
+                  data-testid="button-open-contacts"
+                >
+                  <Phone className="h-4 w-4 mr-2" /> Open Contacts
+                </Button>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-3">
+                  Contact picking isn't supported on this browser. Use the New tab to add someone manually.
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* New Person */}
+      {mode === "new" && (
+        <div className="space-y-2">
+          <div>
+            <Label htmlFor="ap-first" className="text-xs">First name *</Label>
+            <Input
+              id="ap-first"
+              ref={firstNameRef}
+              value={firstName}
+              onChange={e => setFirstName(e.target.value)}
+              placeholder="e.g. Alex"
+              className="mt-1"
+              data-testid="input-add-person-first"
+              onKeyDown={e => { if (e.key === "Enter") handleAddNew(); }}
+            />
+          </div>
+          <div>
+            <Label htmlFor="ap-last" className="text-xs">Last name <span className="text-muted-foreground">(optional)</span></Label>
+            <Input
+              id="ap-last"
+              value={lastName}
+              onChange={e => setLastName(e.target.value)}
+              placeholder="e.g. Chen"
+              className="mt-1"
+              data-testid="input-add-person-last"
+            />
+          </div>
+          <div>
+            <Label htmlFor="ap-phone" className="text-xs">Phone <span className="text-muted-foreground">(optional)</span></Label>
+            <Input
+              id="ap-phone"
+              type="tel"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="e.g. (555) 123-4567"
+              className="mt-1"
+              data-testid="input-add-person-phone"
+            />
+          </div>
+          <Button
+            className="w-full"
+            onClick={handleAddNew}
+            disabled={!firstName.trim() || isBusy}
+            data-testid="button-add-new-person"
+          >
+            {isBusy ? "Adding…" : "Add Person"}
+          </Button>
+        </div>
+      )}
+
+      <Button
+        variant="ghost"
+        size="sm"
+        className="w-full text-muted-foreground"
+        onClick={() => { setExpanded(false); setSearch(""); setFirstName(""); setLastName(""); setPhone(""); setPendingContact(null); }}
+        data-testid="button-cancel-add-person"
+      >
+        Cancel
+      </Button>
+    </div>
+  );
+}
+
+// ─── AssignmentSheetBody ─────────────────────────────────────────────────────
+
 interface AssignmentSheetBodyProps {
   selectedItemId: string | null;
   items: any[];
@@ -64,15 +363,9 @@ interface AssignmentSheetBodyProps {
   setAssignedQuantities: (q: Record<string, number>) => void;
   setSelectedPeople: (p: string[]) => void;
   togglePersonSelection: (id: string) => void;
-  showAddPersonForm: boolean;
-  setShowAddPersonForm: (v: boolean) => void;
-  newPersonName: string;
-  setNewPersonName: (v: string) => void;
-  newPersonPhone: string;
-  setNewPersonPhone: (v: string) => void;
-  handleSelectFromContacts: () => void;
-  handleAddNewPerson: () => void;
-  createPersonMutation: any;
+  receiptId: string;
+  receiptPeopleIds: string[];
+  allPeople: Person[];
 }
 
 function AssignmentSheetBody({
@@ -84,15 +377,9 @@ function AssignmentSheetBody({
   setAssignedQuantities,
   setSelectedPeople,
   togglePersonSelection,
-  showAddPersonForm,
-  setShowAddPersonForm,
-  newPersonName,
-  setNewPersonName,
-  newPersonPhone,
-  setNewPersonPhone,
-  handleSelectFromContacts,
-  handleAddNewPerson,
-  createPersonMutation,
+  receiptId,
+  receiptPeopleIds,
+  allPeople,
 }: AssignmentSheetBodyProps) {
   const selectedItem = items.find((i: any) => i.id === selectedItemId);
   const itemQty = selectedItem?.quantity ?? 1;
@@ -178,72 +465,12 @@ function AssignmentSheetBody({
         </>
       )}
 
-      {!showAddPersonForm ? (
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={() => setShowAddPersonForm(true)}
-          data-testid="button-show-add-person-form"
-        >
-          + Add New Person
-        </Button>
-      ) : (
-        <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
-          {'contacts' in navigator && 'ContactsManager' in window && (
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={handleSelectFromContacts}
-              data-testid="button-select-from-contacts"
-            >
-              Select from Contacts
-            </Button>
-          )}
-          <div className="space-y-2">
-            <Label htmlFor="new-person-name">Name *</Label>
-            <Input
-              id="new-person-name"
-              type="text"
-              value={newPersonName}
-              onChange={(e) => setNewPersonName(e.target.value)}
-              placeholder="e.g. John Doe"
-              data-testid="input-new-person-name"
-              onKeyDown={(e) => { if (e.key === 'Enter' && newPersonName.trim()) handleAddNewPerson(); }}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="new-person-phone">Phone Number (Optional)</Label>
-            <Input
-              id="new-person-phone"
-              type="tel"
-              value={newPersonPhone}
-              onChange={(e) => setNewPersonPhone(e.target.value)}
-              placeholder="e.g. (555) 123-4567"
-              data-testid="input-new-person-phone"
-            />
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1"
-              onClick={() => { setShowAddPersonForm(false); setNewPersonName(""); setNewPersonPhone(""); }}
-              data-testid="button-cancel-add-person"
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              className="flex-1"
-              onClick={handleAddNewPerson}
-              disabled={!newPersonName.trim() || createPersonMutation.isPending}
-              data-testid="button-add-person"
-            >
-              {createPersonMutation.isPending ? "Adding..." : "Add Person"}
-            </Button>
-          </div>
-        </div>
-      )}
+      <AddPersonPanel
+        receiptId={receiptId}
+        receiptPeopleIds={receiptPeopleIds}
+        allPeople={allPeople}
+        onAdded={(id) => setSelectedPeople(prev => [...prev, id])}
+      />
     </div>
   );
 }
@@ -258,9 +485,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const [assignedQuantities, setAssignedQuantities] = useState<Record<string, number>>({});
   const [editItemData, setEditItemData] = useState({ name: "", quantity: 1, price: "" });
-  const [showAddPersonForm, setShowAddPersonForm] = useState(false);
-  const [newPersonName, setNewPersonName] = useState("");
-  const [newPersonPhone, setNewPersonPhone] = useState("");
   const [shareBottomSheetOpen, setShareBottomSheetOpen] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
   const [urlCopied, setUrlCopied] = useState(false);
@@ -474,32 +698,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     }
   });
 
-  const createPersonMutation = useMutation({
-    mutationFn: async (data: { name: string; phone?: string }) => {
-      // Create the person
-      const person = await apiRequest("/api/people", "POST", data);
-      // Add them to this receipt
-      await apiRequest(`/api/receipts/${receiptId}/people`, "POST", { personId: person.id });
-      return person;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/people"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "people"] });
-      setSelectedPeople(prev => [...prev, data.id]);
-      setNewPersonName("");
-      setNewPersonPhone("");
-      setShowAddPersonForm(false);
-      toast({ title: "Person added to receipt" });
-    },
-    onError: (error: any) => {
-      toast({ 
-        title: "Failed to add person", 
-        description: error.message,
-        variant: "destructive" 
-      });
-    }
-  });
-
   const deletePersonMutation = useMutation({
     mutationFn: async (personId: string) => {
       return await apiRequest(`/api/receipts/${receiptId}/people/${personId}`, "DELETE");
@@ -677,73 +875,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       setEditBottomSheetOpen(false);
       setSelectedItemId(null);
       setEditItemData({ name: "", quantity: 1, price: "" });
-    }
-  };
-
-  const handleAddNewPerson = () => {
-    if (newPersonName.trim()) {
-      const personData = {
-        name: newPersonName.trim(),
-        ...(newPersonPhone.trim() && { phone: newPersonPhone.trim() })
-      };
-      createPersonMutation.mutate(personData);
-    }
-  };
-
-  const handleSelectFromContacts = async () => {
-    const supportsContacts = 'contacts' in navigator && 'ContactsManager' in window;
-    
-    if (!supportsContacts) {
-      toast({
-        title: "Contacts not supported",
-        description: "Your browser doesn't support the contacts feature. Please enter the name manually.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    try {
-      const props = ['name', 'tel'];
-      const opts = { multiple: false };
-      const contacts = await (navigator as any).contacts.select(props, opts);
-      
-      if (contacts && contacts.length > 0) {
-        const contact = contacts[0];
-        if (contact.name && contact.name.length > 0) {
-          setNewPersonName(contact.name[0]);
-        }
-        if (contact.tel && contact.tel.length > 0) {
-          setNewPersonPhone(contact.tel[0]);
-        }
-      }
-    } catch (error: any) {
-      console.error('Error selecting contact:', error);
-      
-      if (error?.name === 'InvalidStateError') {
-        toast({
-          title: "Please try again",
-          description: "Tap the button again to select a contact",
-          variant: "destructive"
-        });
-      } else if (error?.name === 'SecurityError') {
-        toast({
-          title: "Contacts access denied",
-          description: "Please allow contacts access in your browser settings",
-          variant: "destructive"
-        });
-      } else if (error?.name === 'TypeError') {
-        toast({
-          title: "Contacts not available",
-          description: "This feature requires a secure connection (HTTPS)",
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Could not access contacts",
-          description: "Please enter the name manually",
-          variant: "destructive"
-        });
-      }
     }
   };
 
@@ -1360,9 +1491,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           setAssignBottomSheetOpen(false);
           setSelectedPeople([]);
           setAssignedQuantities({});
-          setShowAddPersonForm(false);
-          setNewPersonName("");
-          setNewPersonPhone("");
         }}
         title="Assign to People"
         footer={
@@ -1384,15 +1512,9 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           setAssignedQuantities={setAssignedQuantities}
           setSelectedPeople={setSelectedPeople}
           togglePersonSelection={togglePersonSelection}
-          showAddPersonForm={showAddPersonForm}
-          setShowAddPersonForm={setShowAddPersonForm}
-          newPersonName={newPersonName}
-          setNewPersonName={setNewPersonName}
-          newPersonPhone={newPersonPhone}
-          setNewPersonPhone={setNewPersonPhone}
-          handleSelectFromContacts={handleSelectFromContacts}
-          handleAddNewPerson={handleAddNewPerson}
-          createPersonMutation={createPersonMutation}
+          receiptId={receiptId}
+          receiptPeopleIds={peopleWithColors.map(p => p.id)}
+          allPeople={allPeople}
         />
       </BottomSheet>
 
@@ -1565,9 +1687,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         open={managePeopleBottomSheetOpen}
         onClose={() => {
           setManagePeopleBottomSheetOpen(false);
-          setShowAddPersonForm(false);
-          setNewPersonName("");
-          setNewPersonPhone("");
         }}
         title="Manage People"
       >
@@ -1620,81 +1739,12 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             </div>
           )}
 
-          {!showAddPersonForm ? (
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={() => setShowAddPersonForm(true)}
-              data-testid="button-show-add-person-form-manage"
-            >
-              + Add New Person
-            </Button>
-          ) : (
-            <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
-              {'contacts' in navigator && 'ContactsManager' in window && (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleSelectFromContacts}
-                  data-testid="button-select-from-contacts-manage"
-                >
-                  Select from Contacts
-                </Button>
-              )}
-              
-              <div className="space-y-2">
-                <Label htmlFor="manage-person-name">Name *</Label>
-                <Input
-                  id="manage-person-name"
-                  type="text"
-                  value={newPersonName}
-                  onChange={(e) => setNewPersonName(e.target.value)}
-                  placeholder="e.g. John Doe"
-                  data-testid="input-manage-person-name"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && newPersonName.trim()) {
-                      handleAddNewPerson();
-                    }
-                  }}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="manage-person-phone">Phone Number (Optional)</Label>
-                <Input
-                  id="manage-person-phone"
-                  type="tel"
-                  value={newPersonPhone}
-                  onChange={(e) => setNewPersonPhone(e.target.value)}
-                  placeholder="e.g. (555) 123-4567"
-                  data-testid="input-manage-person-phone"
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => {
-                    setShowAddPersonForm(false);
-                    setNewPersonName("");
-                    setNewPersonPhone("");
-                  }}
-                  data-testid="button-cancel-add-person-manage"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="flex-1"
-                  onClick={handleAddNewPerson}
-                  disabled={!newPersonName.trim()}
-                  data-testid="button-add-person-manage"
-                >
-                  Add Person
-                </Button>
-              </div>
-            </div>
-          )}
+          <AddPersonPanel
+            receiptId={receiptId}
+            receiptPeopleIds={peopleWithColors.map(p => p.id)}
+            allPeople={allPeople}
+            onAdded={() => {}}
+          />
         </div>
       </BottomSheet>
 
