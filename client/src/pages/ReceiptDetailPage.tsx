@@ -1258,6 +1258,49 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             })}
           </CardContent>
         </Card>
+
+        {/* Paid By Section — inside scrollable main so it clears the fixed totals bar */}
+        <div className="bg-card rounded-lg p-4 shadow-sm border mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <DollarSign className="h-5 w-5 text-primary" />
+              <div>
+                <p className="text-sm text-muted-foreground">Paid by</p>
+                {receipt?.paidById ? (
+                  <p className="font-medium" data-testid="text-paid-by-name">
+                    {peopleWithColors.find(p => p.id === receipt.paidById)?.name || "Unknown"}
+                  </p>
+                ) : (
+                  <p className="text-muted-foreground">Not set</p>
+                )}
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setPaidByBottomSheetOpen(true);
+                const payer = peopleWithColors.find(p => p.id === receipt?.paidById);
+                setVenmoInput(payer?.venmoUsername || "");
+              }}
+              data-testid="button-edit-paid-by"
+            >
+              {receipt?.paidById ? "Change" : "Set Payer"}
+            </Button>
+          </div>
+          {receipt?.paidById && (
+            <div className="mt-3 pt-3 border-t">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Venmo Username</p>
+                  <p className="font-medium" data-testid="text-venmo-username">
+                    {peopleWithColors.find(p => p.id === receipt.paidById)?.venmoUsername || "Not set"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </main>
 
       <div className="fixed bottom-0 left-0 right-0 bg-card border-t p-4">
@@ -1309,49 +1352,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             <span data-testid="text-receipt-total">${displayTotals.total.toFixed(2)}</span>
           </div>
         </div>
-      </div>
-
-      {/* Paid By Section */}
-      <div className="bg-card rounded-lg p-4 shadow-sm border">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <DollarSign className="h-5 w-5 text-primary" />
-            <div>
-              <p className="text-sm text-muted-foreground">Paid by</p>
-              {receipt?.paidById ? (
-                <p className="font-medium" data-testid="text-paid-by-name">
-                  {peopleWithColors.find(p => p.id === receipt.paidById)?.name || "Unknown"}
-                </p>
-              ) : (
-                <p className="text-muted-foreground">Not set</p>
-              )}
-            </div>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setPaidByBottomSheetOpen(true);
-              const payer = peopleWithColors.find(p => p.id === receipt?.paidById);
-              setVenmoInput(payer?.venmoUsername || "");
-            }}
-            data-testid="button-edit-paid-by"
-          >
-            {receipt?.paidById ? "Change" : "Set Payer"}
-          </Button>
-        </div>
-        {receipt?.paidById && (
-          <div className="mt-3 pt-3 border-t">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Venmo Username</p>
-                <p className="font-medium" data-testid="text-venmo-username">
-                  {peopleWithColors.find(p => p.id === receipt.paidById)?.venmoUsername || "Not set"}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       <BottomSheet
