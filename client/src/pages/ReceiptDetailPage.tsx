@@ -1079,33 +1079,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             </Button>
           </div>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={handleManagePeopleClick}
-            className="hover-elevate active-elevate-2 rounded-full"
-            data-testid="button-manage-people"
-          >
-            <Badge variant="secondary" className="flex items-center gap-1 cursor-pointer">
-              <Users className="h-3 w-3" />
-              {peopleWithColors.length} people
-            </Badge>
-          </button>
-          <button 
-            onClick={() => setAddItemBottomSheetOpen(true)}
-            className="hover-elevate active-elevate-2 rounded-full"
-            data-testid="button-add-item"
-          >
-            <Badge variant="outline" className="flex items-center gap-1 cursor-pointer">
-              <Plus className="h-3 w-3" />
-              Add Item
-            </Badge>
-          </button>
-          <Badge variant="outline">{items.length} items</Badge>
-          <Badge variant={items.every(i => (i.assignedTo as string[] || []).length > 0) ? "default" : "secondary"}>
-            {items.filter(i => (i.assignedTo as string[] || []).length > 0).length}/{items.length} assigned
-          </Badge>
-        </div>
       </header>
 
       {/* Validation Warning Banner */}
@@ -1198,19 +1171,55 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               </Button>
             );
           })}
+
+          {/* Add Person tab button — always at far right */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleManagePeopleClick}
+            className="whitespace-nowrap flex items-center gap-1.5 text-muted-foreground"
+            data-testid="button-add-person-tab"
+          >
+            <Users className="h-3.5 w-3.5" />
+            Add Person
+          </Button>
         </div>
       </div>
 
       <main className="flex-1 overflow-y-auto p-4 pb-32">
         <Card className="mb-4">
           <CardHeader className="pb-3">
-            <h2 className="font-semibold text-base">
-              {selectedTab === "all" 
-                ? "All Items" 
-                : selectedTab === "unassigned"
-                ? "Unassigned Items"
-                : `${getPersonById(selectedTab)?.name}'s Items`}
-            </h2>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <h2 className="font-semibold text-base truncate">
+                  {selectedTab === "all" 
+                    ? "All Items" 
+                    : selectedTab === "unassigned"
+                    ? "Unassigned Items"
+                    : `${getPersonById(selectedTab)?.name}'s Items`}
+                </h2>
+                <span className="text-xs text-muted-foreground flex-shrink-0">
+                  {filteredItems.length}
+                  {selectedTab === "all" && hasUnassignedItems && (
+                    <span className="ml-1.5 text-amber-600 dark:text-amber-400 font-medium">
+                      · {items.filter(i => (i.assignedTo as string[] || []).length === 0).length} unassigned
+                    </span>
+                  )}
+                </span>
+              </div>
+              {selectedTab === "all" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setAddItemBottomSheetOpen(true)}
+                  className="flex-shrink-0 flex items-center gap-1"
+                  data-testid="button-add-item"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Item
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="divide-y">
             {filteredItems.map((item) => {
