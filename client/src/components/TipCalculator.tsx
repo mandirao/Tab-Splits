@@ -147,76 +147,64 @@ export default function TipCalculator({
             {/* Percentage field */}
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Percentage</label>
-              {activeField === "amt" ? (
-                <div className="flex items-center h-9 rounded-md border bg-muted/50 px-3 text-sm text-muted-foreground select-none">
-                  <span className="flex-1">{pctStr || "—"}</span>
-                  <span className="ml-1">%</span>
+              <div className="relative">
+                <Input
+                  ref={pctInputRef}
+                  type="number"
+                  min="0"
+                  value={pctStr}
+                  placeholder="0"
+                  readOnly={activeField === "amt"}
+                  onFocus={() => setActiveField("pct")}
+                  onChange={(e) => handlePctChange(e.target.value)}
+                  className={`pr-12 transition-colors ${activeField === "amt" ? "bg-muted/50 text-muted-foreground cursor-pointer" : ""}`}
+                  data-testid="input-tip-percentage"
+                />
+                <div className="absolute right-0 top-0 h-full flex items-center gap-0.5 pr-2 pointer-events-none">
+                  {pctStr !== "" && activeField === "pct" && (
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); clearPct(); }}
+                      className="p-0.5 rounded text-muted-foreground hover:text-foreground pointer-events-auto"
+                      data-testid="button-clear-pct"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                  <span className="text-sm text-muted-foreground">%</span>
                 </div>
-              ) : (
-                <div className="relative">
-                  <Input
-                    ref={pctInputRef}
-                    type="number"
-                    min="0"
-                    value={pctStr}
-                    placeholder="0"
-                    onFocus={() => setActiveField("pct")}
-                    onChange={(e) => handlePctChange(e.target.value)}
-                    className="pr-12"
-                    data-testid="input-tip-percentage"
-                  />
-                  <div className="absolute right-0 top-0 h-full flex items-center gap-0.5 pr-2">
-                    {pctStr !== "" && activeField === "pct" && (
-                      <button
-                        type="button"
-                        onMouseDown={(e) => { e.preventDefault(); clearPct(); }}
-                        className="p-0.5 rounded text-muted-foreground hover:text-foreground"
-                        data-testid="button-clear-pct"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
-                    <span className="text-sm text-muted-foreground">%</span>
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
 
             {/* Amount field */}
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Amount</label>
-              {activeField === "pct" ? (
-                <div className="flex items-center h-9 rounded-md border bg-muted/50 px-3 text-sm text-muted-foreground select-none">
-                  <span className="mr-1">$</span>
-                  <span className="flex-1">{amtStr || "—"}</span>
-                </div>
-              ) : (
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
-                  <Input
-                    ref={amtInputRef}
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={amtStr}
-                    placeholder="0.00"
-                    onFocus={() => setActiveField("amt")}
-                    onChange={(e) => handleAmtChange(e.target.value)}
-                    className="pl-6 pr-8"
-                    data-testid="input-tip-amount"
-                  />
-                  {amtStr !== "" && activeField === "amt" && (
-                    <button
-                      type="button"
-                      onMouseDown={(e) => { e.preventDefault(); clearAmt(); }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground hover:text-foreground"
-                      data-testid="button-clear-amt"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-              )}
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">$</span>
+                <Input
+                  ref={amtInputRef}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={amtStr}
+                  placeholder="0.00"
+                  readOnly={activeField === "pct"}
+                  onFocus={() => setActiveField("amt")}
+                  onChange={(e) => handleAmtChange(e.target.value)}
+                  className={`pl-6 pr-8 transition-colors ${activeField === "pct" ? "bg-muted/50 text-muted-foreground cursor-pointer" : ""}`}
+                  data-testid="input-tip-amount"
+                />
+                {amtStr !== "" && activeField === "amt" && (
+                  <button
+                    type="button"
+                    onMouseDown={(e) => { e.preventDefault(); clearAmt(); }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground hover:text-foreground"
+                    data-testid="button-clear-amt"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}
