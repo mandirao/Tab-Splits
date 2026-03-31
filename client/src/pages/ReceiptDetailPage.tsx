@@ -9,7 +9,7 @@ import ReceiptItemRow from "@/components/ReceiptItemRow";
 import TipCalculator from "@/components/TipCalculator";
 import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
-import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart } from "lucide-react";
+import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -507,6 +507,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   } | null>(null);
   const [showScannedImage, setShowScannedImage] = useState(false);
   const [scannedImageUrl, setScannedImageUrl] = useState<string | null>(null);
+  const [showRescanConfirm, setShowRescanConfirm] = useState(false);
   const [addItemBottomSheetOpen, setAddItemBottomSheetOpen] = useState(false);
   const [newItemData, setNewItemData] = useState({ name: "", quantity: 1, price: "" });
   const [paidByBottomSheetOpen, setPaidByBottomSheetOpen] = useState(false);
@@ -546,6 +547,13 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     queryKey: ["/api/receipts", receiptId],
   });
 
+  // Fall back to receipt.imageUrl (object storage) when session storage is cleared
+  useEffect(() => {
+    if (!scannedImageUrl && receipt?.imageUrl) {
+      setScannedImageUrl(receipt.imageUrl);
+    }
+  }, [receipt?.imageUrl, scannedImageUrl]);
+
   const { data: items = [] } = useQuery<ReceiptItem[]>({
     queryKey: ["/api/receipts", receiptId, "items"],
   });
@@ -553,6 +561,81 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   // Fetch people on this specific receipt
   const { data: receiptPeople = [] } = useQuery<Person[]>({
     queryKey: ["/api/receipts", receiptId, "people"],
+  });
+
+  // ReScan mutation: re-runs OCR on the stored image, replacing all items
+  const rescanMutation = useMutation({
+    mutationFn: async () => {
+      // Get image as base64: prefer session storage, fall back to fetching from URL
+      let base64: string;
+      const sessionBase64 = sessionStorage.getItem(`scanned_image_${receiptId}`);
+      if (sessionBase64) {
+        // Data URL format: "data:image/jpeg;base64,<data>"
+        base64 = sessionBase64.includes(",") ? sessionBase64.split(",")[1] : sessionBase64;
+      } else if (scannedImageUrl) {
+        // Fetch from object storage URL and convert to base64
+        const resp = await fetch(scannedImageUrl);
+        if (!resp.ok) throw new Error("Could not load receipt image for re-scan");
+        const blob = await resp.blob();
+        base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            resolve(result.includes(",") ? result.split(",")[1] : result);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } else {
+        throw new Error("No scanned image available for re-scan");
+      }
+
+      // Call the OCR API
+      const parsed = await apiRequest("/api/scan-receipt", "POST", { image: base64 });
+      if (!parsed.items || parsed.items.length === 0) {
+        throw new Error("No items detected in the image");
+      }
+
+      // Update receipt fields (name, subtotal, tax, tip, total)
+      const receiptUpdate: Record<string, string> = {};
+      if (parsed.restaurantName) receiptUpdate.restaurantName = parsed.restaurantName;
+      if (parsed.subtotal != null) receiptUpdate.subtotal = Number(parsed.subtotal).toFixed(2);
+      if (parsed.tax != null) receiptUpdate.tax = Number(parsed.tax).toFixed(2);
+      if (parsed.tip != null) receiptUpdate.tip = Number(parsed.tip).toFixed(2);
+      if (parsed.total != null) receiptUpdate.total = Number(parsed.total).toFixed(2);
+      if (Object.keys(receiptUpdate).length > 0) {
+        await apiRequest(`/api/receipts/${receiptId}`, "PATCH", receiptUpdate);
+      }
+
+      // Clear all existing items, then insert fresh ones
+      await apiRequest(`/api/receipts/${receiptId}/items`, "DELETE");
+      for (const item of parsed.items) {
+        await apiRequest(`/api/receipts/${receiptId}/items`, "POST", {
+          name: item.name,
+          quantity: item.quantity ?? 1,
+          price: Number(item.price).toFixed(2),
+        });
+      }
+
+      return parsed;
+    },
+    onSuccess: (parsed) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
+      setShowScannedImage(false);
+      setShowRescanConfirm(false);
+      toast({
+        title: "Receipt re-parsed",
+        description: `Found ${parsed.items.length} item${parsed.items.length === 1 ? "" : "s"}.`,
+      });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Re-scan failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    },
   });
 
   // Fetch all people for assignment dropdown (global list)
@@ -2151,18 +2234,70 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         </div>
       </BottomSheet>
 
-      <Dialog open={showScannedImage} onOpenChange={setShowScannedImage}>
+      <Dialog open={showScannedImage} onOpenChange={(open) => { setShowScannedImage(open); setShowRescanConfirm(false); }}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Scanned Receipt Image</DialogTitle>
           </DialogHeader>
           {scannedImageUrl && (
-            <div className="relative">
-              <img 
-                src={scannedImageUrl} 
-                alt="Scanned receipt" 
-                className="w-full h-auto rounded-lg"
-              />
+            <div className="space-y-3">
+              <div className="relative overflow-y-auto max-h-[60vh]">
+                <img
+                  src={scannedImageUrl}
+                  alt="Scanned receipt"
+                  className="w-full h-auto rounded-lg"
+                />
+              </div>
+
+              {!showRescanConfirm ? (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setShowRescanConfirm(true)}
+                  data-testid="button-initiate-rescan"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Re-parse with AI
+                </Button>
+              ) : (
+                <div className="space-y-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 p-3">
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                    Replace all current items?
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    All items and assignments will be removed and replaced with whatever AI reads from the image. This cannot be undone.
+                  </p>
+                  <div className="flex gap-2 pt-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setShowRescanConfirm(false)}
+                      disabled={rescanMutation.isPending}
+                      data-testid="button-rescan-cancel"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => rescanMutation.mutate()}
+                      disabled={rescanMutation.isPending}
+                      data-testid="button-rescan-confirm"
+                    >
+                      {rescanMutation.isPending ? (
+                        <>
+                          <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                          Scanning…
+                        </>
+                      ) : (
+                        "Re-parse Receipt"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>

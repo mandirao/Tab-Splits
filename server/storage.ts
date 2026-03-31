@@ -33,6 +33,7 @@ export interface IStorage {
   getReceiptItems(receiptId: string): Promise<ReceiptItem[]>;
   updateReceiptItem(id: string, item: Partial<InsertReceiptItem>): Promise<ReceiptItem>;
   deleteReceiptItem(id: string): Promise<void>;
+  clearReceiptItems(receiptId: string): Promise<void>;
 
   // People operations
   createPerson(person: InsertPerson): Promise<Person>;
@@ -138,6 +139,10 @@ export class DatabaseStorage implements IStorage {
 
   async deleteReceiptItem(id: string): Promise<void> {
     await db.delete(receiptItems).where(eq(receiptItems.id, id));
+  }
+
+  async clearReceiptItems(receiptId: string): Promise<void> {
+    await db.delete(receiptItems).where(eq(receiptItems.receiptId, receiptId));
   }
 
   // People operations

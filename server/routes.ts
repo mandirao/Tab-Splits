@@ -204,6 +204,16 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
+  // Clear all items for a receipt (used by ReScan)
+  app.delete("/api/receipts/:id/items", async (req, res) => {
+    try {
+      await storage.clearReceiptItems(req.params.id);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // People routes
   app.post("/api/people", async (req, res) => {
     try {
