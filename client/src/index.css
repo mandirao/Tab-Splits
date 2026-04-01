@@ -13,9 +13,9 @@
   --background: 41 89% 96%;       /* Cream #FEF9EE */
   --foreground: 0 0% 7%;          /* Ink #111111 */
   --border: 41 35% 88%;
-  --card: 0 0% 100%;              /* Pure white cards on cream bg */
+  --card: 41 55% 98%;             /* Warm cream-white, barely lighter than bg */
   --card-foreground: 0 0% 7%;
-  --card-border: 41 30% 91%;
+  --card-border: 41 35% 90%;
   --sidebar: 41 60% 94%;
   --sidebar-foreground: 0 0% 7%;
   --sidebar-border: 41 35% 88%;
@@ -24,9 +24,9 @@
   --sidebar-accent: 41 50% 89%;
   --sidebar-accent-foreground: 0 0% 7%;
   --sidebar-ring: 38 92% 50%;
-  --popover: 0 0% 100%;
+  --popover: 41 55% 98%;
   --popover-foreground: 0 0% 7%;
-  --popover-border: 41 30% 89%;
+  --popover-border: 41 35% 89%;
   --primary: 38 92% 50%;          /* Amber #F59E0B */
   --primary-foreground: 0 0% 7%;  /* Ink on amber = 8.2:1 contrast */
   --secondary: 41 40% 90%;
