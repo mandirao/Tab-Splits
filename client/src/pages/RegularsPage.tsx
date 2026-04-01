@@ -11,16 +11,14 @@ import type { Person } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
 const PERSON_COLORS = [
-  'hsl(330, 75%, 65%)',
-  'hsl(340, 80%, 60%)',
-  'hsl(25, 90%, 62%)',
-  'hsl(15, 85%, 65%)',
-  'hsl(45, 95%, 65%)',
-  'hsl(185, 65%, 70%)',
-  'hsl(195, 70%, 65%)',
-  'hsl(280, 55%, 68%)',
-  'hsl(270, 60%, 70%)',
-  'hsl(35, 85%, 68%)',
+  'hsl(38, 92%, 50%)',   // Amber
+  'hsl(17, 81%, 53%)',   // Coral
+  'hsl(345, 77%, 57%)',  // Raspberry
+  'hsl(258, 90%, 66%)',  // Violet
+  'hsl(217, 91%, 60%)',  // Blue
+  'hsl(164, 87%, 39%)',  // Teal
+  'hsl(142, 71%, 45%)',  // Lime
+  'hsl(330, 81%, 60%)',  // Pink
 ];
 
 type AddMode = "contacts" | "manual";
@@ -128,17 +126,8 @@ export default function RegularsPage() {
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      <header className="flex-shrink-0 p-4 border-b bg-card">
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <h1 className="text-2xl font-bold">Regulars</h1>
-          <Button
-            size="icon"
-            onClick={openSheet}
-            data-testid="button-add-person"
-          >
-            <Plus className="h-5 w-5" />
-          </Button>
-        </div>
+      <header className="flex-shrink-0 p-4 border-b bg-card space-y-3">
+        <h1 className="text-2xl font-bold">Regulars</h1>
 
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -151,6 +140,15 @@ export default function RegularsPage() {
             data-testid="input-search"
           />
         </div>
+
+        <Button
+          className="w-full"
+          onClick={openSheet}
+          data-testid="button-add-person"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add Diner
+        </Button>
       </header>
 
       <main className="flex-1 overflow-y-auto p-4">
@@ -167,10 +165,19 @@ export default function RegularsPage() {
               onRemove={() => deletePersonMutation.mutate(person.id)}
             />
           ))}
-          {filteredPeople.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground space-y-1">
-              <p className="font-medium">No regulars yet</p>
+          {filteredPeople.length === 0 && !searchQuery && (
+            <div className="text-center py-12 text-muted-foreground space-y-3">
+              <p className="font-medium text-foreground">No regulars yet</p>
               <p className="text-sm">Add your dining crew so they're ready to split any bill</p>
+              <Button variant="outline" onClick={openSheet} data-testid="button-add-person-empty">
+                <Plus className="h-4 w-4 mr-2" />
+                Add your first diner
+              </Button>
+            </div>
+          )}
+          {filteredPeople.length === 0 && searchQuery && (
+            <div className="text-center py-12 text-muted-foreground">
+              <p className="text-sm">No diners match "{searchQuery}"</p>
             </div>
           )}
         </div>
