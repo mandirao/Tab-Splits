@@ -293,8 +293,7 @@ export default function HomePage() {
       <header className="flex-shrink-0 p-4 border-b bg-card">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold">SplitTab</h1>
-            <p className="text-xs text-muted-foreground">by Amuse-Bouche</p>
+            <h1 className="text-2xl font-bold">Tab Splits</h1>
           </div>
           <Button
             variant="ghost"

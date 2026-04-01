@@ -417,7 +417,7 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
                   onClick={() => {
                     const username = encodeURIComponent(receipt.paidByVenmo || "");
                     const amount = myTotals.total.toFixed(2);
-                    const note = encodeURIComponent(`SplitTab - ${receipt.restaurantName || 'Receipt'}`);
+                    const note = encodeURIComponent(`Tab Splits - ${receipt.restaurantName || 'Receipt'}`);
                     window.location.href = `venmo://paycharge?txn=pay&recipients=${username}&amount=${amount}&note=${note}`;
                   }}
                   data-testid={`button-pay-venmo-${selectedTab}`}
@@ -472,7 +472,7 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
                         onClick={() => {
                           const username = encodeURIComponent(receipt.paidByVenmo || "");
                           const amount = totals.total.toFixed(2);
-                          const note = encodeURIComponent(`SplitTab - ${receipt.restaurantName || 'Receipt'}`);
+                          const note = encodeURIComponent(`Tab Splits - ${receipt.restaurantName || 'Receipt'}`);
                           window.location.href = `venmo://paycharge?txn=pay&recipients=${username}&amount=${amount}&note=${note}`;
                         }}
                         data-testid={`button-pay-venmo-${personId}`}
