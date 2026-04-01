@@ -18,7 +18,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import ReceiptCard from "@/components/ReceiptCard";
-import { Camera, Search, Users, Pencil, Trash2, Check, X, Phone, LogOut } from "lucide-react";
+import { Camera, Search, Users, Pencil, Trash2, Check, X, Phone, LogOut, Plus, UserPlus, ChevronLeft } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -30,12 +30,24 @@ interface ReceiptWithDetails extends Receipt {
   items?: ReceiptItem[];
 }
 
+type AddMode = "contacts" | "manual";
+
 function ManageDinersSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const { toast } = useToast();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [deleteDialogPerson, setDeleteDialogPerson] = useState<Person | null>(null);
+
+  // Add-diner state
+  const [isAdding, setIsAdding] = useState(false);
+  const [addMode, setAddMode] = useState<AddMode>("manual");
+  const [pendingContact, setPendingContact] = useState<{ name: string; phone: string } | null>(null);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+
+  const contactsSupported = typeof navigator !== "undefined" && "contacts" in navigator && "ContactsManager" in window;
 
   const { data: people = [], isLoading } = useQuery<Person[]>({
     queryKey: ["/api/people"],
@@ -73,37 +85,214 @@ function ManageDinersSheet({ open, onOpenChange }: { open: boolean; onOpenChange
     },
   });
 
+  const createMutation = useMutation({
+    mutationFn: async (data: { name: string; phone?: string }) => {
+      return await apiRequest("/api/people", "POST", { ...data, isRegular: 1 });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/people"] });
+      toast({ title: "Diner added" });
+      resetAdd();
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not add diner", description: err.message, variant: "destructive" });
+    },
+  });
+
   const startEdit = (person: Person) => {
     setEditingId(person.id);
     setEditName(person.name);
     setEditPhone(person.phone ?? "");
   };
 
-  const cancelEdit = () => {
-    setEditingId(null);
-  };
+  const cancelEdit = () => setEditingId(null);
 
   const saveEdit = () => {
     if (!editingId || !editName.trim()) return;
     updateMutation.mutate({ id: editingId, name: editName, phone: editPhone });
   };
 
+  const resetAdd = () => {
+    setIsAdding(false);
+    setPendingContact(null);
+    setFirstName("");
+    setLastName("");
+    setNewPhone("");
+  };
+
+  const openAdd = () => {
+    setAddMode(contactsSupported ? "contacts" : "manual");
+    setIsAdding(true);
+  };
+
+  const handleOpenContacts = async () => {
+    try {
+      const contacts = await (navigator as any).contacts.select(["name", "tel"], { multiple: false });
+      if (contacts?.length > 0) {
+        const c = contacts[0];
+        setPendingContact({ name: c.name?.[0] ?? "", phone: c.tel?.[0] ?? "" });
+      }
+    } catch (e: any) {
+      if (e?.name !== "AbortError") {
+        toast({ title: "Could not open contacts", description: "Try adding manually instead.", variant: "destructive" });
+      }
+    }
+  };
+
+  const handleAddFromContact = () => {
+    if (!pendingContact?.name) return;
+    createMutation.mutate({ name: pendingContact.name, ...(pendingContact.phone ? { phone: pendingContact.phone } : {}) });
+  };
+
+  const handleAddManually = () => {
+    const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
+    if (!name) return;
+    createMutation.mutate({ name, ...(newPhone.trim() ? { phone: newPhone.trim() } : {}) });
+  };
+
+  const isBusy = createMutation.isPending;
+
   return (
     <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="bottom" className="rounded-t-2xl max-h-[80vh] flex flex-col p-0">
+      <Sheet open={open} onOpenChange={(v) => { if (!v) { resetAdd(); } onOpenChange(v); }}>
+        <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] flex flex-col p-0">
           <SheetHeader className="px-4 pt-5 pb-3 border-b flex-shrink-0">
-            <SheetTitle className="text-lg">Manage Diners</SheetTitle>
+            <div className="flex items-center justify-between gap-3">
+              {isAdding ? (
+                <button
+                  type="button"
+                  onClick={resetAdd}
+                  className="flex items-center gap-1 text-sm text-muted-foreground"
+                  data-testid="button-back-to-diners"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Back
+                </button>
+              ) : (
+                <SheetTitle className="text-lg">Manage Diners</SheetTitle>
+              )}
+              {!isAdding && (
+                <Button size="sm" onClick={openAdd} data-testid="button-add-diner">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Diner
+                </Button>
+              )}
+            </div>
+            {isAdding && (
+              <SheetTitle className="text-lg mt-1">Add Diner</SheetTitle>
+            )}
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto">
-            {isLoading ? (
+            {isAdding ? (
+              <div className="p-4 space-y-4">
+                {/* Mode tabs */}
+                <div className="flex gap-1 bg-muted rounded-md p-1">
+                  {([
+                    { id: "contacts" as const, label: "From Contacts", icon: Phone },
+                    { id: "manual" as const, label: "Manual", icon: UserPlus },
+                  ] as const).map(({ id, label, icon: Icon }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => { setAddMode(id); setPendingContact(null); }}
+                      className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-1.5 rounded transition-colors ${
+                        addMode === id ? "bg-background shadow-sm text-foreground" : "text-muted-foreground"
+                      }`}
+                      data-testid={`button-add-mode-${id}`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {addMode === "contacts" && (
+                  <div className="space-y-3">
+                    {pendingContact ? (
+                      <>
+                        <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <span className="text-sm font-semibold text-primary">
+                              {pendingContact.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{pendingContact.name}</p>
+                            {pendingContact.phone && (
+                              <p className="text-xs text-muted-foreground">{pendingContact.phone}</p>
+                            )}
+                          </div>
+                          <Button size="icon" variant="ghost" onClick={() => setPendingContact(null)} data-testid="button-clear-contact">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <Button className="w-full" onClick={handleAddFromContact} disabled={!pendingContact.name || isBusy} data-testid="button-confirm-add-contact">
+                          {isBusy ? "Adding…" : `Add ${pendingContact.name.split(" ")[0]}`}
+                        </Button>
+                      </>
+                    ) : contactsSupported ? (
+                      <Button variant="outline" className="w-full" onClick={handleOpenContacts} data-testid="button-open-contacts">
+                        <Phone className="h-4 w-4 mr-2" />
+                        Choose from Contacts
+                      </Button>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Contact picking isn't supported in this browser. Switch to Manual to add someone.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {addMode === "manual" && (
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <p className="text-xs font-medium mb-1">First name *</p>
+                        <Input
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          placeholder="Alex"
+                          autoFocus
+                          onKeyDown={(e) => { if (e.key === "Enter") handleAddManually(); }}
+                          data-testid="input-add-first"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-medium mb-1">Last name</p>
+                        <Input
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          placeholder="Chen"
+                          data-testid="input-add-last"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium mb-1">Phone <span className="text-muted-foreground font-normal">(optional)</span></p>
+                      <Input
+                        type="tel"
+                        value={newPhone}
+                        onChange={(e) => setNewPhone(e.target.value)}
+                        placeholder="(555) 123-4567"
+                        data-testid="input-add-phone"
+                      />
+                    </div>
+                    <Button className="w-full" onClick={handleAddManually} disabled={!firstName.trim() || isBusy} data-testid="button-add-manual">
+                      {isBusy ? "Adding…" : "Add Diner"}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : isLoading ? (
               <div className="py-10 text-center text-muted-foreground text-sm">Loading…</div>
             ) : people.length === 0 ? (
-              <div className="py-10 text-center text-muted-foreground text-sm">
-                <Users className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                <p>No saved diners yet</p>
-                <p className="text-xs mt-1">Diners are saved when you add them to a tab</p>
+              <div className="py-10 text-center text-muted-foreground text-sm space-y-3">
+                <Users className="h-8 w-8 mx-auto opacity-40" />
+                <div>
+                  <p className="font-medium text-foreground">No saved diners yet</p>
+                  <p className="text-xs mt-1">Tap "Add Diner" above to get started</p>
+                </div>
               </div>
             ) : (
               <ul className="divide-y">
@@ -130,21 +319,11 @@ function ManageDinersSheet({ open, onOpenChange }: { open: boolean; onOpenChange
                           />
                         </div>
                         <div className="flex gap-2 pt-1">
-                          <Button
-                            size="sm"
-                            onClick={saveEdit}
-                            disabled={!editName.trim() || updateMutation.isPending}
-                            data-testid={`button-save-diner-${person.id}`}
-                          >
+                          <Button size="sm" onClick={saveEdit} disabled={!editName.trim() || updateMutation.isPending} data-testid={`button-save-diner-${person.id}`}>
                             <Check className="h-3.5 w-3.5 mr-1" />
                             {updateMutation.isPending ? "Saving…" : "Save"}
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={cancelEdit}
-                            data-testid={`button-cancel-edit-diner-${person.id}`}
-                          >
+                          <Button size="sm" variant="ghost" onClick={cancelEdit} data-testid={`button-cancel-edit-diner-${person.id}`}>
                             <X className="h-3.5 w-3.5 mr-1" />
                             Cancel
                           </Button>
@@ -153,33 +332,18 @@ function ManageDinersSheet({ open, onOpenChange }: { open: boolean; onOpenChange
                     ) : (
                       <div className="flex items-center gap-3">
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate" data-testid={`text-diner-name-${person.id}`}>
-                            {person.name}
-                          </p>
+                          <p className="font-medium truncate" data-testid={`text-diner-name-${person.id}`}>{person.name}</p>
                           {person.phone ? (
-                            <p className="text-sm text-muted-foreground truncate" data-testid={`text-diner-phone-${person.id}`}>
-                              {person.phone}
-                            </p>
+                            <p className="text-sm text-muted-foreground truncate" data-testid={`text-diner-phone-${person.id}`}>{person.phone}</p>
                           ) : (
                             <p className="text-sm text-muted-foreground/50 italic">No phone</p>
                           )}
                         </div>
                         <div className="flex gap-1 flex-shrink-0">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => startEdit(person)}
-                            data-testid={`button-edit-diner-${person.id}`}
-                          >
+                          <Button size="icon" variant="ghost" onClick={() => startEdit(person)} data-testid={`button-edit-diner-${person.id}`}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="text-destructive"
-                            onClick={() => setDeleteDialogPerson(person)}
-                            data-testid={`button-delete-diner-${person.id}`}
-                          >
+                          <Button size="icon" variant="ghost" className="text-destructive" onClick={() => setDeleteDialogPerson(person)} data-testid={`button-delete-diner-${person.id}`}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
