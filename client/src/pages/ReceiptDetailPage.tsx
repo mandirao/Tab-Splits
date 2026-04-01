@@ -1726,81 +1726,67 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             </div>
           ) : (
             <>
-              <div className="space-y-3">
-                <h3 className="font-semibold text-sm">Scan QR Code</h3>
-                <p className="text-sm text-muted-foreground">
-                  Anyone at the table can scan this code to see the receipt and their total
-                </p>
-                {qrCodeDataUrl && (
-                  <div className="flex justify-center p-4 bg-white rounded-lg">
-                    <img src={qrCodeDataUrl} alt="QR Code" className="w-64 h-64" data-testid="img-qr-code" />
+              {/* QR Code */}
+              {qrCodeDataUrl && (
+                <div className="flex justify-center">
+                  <div className="p-4 bg-white rounded-xl">
+                    <img src={qrCodeDataUrl} alt="QR Code" className="w-48 h-48" data-testid="img-qr-code" />
                   </div>
-                )}
-              </div>
-
-              <div className="border-t pt-4">
-                <h3 className="font-semibold text-sm mb-3">Copy Link</h3>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Quick copy the link to share anywhere
-                </p>
-                <Button
-                  variant="outline"
-                  className="w-full justify-between"
-                  onClick={async () => {
-                    const shareUrl = `${window.location.origin}/share/${activeShareToken}`;
-                    await navigator.clipboard.writeText(shareUrl);
-                    setUrlCopied(true);
-                    toast({ title: "Link copied to clipboard!" });
-                    setTimeout(() => setUrlCopied(false), 2000);
-                  }}
-                  data-testid="button-copy-url"
-                >
-                  <span className="truncate mr-2 text-muted-foreground">
-                    {`${window.location.origin}/share/${activeShareToken}`}
-                  </span>
-                  {urlCopied ? (
-                    <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                  ) : (
-                    <Copy className="h-4 w-4 flex-shrink-0" />
-                  )}
-                </Button>
-              </div>
-
-              <div className="border-t pt-4">
-                <h3 className="font-semibold text-sm mb-3">Send via Text</h3>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Select people with phone numbers to send them the link
-                </p>
-                <div className="space-y-2">
-                  {peopleWithColors
-                    .filter(person => person.phone)
-                    .map((person) => (
-                      <Button
-                        key={person.id}
-                        variant="outline"
-                        className="w-full justify-between"
-                        onClick={() => handleSendSMS(person.id)}
-                        data-testid={`button-send-sms-${person.id}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-6 h-6 rounded-full text-white text-xs font-semibold flex items-center justify-center"
-                            style={{ backgroundColor: person.color }}
-                          >
-                            {person.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                          </div>
-                          <span>{person.name}</span>
-                        </div>
-                        <MessageSquare className="h-4 w-4" />
-                      </Button>
-                    ))}
-                  {peopleWithColors.filter(person => person.phone).length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      No people with phone numbers yet. Add phone numbers when creating people to send them text messages.
-                    </p>
-                  )}
                 </div>
-              </div>
+              )}
+
+              {/* Copy link */}
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={async () => {
+                  const shareUrl = `${window.location.origin}/share/${activeShareToken}`;
+                  await navigator.clipboard.writeText(shareUrl);
+                  setUrlCopied(true);
+                  toast({ title: "Link copied!" });
+                  setTimeout(() => setUrlCopied(false), 2000);
+                }}
+                data-testid="button-copy-url"
+              >
+                {urlCopied ? (
+                  <Check className="h-4 w-4 mr-2 text-green-500" />
+                ) : (
+                  <Copy className="h-4 w-4 mr-2" />
+                )}
+                {urlCopied ? "Copied!" : "Copy Link"}
+              </Button>
+
+              {/* Send via text — only shown when someone has a phone number */}
+              {peopleWithColors.filter(p => p.phone).length > 0 && (
+                <>
+                  <div className="border-t" />
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Send via Text</p>
+                    {peopleWithColors
+                      .filter(person => person.phone)
+                      .map((person) => (
+                        <Button
+                          key={person.id}
+                          variant="outline"
+                          className="w-full justify-between"
+                          onClick={() => handleSendSMS(person.id)}
+                          data-testid={`button-send-sms-${person.id}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-6 h-6 rounded-full text-white text-xs font-semibold flex items-center justify-center"
+                              style={{ backgroundColor: person.color }}
+                            >
+                              {person.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                            </div>
+                            <span>{person.name}</span>
+                          </div>
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
+                      ))}
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>
