@@ -420,30 +420,32 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
           </Card>
         )}
 
-        {/* Receipt total — always visible */}
-        <Card>
-          <CardHeader className="pb-3">
-            <h2 className="font-semibold text-base">Receipt Total</h2>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span data-testid="text-receipt-subtotal">${subtotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Tax</span>
-              <span data-testid="text-receipt-tax">${tax.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Tip</span>
-              <span data-testid="text-receipt-tip">${tip.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-xl font-bold pt-2 border-t">
-              <span>Total</span>
-              <span data-testid="text-receipt-total">${total.toFixed(2)}</span>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Receipt total — All tab only */}
+        {isAllTab && (
+          <Card>
+            <CardHeader className="pb-3">
+              <h2 className="font-semibold text-base">Receipt Total</h2>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span data-testid="text-receipt-subtotal">${subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Tax</span>
+                <span data-testid="text-receipt-tax">${tax.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Tip</span>
+                <span data-testid="text-receipt-tip">${tip.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-xl font-bold pt-2 border-t">
+                <span>Total</span>
+                <span data-testid="text-receipt-total">${total.toFixed(2)}</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );
