@@ -572,7 +572,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [managePeopleBottomSheetOpen, setManagePeopleBottomSheetOpen] = useState(false);
   const [personToDelete, setPersonToDelete] = useState<string | null>(null);
   const [paymentsBottomSheetOpen, setPaymentsBottomSheetOpen] = useState(false);
-  const [showAddPaymentForm, setShowAddPaymentForm] = useState(false);
   const [selectedPayerPersonId, setSelectedPayerPersonId] = useState<string>("");
   const [paymentAmount, setPaymentAmount] = useState<string>("");
   const [payerVenmoInput, setPayerVenmoInput] = useState<string>("");
@@ -587,7 +586,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [showRescanConfirm, setShowRescanConfirm] = useState(false);
   const [addItemBottomSheetOpen, setAddItemBottomSheetOpen] = useState(false);
   const [newItemData, setNewItemData] = useState({ name: "", quantity: 1, price: "" });
-  const [venmoInput, setVenmoInput] = useState("");
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
 
@@ -1112,6 +1110,13 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   };
 
   const handlePaymentsClick = () => {
+    // Pre-select whoever is already marked as payer
+    if (receipt?.paidById) {
+      const currentPayer = peopleWithColors.find(p => p.id === receipt.paidById);
+      setSelectedPayerPersonId(receipt.paidById);
+      setPayerVenmoInput(currentPayer?.venmoUsername || "");
+      setPaymentAmount(total.toFixed(2));
+    }
     setPaymentsBottomSheetOpen(true);
   };
 
@@ -1135,6 +1140,9 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       return;
     }
 
+    // Keep paidById in sync with payment payer
+    updatePaidByMutation.mutate({ paidById: selectedPayerPersonId });
+
     // If Venmo username was provided, update the person's Venmo
     if (payerVenmoInput.trim()) {
       updatePersonVenmoMutation.mutate({
@@ -1142,7 +1150,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         venmoUsername: payerVenmoInput.trim()
       });
     }
-    
+
     createPaymentMutation.mutate({
       personId: selectedPayerPersonId,
       amount: amount.toFixed(2)
@@ -1809,10 +1817,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
 
       <BottomSheet
         open={managePeopleBottomSheetOpen}
-        onClose={() => {
-          setManagePeopleBottomSheetOpen(false);
-          setVenmoInput("");
-        }}
+        onClose={() => setManagePeopleBottomSheetOpen(false)}
         title="Manage People"
       >
         <div className="space-y-3">
@@ -1821,86 +1826,38 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           )}
 
           {peopleWithColors.map((person) => {
-            const isPayer = receipt?.paidById === person.id;
             const hasAssignedItems = items.some(item =>
               (item.assignedTo as string[] || []).includes(person.id)
             );
             const initials = person.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-
-            const saveVenmo = (value: string) => {
-              updatePersonVenmoMutation.mutate({
-                personId: person.id,
-                venmoUsername: value.trim().replace(/^@/, ''),
-              });
-            };
-
             return (
-              <div key={person.id} data-testid={`person-item-${person.id}`}>
-                {/* Person row */}
-                <div className={`flex items-center gap-3 p-3 rounded-lg border ${isPayer ? 'border-primary bg-primary/5' : ''}`}>
-                  <div
-                    className="w-8 h-8 rounded-full text-white text-sm font-semibold flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: person.color }}
-                  >
-                    {initials}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm">{person.name}</p>
-                    {person.phone && (
-                      <p className="text-xs text-muted-foreground">{person.phone}</p>
-                    )}
-                  </div>
-
-                  {/* Paid toggle */}
-                  <Button
-                    size="sm"
-                    variant={isPayer ? "default" : "outline"}
-                    onClick={() => {
-                      if (isPayer) {
-                        updatePaidByMutation.mutate({ paidById: null });
-                        setVenmoInput("");
-                      } else {
-                        updatePaidByMutation.mutate({ paidById: person.id });
-                        setVenmoInput(person.venmoUsername || "");
-                      }
-                    }}
-                    data-testid={`button-select-payer-${person.id}`}
-                  >
-                    {isPayer && <Check className="h-3.5 w-3.5 mr-1" />}
-                    Paid
-                  </Button>
-
-                  {/* Delete */}
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => handleDeletePerson(person.id)}
-                    disabled={hasAssignedItems}
-                    data-testid={`button-delete-person-${person.id}`}
-                    className={hasAssignedItems ? "opacity-50 cursor-not-allowed" : ""}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+              <div
+                key={person.id}
+                className="flex items-center gap-3 p-3 rounded-lg border"
+                data-testid={`person-item-${person.id}`}
+              >
+                <div
+                  className="w-8 h-8 rounded-full text-white text-sm font-semibold flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: person.color }}
+                >
+                  {initials}
                 </div>
-
-                {/* Venmo field — slides in below the payer row, auto-saves */}
-                {isPayer && (
-                  <div className="mt-1.5 px-1">
-                    <Input
-                      type="text"
-                      placeholder="@venmo username (optional)"
-                      value={venmoInput}
-                      onChange={(e) => setVenmoInput(e.target.value)}
-                      onBlur={() => saveVenmo(venmoInput)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') saveVenmo((e.target as HTMLInputElement).value);
-                      }}
-                      className="text-sm"
-                      data-testid="input-venmo-username"
-                    />
-                  </div>
-                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">{person.name}</p>
+                  {person.phone && (
+                    <p className="text-xs text-muted-foreground">{person.phone}</p>
+                  )}
+                </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => handleDeletePerson(person.id)}
+                  disabled={hasAssignedItems}
+                  data-testid={`button-delete-person-${person.id}`}
+                  className={hasAssignedItems ? "opacity-50 cursor-not-allowed" : ""}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
               </div>
             );
           })}
@@ -1918,153 +1875,132 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         open={paymentsBottomSheetOpen}
         onClose={() => {
           setPaymentsBottomSheetOpen(false);
-          setShowAddPaymentForm(false);
           setSelectedPayerPersonId("");
           setPaymentAmount("");
           setPayerVenmoInput("");
         }}
-        title="Payments"
+        title="Who Paid?"
       >
-        <div className="space-y-6">
-          <div>
-            <h3 className="font-semibold mb-3">Payments Made</h3>
-            {payments.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">
-                No payments recorded yet
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {payments.map((payment) => {
-                  const payer = getPersonById(payment.personId);
-                  return (
-                    <div
-                      key={payment.id}
-                      className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
-                      data-testid={`payment-${payment.id}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        {payer && (
-                          <div 
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold"
-                            style={{ backgroundColor: payer.color }}
-                          >
-                            {getInitialsForPerson(payer.id)}
-                          </div>
-                        )}
-                        <div>
-                          <p className="font-medium">{payer?.name || "Unknown"}</p>
-                          <p className="text-sm text-muted-foreground">Paid ${parseFloat(payment.amount).toFixed(2)}</p>
-                        </div>
-                      </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleDeletePayment(payment.id)}
-                        data-testid={`button-delete-payment-${payment.id}`}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {!showAddPaymentForm ? (
-              <Button
-                variant="outline"
-                className="w-full mt-3"
-                onClick={() => {
-                  setShowAddPaymentForm(true);
-                  setPaymentAmount(total.toFixed(2));
-                  setPayerVenmoInput("");
-                }}
-                data-testid="button-show-add-payment-form"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Payment
-              </Button>
-            ) : (
-              <div className="mt-3 p-4 border rounded-lg bg-muted/30 space-y-3">
-                <div className="space-y-2">
-                  <Label htmlFor="payer-select">Who paid?</Label>
-                  <select
-                    id="payer-select"
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    value={selectedPayerPersonId}
-                    onChange={(e) => {
-                      const personId = e.target.value;
-                      setSelectedPayerPersonId(personId);
-                      const person = peopleWithColors.find(p => p.id === personId);
-                      setPayerVenmoInput(person?.venmoUsername || "");
-                    }}
-                    data-testid="select-payer"
-                  >
-                    <option value="">Select a person</option>
-                    {peopleWithColors.map((person) => (
-                      <option key={person.id} value={person.id}>
-                        {person.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="payment-amount">Amount paid</Label>
-                  <Input
-                    id="payment-amount"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    data-testid="input-payment-amount"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="payer-venmo">Venmo username (optional)</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">@</span>
-                    <Input
-                      id="payer-venmo"
-                      type="text"
-                      placeholder="username"
-                      className="pl-7"
-                      value={payerVenmoInput}
-                      onChange={(e) => setPayerVenmoInput(e.target.value.replace(/^@/, ''))}
-                      data-testid="input-payer-venmo"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
+        <div className="space-y-3">
+          {peopleWithColors.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">Add people to the bill first</p>
+          ) : (
+            peopleWithColors.map((person) => {
+              const isSelected = selectedPayerPersonId === person.id;
+              const initials = person.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+              return (
+                <div key={person.id}>
+                  <button
+                    className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                      isSelected ? 'border-primary bg-primary/5' : 'border-border hover-elevate'
+                    }`}
                     onClick={() => {
-                      setShowAddPaymentForm(false);
-                      setSelectedPayerPersonId("");
-                      setPaymentAmount("");
-                      setPayerVenmoInput("");
+                      if (isSelected) {
+                        setSelectedPayerPersonId("");
+                        setPayerVenmoInput("");
+                        setPaymentAmount("");
+                        updatePaidByMutation.mutate({ paidById: null });
+                      } else {
+                        setSelectedPayerPersonId(person.id);
+                        setPayerVenmoInput(person.venmoUsername || "");
+                        setPaymentAmount(total.toFixed(2));
+                        updatePaidByMutation.mutate({ paidById: person.id });
+                      }
                     }}
-                    data-testid="button-cancel-add-payment"
+                    data-testid={`button-select-payer-${person.id}`}
                   >
-                    Cancel
-                  </Button>
-                  <Button
-                    className="flex-1"
-                    onClick={handleAddPayment}
-                    disabled={!selectedPayerPersonId || !paymentAmount}
-                    data-testid="button-add-payment"
-                  >
-                    Add Payment
-                  </Button>
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-8 h-8 rounded-full text-white text-sm font-semibold flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: person.color }}
+                      >
+                        {initials}
+                      </div>
+                      <span className="font-medium text-sm">{person.name}</span>
+                    </div>
+                    {isSelected && <Check className="h-4 w-4 text-primary" />}
+                  </button>
+
+                  {/* Inline form — only for selected payer */}
+                  {isSelected && (
+                    <div className="mt-2 mx-1 space-y-2">
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">@</span>
+                        <Input
+                          type="text"
+                          placeholder="venmo username (optional)"
+                          className="pl-7 text-sm"
+                          value={payerVenmoInput}
+                          onChange={(e) => setPayerVenmoInput(e.target.value.replace(/^@/, ''))}
+                          data-testid="input-payer-venmo"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          value={paymentAmount}
+                          onChange={(e) => setPaymentAmount(e.target.value)}
+                          className="text-sm"
+                          data-testid="input-payment-amount"
+                        />
+                        <Button
+                          onClick={handleAddPayment}
+                          disabled={!paymentAmount || createPaymentMutation.isPending}
+                          data-testid="button-add-payment"
+                        >
+                          {createPaymentMutation.isPending ? "…" : "Record"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
-          </div>
+              );
+            })
+          )}
+
+          {/* Recorded payments */}
+          {payments.length > 0 && (
+            <>
+              <div className="border-t pt-1" />
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Recorded</p>
+              {payments.map((payment) => {
+                const payer = getPersonById(payment.personId);
+                return (
+                  <div
+                    key={payment.id}
+                    className="flex items-center justify-between p-3 border rounded-lg"
+                    data-testid={`payment-${payment.id}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {payer && (
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0"
+                          style={{ backgroundColor: payer.color }}
+                        >
+                          {getInitialsForPerson(payer.id)}
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-medium text-sm">{payer?.name || "Unknown"}</p>
+                        <p className="text-xs text-muted-foreground">${parseFloat(payment.amount).toFixed(2)}</p>
+                      </div>
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => handleDeletePayment(payment.id)}
+                      data-testid={`button-delete-payment-${payment.id}`}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </>
+          )}
         </div>
       </BottomSheet>
 
