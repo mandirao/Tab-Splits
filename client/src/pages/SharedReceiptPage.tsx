@@ -280,15 +280,18 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
                 onClick={() => setSelectedTab(person.id)}
                 className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors border ${
                   isActive
-                    ? "bg-primary text-primary-foreground border-primary"
+                    ? "text-white"
                     : "border-border text-muted-foreground hover-elevate"
                 }`}
+                style={isActive ? { backgroundColor: person.color, borderColor: person.color } : undefined}
                 data-testid={`tab-person-${person.id}`}
               >
-                <div
-                  className="w-4 h-4 rounded-full shrink-0"
-                  style={{ backgroundColor: person.color }}
-                />
+                {!isActive && (
+                  <div
+                    className="w-4 h-4 rounded-full shrink-0"
+                    style={{ backgroundColor: person.color }}
+                  />
+                )}
                 {person.name}
               </button>
             );
