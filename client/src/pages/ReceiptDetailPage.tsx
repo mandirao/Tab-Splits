@@ -1829,138 +1829,102 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         }}
         title="Manage People"
       >
-        <div className="space-y-5">
+        <div className="space-y-3">
+          {peopleWithColors.length === 0 && (
+            <p className="text-sm text-muted-foreground">No one on this bill yet.</p>
+          )}
 
-          {/* ── Who paid? ── */}
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold">Who paid?</h3>
-            {peopleWithColors.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Add people to the bill first</p>
-            ) : (
-              <div className="space-y-1.5">
-                {peopleWithColors.map((person) => {
-                  const isSelected = receipt?.paidById === person.id;
-                  return (
-                    <div key={person.id}>
-                      <button
-                        className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                          isSelected
-                            ? 'border-primary bg-primary/10'
-                            : 'border-border hover-elevate'
-                        }`}
-                        onClick={() => {
-                          if (isSelected) {
-                            updatePaidByMutation.mutate({ paidById: null });
-                            setVenmoInput("");
-                          } else {
-                            updatePaidByMutation.mutate({ paidById: person.id });
-                            setVenmoInput(person.venmoUsername || "");
-                          }
-                        }}
-                        data-testid={`button-select-payer-${person.id}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold"
-                            style={{ backgroundColor: person.color }}
-                          >
-                            {person.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                          </div>
-                          <span className="font-medium text-sm">{person.name}</span>
-                        </div>
-                        {isSelected && <Check className="h-4 w-4 text-primary" />}
-                      </button>
+          {peopleWithColors.map((person) => {
+            const isPayer = receipt?.paidById === person.id;
+            const hasAssignedItems = items.some(item =>
+              (item.assignedTo as string[] || []).includes(person.id)
+            );
+            const initials = person.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
-                      {/* Inline Venmo input — only for selected payer */}
-                      {isSelected && (
-                        <div className="mt-1.5 mx-1 flex gap-2 items-center">
-                          <Input
-                            type="text"
-                            placeholder="Venmo username (optional)"
-                            value={venmoInput}
-                            onChange={(e) => setVenmoInput(e.target.value)}
-                            className="text-sm"
-                            data-testid="input-venmo-username"
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              if (receipt?.paidById && venmoInput.trim()) {
-                                updatePersonVenmoMutation.mutate({
-                                  personId: receipt.paidById,
-                                  venmoUsername: venmoInput.trim().replace(/^@/, '')
-                                });
-                              }
-                            }}
-                            disabled={!venmoInput.trim() || updatePersonVenmoMutation.isPending}
-                            data-testid="button-save-venmo"
-                          >
-                            {updatePersonVenmoMutation.isPending ? "…" : "Save"}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+            const saveVenmo = (value: string) => {
+              updatePersonVenmoMutation.mutate({
+                personId: person.id,
+                venmoUsername: value.trim().replace(/^@/, ''),
+              });
+            };
+
+            return (
+              <div key={person.id} data-testid={`person-item-${person.id}`}>
+                {/* Person row */}
+                <div className={`flex items-center gap-3 p-3 rounded-lg border ${isPayer ? 'border-primary bg-primary/5' : ''}`}>
+                  <div
+                    className="w-8 h-8 rounded-full text-white text-sm font-semibold flex items-center justify-center shrink-0"
+                    style={{ backgroundColor: person.color }}
+                  >
+                    {initials}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm">{person.name}</p>
+                    {person.phone && (
+                      <p className="text-xs text-muted-foreground">{person.phone}</p>
+                    )}
+                  </div>
+
+                  {/* Paid toggle */}
+                  <Button
+                    size="sm"
+                    variant={isPayer ? "default" : "outline"}
+                    onClick={() => {
+                      if (isPayer) {
+                        updatePaidByMutation.mutate({ paidById: null });
+                        setVenmoInput("");
+                      } else {
+                        updatePaidByMutation.mutate({ paidById: person.id });
+                        setVenmoInput(person.venmoUsername || "");
+                      }
+                    }}
+                    data-testid={`button-select-payer-${person.id}`}
+                  >
+                    {isPayer && <Check className="h-3.5 w-3.5 mr-1" />}
+                    Paid
+                  </Button>
+
+                  {/* Delete */}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => handleDeletePerson(person.id)}
+                    disabled={hasAssignedItems}
+                    data-testid={`button-delete-person-${person.id}`}
+                    className={hasAssignedItems ? "opacity-50 cursor-not-allowed" : ""}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+
+                {/* Venmo field — slides in below the payer row, auto-saves */}
+                {isPayer && (
+                  <div className="mt-1.5 px-1">
+                    <Input
+                      type="text"
+                      placeholder="@venmo username (optional)"
+                      value={venmoInput}
+                      onChange={(e) => setVenmoInput(e.target.value)}
+                      onBlur={() => saveVenmo(venmoInput)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') saveVenmo((e.target as HTMLInputElement).value);
+                      }}
+                      className="text-sm"
+                      data-testid="input-venmo-username"
+                    />
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            );
+          })}
 
-          <div className="border-t" />
-
-          {/* ── People on this bill ── */}
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold">On this bill</h3>
-            {peopleWithColors.length > 0 && (
-              <div className="space-y-1.5">
-                {peopleWithColors.map((person) => {
-                  const hasAssignedItems = items.some(item =>
-                    (item.assignedTo as string[] || []).includes(person.id)
-                  );
-                  return (
-                    <div
-                      key={person.id}
-                      className="flex items-center justify-between p-3 rounded-lg border"
-                      data-testid={`person-item-${person.id}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-8 h-8 rounded-full text-white text-sm font-semibold flex items-center justify-center"
-                          style={{ backgroundColor: person.color }}
-                        >
-                          {person.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">{person.name}</p>
-                          {person.phone && (
-                            <p className="text-xs text-muted-foreground">{person.phone}</p>
-                          )}
-                        </div>
-                      </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleDeletePerson(person.id)}
-                        disabled={hasAssignedItems}
-                        data-testid={`button-delete-person-${person.id}`}
-                        className={hasAssignedItems ? "opacity-50 cursor-not-allowed" : ""}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            <AddPersonPanel
-              receiptId={receiptId}
-              receiptPeopleIds={peopleWithColors.map(p => p.id)}
-              allPeople={allPeople}
-              onAdded={() => {}}
-            />
-          </div>
+          <AddPersonPanel
+            receiptId={receiptId}
+            receiptPeopleIds={peopleWithColors.map(p => p.id)}
+            allPeople={allPeople}
+            onAdded={() => {}}
+          />
         </div>
       </BottomSheet>
 
