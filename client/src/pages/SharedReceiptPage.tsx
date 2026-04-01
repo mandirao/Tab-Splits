@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import type { ReceiptItem } from "@shared/schema";
-import { Image, DollarSign, ChevronRight, Receipt, ArrowRight } from "lucide-react";
+import { Image, DollarSign, ChevronRight, ArrowRight } from "lucide-react";
+import logoUrl from "@assets/icon-1024_1775014486817.png";
 import { getDisplayNames } from "@/lib/personDisplay";
 
 interface RedactedPerson {
@@ -91,7 +92,7 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
         <div className="w-full max-w-sm space-y-6">
           <div className="text-center space-y-3">
             <div className="flex items-center justify-center gap-1.5">
-              <Receipt className="h-4 w-4 text-primary" />
+              <img src={logoUrl} alt="Tab Splits" className="h-5 w-5 rounded-md" />
               <span className="text-sm font-semibold tracking-wide text-primary">Tab Splits</span>
             </div>
             <div className="space-y-0.5">
@@ -230,7 +231,7 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
           <div className="text-center flex-1 min-w-0">
             <h1 className="text-xl font-bold truncate">{receipt.restaurantName || "Receipt"}</h1>
             <div className="flex items-center justify-center gap-1 mt-0.5">
-              <Receipt className="h-3 w-3 text-primary" />
+              <img src={logoUrl} alt="Tab Splits" className="h-4 w-4 rounded-md" />
               <span className="text-xs font-semibold tracking-wide text-primary">Tab Splits</span>
             </div>
           </div>
@@ -549,7 +550,7 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
       {/* Signup CTA footer */}
       <div className="border-t bg-card px-6 py-8 text-center space-y-3">
         <div className="flex items-center justify-center gap-1.5 mb-1">
-          <Receipt className="h-4 w-4 text-primary" />
+          <img src={logoUrl} alt="Tab Splits" className="h-5 w-5 rounded-md" />
           <span className="text-sm font-semibold tracking-wide text-primary">Tab Splits</span>
         </div>
         <p className="text-sm font-medium text-foreground">Split your own tabs for free</p>

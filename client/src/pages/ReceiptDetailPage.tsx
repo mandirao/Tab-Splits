@@ -10,7 +10,8 @@ import ReceiptItemRow from "@/components/ReceiptItemRow";
 import TipCalculator from "@/components/TipCalculator";
 import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
-import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw, Receipt as ReceiptIcon } from "lucide-react";
+import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw } from "lucide-react";
+import logoUrl from "@assets/icon-1024_1775014486817.png";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1351,7 +1352,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               <Pencil className="h-3.5 w-3.5 opacity-50" />
             </button>
             <div className="flex items-center justify-center gap-1 mt-0.5">
-              <ReceiptIcon className="h-3 w-3 text-primary" />
+              <img src={logoUrl} alt="Tab Splits" className="h-4 w-4 rounded-md" />
               <span className="text-xs font-semibold tracking-wide text-primary">Tab Splits</span>
             </div>
           </div>

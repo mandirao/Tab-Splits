@@ -18,7 +18,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import ReceiptCard from "@/components/ReceiptCard";
-import { Camera, Search, Users, Pencil, Trash2, Check, X, Phone, LogOut, Plus, UserPlus, ChevronLeft, Receipt as ReceiptIcon } from "lucide-react";
+import { Camera, Search, Users, Pencil, Trash2, Check, X, Phone, LogOut, Plus, UserPlus, ChevronLeft } from "lucide-react";
+import logoUrl from "@assets/icon-1024_1775014486817.png";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -460,7 +461,7 @@ export default function HomePage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <div className="flex items-center gap-2">
-              <ReceiptIcon className="h-5 w-5 text-primary" />
+              <img src={logoUrl} alt="Tab Splits" className="h-7 w-7 rounded-lg" />
               <h1 className="text-2xl font-bold">Tab Splits</h1>
             </div>
             {user && (
