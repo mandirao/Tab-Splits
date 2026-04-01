@@ -10,7 +10,7 @@ import ReceiptItemRow from "@/components/ReceiptItemRow";
 import TipCalculator from "@/components/TipCalculator";
 import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
-import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw } from "lucide-react";
+import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw, Receipt as ReceiptIcon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1338,17 +1338,23 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <button 
-            className="text-xl font-bold flex-1 text-center flex items-center justify-center gap-1 hover:text-primary transition-colors"
-            onClick={() => {
-              setNameInput(receipt.restaurantName || "");
-              setEditingName(true);
-            }}
-            data-testid="button-edit-name"
-          >
-            <span>{receipt.restaurantName || "Receipt"}</span>
-            <Pencil className="h-3.5 w-3.5 opacity-50" />
-          </button>
+          <div className="flex-1 text-center">
+            <button 
+              className="text-xl font-bold flex items-center justify-center gap-1 hover:text-primary transition-colors mx-auto"
+              onClick={() => {
+                setNameInput(receipt.restaurantName || "");
+                setEditingName(true);
+              }}
+              data-testid="button-edit-name"
+            >
+              <span>{receipt.restaurantName || "Receipt"}</span>
+              <Pencil className="h-3.5 w-3.5 opacity-50" />
+            </button>
+            <div className="flex items-center justify-center gap-1 mt-0.5">
+              <ReceiptIcon className="h-3 w-3 text-primary" />
+              <span className="text-xs font-semibold tracking-wide text-primary">Tab Splits</span>
+            </div>
+          </div>
           <div className="flex gap-2">
             {scannedImageUrl && (
               <Button 

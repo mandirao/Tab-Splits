@@ -18,7 +18,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import ReceiptCard from "@/components/ReceiptCard";
-import { Camera, Search, Users, Pencil, Trash2, Check, X, Phone, LogOut, Plus, UserPlus, ChevronLeft } from "lucide-react";
+import { Camera, Search, Users, Pencil, Trash2, Check, X, Phone, LogOut, Plus, UserPlus, ChevronLeft, Receipt as ReceiptIcon } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -459,7 +459,10 @@ export default function HomePage() {
       <header className="flex-shrink-0 p-4 border-b bg-card">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold">Tab Splits</h1>
+            <div className="flex items-center gap-2">
+              <ReceiptIcon className="h-5 w-5 text-primary" />
+              <h1 className="text-2xl font-bold">Tab Splits</h1>
+            </div>
             {user && (
               <p className="text-xs text-muted-foreground">{user.name}</p>
             )}
