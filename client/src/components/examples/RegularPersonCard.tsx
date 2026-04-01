@@ -1,8 +1,8 @@
 import RegularPersonCard from '../RegularPersonCard';
 
 const PERSON_COLORS = [
-  'hsl(330, 75%, 65%)',
-  'hsl(340, 80%, 60%)',
+  'hsl(38, 92%, 50%)',   // Amber
+  'hsl(17, 81%, 53%)',   // Coral
 ];
 
 export default function RegularPersonCardExample() {

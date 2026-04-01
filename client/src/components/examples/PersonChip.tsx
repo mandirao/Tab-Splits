@@ -2,9 +2,9 @@ import PersonChip from '../PersonChip';
 import { useState } from 'react';
 
 const PERSON_COLORS = [
-  'hsl(330, 75%, 65%)',
-  'hsl(340, 80%, 60%)',
-  'hsl(25, 90%, 62%)',
+  'hsl(38, 92%, 50%)',   // Amber
+  'hsl(17, 81%, 53%)',   // Coral
+  'hsl(345, 77%, 57%)',  // Raspberry
 ];
 
 export default function PersonChipExample() {
