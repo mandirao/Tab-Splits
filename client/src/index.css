@@ -39,16 +39,16 @@
   --destructive-foreground: 0 0% 98%;
   --input: 41 35% 85%;
   --ring: 38 92% 50%;
-  --person-1: 330 75% 65%;
-  --person-2: 340 80% 60%;
-  --person-3: 25 90% 62%;
-  --person-4: 15 85% 65%;
-  --person-5: 45 95% 65%;
-  --person-6: 185 65% 70%;
-  --person-7: 195 70% 65%;
-  --person-8: 280 55% 68%;
-  --person-9: 270 60% 70%;
-  --person-10: 35 85% 68%;
+  --person-1: 38 92% 50%;   /* Amber   #F59E0B */
+  --person-2: 17 81% 53%;   /* Coral   #E85D24 */
+  --person-3: 345 77% 57%;  /* Raspberry #E63F6A */
+  --person-4: 258 90% 66%;  /* Violet  #8B5CF6 */
+  --person-5: 217 91% 60%;  /* Blue    #3B82F6 */
+  --person-6: 164 87% 39%;  /* Teal    #0DB88A */
+  --person-7: 142 71% 45%;  /* Lime    #22C55E */
+  --person-8: 330 81% 60%;  /* Pink    #EC4899 */
+  --person-9: 38 92% 50%;   /* Amber (cycle) */
+  --person-10: 17 81% 53%;  /* Coral (cycle) */
   --chart-1: 38 92% 50%;
   --chart-2: 198 77% 40%;
   --chart-3: 280 65% 47%;
@@ -134,18 +134,18 @@
   --destructive-foreground: 0 0% 98%;
   --input: 30 15% 26%;
   --ring: 38 88% 55%;
-  --person-1: 330 75% 65%;
-  --person-2: 340 80% 60%;
-  --person-3: 25 90% 62%;
-  --person-4: 15 85% 65%;
-  --person-5: 45 95% 65%;
-  --person-6: 185 65% 70%;
-  --person-7: 195 70% 65%;
-  --person-8: 280 55% 68%;
-  --person-9: 270 60% 70%;
-  --person-10: 35 85% 68%;
-  --chart-1: 142 70% 55%;
-  --chart-2: 221 83% 65%;
+  --person-1: 38 88% 55%;   /* Amber   (brightened for dark) */
+  --person-2: 17 85% 60%;   /* Coral */
+  --person-3: 345 78% 63%;  /* Raspberry */
+  --person-4: 258 85% 72%;  /* Violet */
+  --person-5: 217 88% 65%;  /* Blue */
+  --person-6: 164 82% 46%;  /* Teal */
+  --person-7: 142 68% 52%;  /* Lime */
+  --person-8: 330 80% 65%;  /* Pink */
+  --person-9: 38 88% 55%;   /* Amber (cycle) */
+  --person-10: 17 85% 60%;  /* Coral (cycle) */
+  --chart-1: 38 88% 55%;
+  --chart-2: 198 77% 50%;
   --chart-3: 280 65% 65%;
   --chart-4: 36 100% 65%;
   --chart-5: 339 82% 70%;
