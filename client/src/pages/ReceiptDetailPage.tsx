@@ -1482,7 +1482,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         </div>
       </div>
 
-      <main className="flex-1 overflow-y-auto p-4 pb-32">
+      <main className="flex-1 overflow-y-auto p-4 pb-64">
         <Card className="mb-4">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between gap-2">
