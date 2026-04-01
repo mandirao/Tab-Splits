@@ -9,6 +9,8 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   name: text("name").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  resetToken: varchar("reset_token"),
+  resetTokenExpiry: timestamp("reset_token_expiry"),
 });
 
 export const receipts = pgTable("receipts", {

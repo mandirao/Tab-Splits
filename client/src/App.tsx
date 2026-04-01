@@ -11,6 +11,7 @@ import RegularsPage from "@/pages/RegularsPage";
 import ScanReceiptPage from "@/pages/ScanReceiptPage";
 import SharedReceiptPage from "@/pages/SharedReceiptPage";
 import LoginPage from "@/pages/LoginPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -44,6 +45,7 @@ function Router() {
     <Switch>
       {/* Public routes */}
       <Route path="/login" component={LoginPage} />
+      <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/share/:token" component={SharedReceiptPage} />
 
       {/* Protected admin routes */}
