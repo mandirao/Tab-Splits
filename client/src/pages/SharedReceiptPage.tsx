@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import type { ReceiptItem } from "@shared/schema";
-import { Image, DollarSign, ChevronRight } from "lucide-react";
+import { Image, DollarSign, ChevronRight, Receipt, ArrowRight } from "lucide-react";
 import { getDisplayNames } from "@/lib/personDisplay";
 
 interface RedactedPerson {
@@ -89,11 +89,17 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-sm space-y-6">
-          <div className="text-center space-y-1">
-            <h1 className="text-2xl font-bold">
-              {receipt?.restaurantName || (loading ? "Loading…" : "Shared Tab")}
-            </h1>
-            <p className="text-sm text-muted-foreground">Who are you?</p>
+          <div className="text-center space-y-3">
+            <div className="flex items-center justify-center gap-1.5">
+              <Receipt className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold tracking-wide text-primary">Tab Splits</span>
+            </div>
+            <div className="space-y-0.5">
+              <h1 className="text-2xl font-bold">
+                {receipt?.restaurantName || (loading ? "Loading…" : "Shared Tab")}
+              </h1>
+              <p className="text-sm text-muted-foreground">Who are you?</p>
+            </div>
           </div>
 
           {loading ? (
@@ -223,7 +229,10 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
           <div className="w-10 shrink-0" />
           <div className="text-center flex-1 min-w-0">
             <h1 className="text-xl font-bold truncate">{receipt.restaurantName || "Receipt"}</h1>
-            <p className="text-sm text-muted-foreground">Shared Tab</p>
+            <div className="flex items-center justify-center gap-1 mt-0.5">
+              <Receipt className="h-3 w-3 text-primary" />
+              <span className="text-xs font-semibold tracking-wide text-primary">Tab Splits</span>
+            </div>
           </div>
           {receipt.imageUrl ? (
             <Dialog>
@@ -301,7 +310,7 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
         </div>
       </div>
 
-      <main className="p-4 pb-24 space-y-4">
+      <main className="p-4 pb-6 space-y-4">
 
         {/* Items card */}
         <Card>
@@ -536,6 +545,24 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
           </Card>
         )}
       </main>
+
+      {/* Signup CTA footer */}
+      <div className="border-t bg-card px-6 py-8 text-center space-y-3">
+        <div className="flex items-center justify-center gap-1.5 mb-1">
+          <Receipt className="h-4 w-4 text-primary" />
+          <span className="text-sm font-semibold tracking-wide text-primary">Tab Splits</span>
+        </div>
+        <p className="text-sm font-medium text-foreground">Split your own tabs for free</p>
+        <p className="text-xs text-muted-foreground">
+          Scan receipts, assign items, and settle up — all in seconds.
+        </p>
+        <a href="/login" className="block" data-testid="link-signup-cta">
+          <Button variant="outline" className="w-full gap-2">
+            Get started
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </a>
+      </div>
     </div>
   );
 }
