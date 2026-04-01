@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import HomePage from "@/pages/HomePage";
 import ReceiptDetailPage from "@/pages/ReceiptDetailPage";
-import SummaryPage from "@/pages/SummaryPage";
 import OrganizerViewPage from "@/pages/OrganizerViewPage";
 import RegularsPage from "@/pages/RegularsPage";
 import ScanReceiptPage from "@/pages/ScanReceiptPage";
@@ -20,7 +19,7 @@ function Router() {
       <Route path="/scan" component={ScanReceiptPage} />
       <Route path="/debug-upload" component={DebugFileInput} />
       <Route path="/receipt/:id" component={ReceiptDetailPage} />
-      <Route path="/receipt/:id/summary" component={SummaryPage} />
+      <Route path="/receipt/:id/summary" component={OrganizerViewPage} />
       <Route path="/receipt/:id/view" component={OrganizerViewPage} />
       <Route path="/regulars" component={RegularsPage} />
       <Route path="/share/:token" component={SharedReceiptPage} />
