@@ -422,7 +422,7 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
                   }}
                   data-testid={`button-pay-venmo-${selectedTab}`}
                 >
-                  Pay ${myTotals.total.toFixed(2)} via Venmo
+                  Pay @{receipt.paidByVenmo} on Venmo
                 </Button>
               )}
             </CardContent>
@@ -477,7 +477,7 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
                         }}
                         data-testid={`button-pay-venmo-${personId}`}
                       >
-                        Pay ${totals.total.toFixed(2)} via Venmo
+                        Pay @{receipt.paidByVenmo} on Venmo
                       </Button>
                     )}
                   </div>

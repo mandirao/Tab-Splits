@@ -111,6 +111,10 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
     t.total = t.subtotal + t.tax + t.tip;
   });
 
+  // Payer Venmo info
+  const payer = receipt.paidById ? people.find(p => p.id === receipt.paidById) : null;
+  const payerVenmo = payer?.venmoUsername || null;
+
   // Tab filtering
   const isAllTab = selectedTab === "all";
   const filteredItems = isAllTab
@@ -323,6 +327,22 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
                 <span>Total</span>
                 <span data-testid={`text-person-total-${selectedTab}`}>${myTotals.total.toFixed(2)}</span>
               </div>
+
+              {/* Venmo pay CTA */}
+              {payerVenmo && selectedTab !== receipt.paidById && (
+                <Button
+                  className="w-full mt-2"
+                  onClick={() => {
+                    const username = encodeURIComponent(payerVenmo);
+                    const amount = myTotals.total.toFixed(2);
+                    const note = encodeURIComponent(`SplitTab - ${receipt.restaurantName || 'Receipt'}`);
+                    window.location.href = `venmo://paycharge?txn=pay&recipients=${username}&amount=${amount}&note=${note}`;
+                  }}
+                  data-testid={`button-pay-venmo-${selectedTab}`}
+                >
+                  Pay @{payerVenmo} on Venmo
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}
