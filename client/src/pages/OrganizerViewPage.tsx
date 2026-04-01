@@ -5,24 +5,26 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import type { Receipt, ReceiptItem, Person, Payment } from "@shared/schema";
-import { ArrowLeft, Image, DollarSign } from "lucide-react";
+import { ArrowLeft, Image } from "lucide-react";
 import { useLocation } from "wouter";
 import { getDisplayNames } from "@/lib/personDisplay";
 
 function gcd(a: number, b: number): number { return b === 0 ? a : gcd(b, a % b); }
 
 const PERSON_COLORS = [
-  'hsl(330, 75%, 65%)',
-  'hsl(340, 80%, 60%)',
-  'hsl(25, 90%, 62%)',
-  'hsl(15, 85%, 65%)',
-  'hsl(45, 95%, 65%)',
-  'hsl(185, 65%, 70%)',
-  'hsl(195, 70%, 65%)',
-  'hsl(280, 55%, 68%)',
-  'hsl(270, 60%, 70%)',
-  'hsl(35, 85%, 68%)',
+  'hsl(38, 92%, 50%)',   // Amber
+  'hsl(17, 81%, 53%)',   // Coral
+  'hsl(345, 77%, 57%)',  // Raspberry
+  'hsl(258, 90%, 66%)',  // Violet
+  'hsl(217, 91%, 60%)',  // Blue
+  'hsl(164, 87%, 39%)',  // Teal
+  'hsl(142, 71%, 45%)',  // Lime
+  'hsl(330, 81%, 60%)',  // Pink
 ];
+
+function firstNameOnly(fullName: string) {
+  return fullName.trim().split(/\s+/)[0] ?? fullName;
+}
 
 export default function OrganizerViewPage({ params }: { params: { id: string } }) {
   const receiptId = params?.id || window.location.pathname.split('/')[2];
@@ -46,7 +48,6 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
     queryKey: ["/api/receipts", receiptId, "payments"],
   });
 
-  // Scroll active tab into view
   useEffect(() => {
     if (!tabRowRef.current) return;
     const active = tabRowRef.current.querySelector<HTMLElement>('[data-active="true"]');
@@ -88,7 +89,6 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
   const tip = parseFloat(receipt.tip) || 0;
   const total = subtotal + tax + tip;
 
-  // Build per-person totals
   const personTotals = new Map<string, { subtotal: number; tax: number; tip: number; total: number }>();
   items.forEach(item => {
     const itemPrice = parseFloat(item.price) || 0;
@@ -112,23 +112,17 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
     t.total = t.subtotal + t.tax + t.tip;
   });
 
-  // Payer Venmo info
   const payer = receipt.paidById ? people.find(p => p.id === receipt.paidById) : null;
   const payerVenmo = payer?.venmoUsername || null;
 
-  // Tab filtering
   const isAllTab = selectedTab === "all";
   const filteredItems = isAllTab
     ? items
     : items.filter(item => (item.assignedTo as string[] || []).includes(selectedTab));
 
-  const filteredPersonTotals = isAllTab
-    ? Array.from(personTotals.entries())
-    : Array.from(personTotals.entries()).filter(([id]) => id === selectedTab);
-
   const myTotals = !isAllTab ? personTotals.get(selectedTab) : null;
+  const selectedPerson = !isAllTab ? getPersonById(selectedTab) : null;
 
-  // Only show people who have assigned items in the tab row
   const peopleInTabs = peopleWithColors.filter(p => personTotals.has(p.id));
   const displayNames = getDisplayNames(peopleInTabs);
 
@@ -147,7 +141,7 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
           </Button>
           <div className="text-center flex-1 min-w-0">
             <h1 className="text-xl font-bold truncate">{receipt.restaurantName || "Receipt"}</h1>
-            <p className="text-sm text-muted-foreground">Summary View</p>
+            <p className="text-sm text-muted-foreground">Summary</p>
           </div>
           {receipt.imageUrl ? (
             <Dialog>
@@ -178,10 +172,7 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
 
       {/* Tab row */}
       <div className="sticky top-[73px] z-40 bg-background border-b">
-        <div
-          ref={tabRowRef}
-          className="flex overflow-x-auto scrollbar-hide px-3 py-2 gap-2"
-        >
+        <div ref={tabRowRef} className="flex overflow-x-auto scrollbar-hide px-3 py-2 gap-2">
           <button
             data-active={selectedTab === "all"}
             onClick={() => setSelectedTab("all")}
@@ -203,18 +194,13 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
                 data-active={isActive}
                 onClick={() => setSelectedTab(person.id)}
                 className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors border ${
-                  isActive
-                    ? "text-white"
-                    : "border-border text-muted-foreground hover-elevate"
+                  isActive ? "text-white" : "border-border text-muted-foreground hover-elevate"
                 }`}
                 style={isActive ? { backgroundColor: person.color, borderColor: person.color } : undefined}
                 data-testid={`tab-person-${person.id}`}
               >
                 {!isActive && (
-                  <div
-                    className="w-4 h-4 rounded-full shrink-0"
-                    style={{ backgroundColor: person.color }}
-                  />
+                  <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: person.color }} />
                 )}
                 {displayNames.get(person.id) ?? person.name}
               </button>
@@ -223,235 +209,127 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
         </div>
       </div>
 
-      <main className="p-4 pb-24 space-y-4">
-        {/* Items card */}
+      <main className="p-4 pb-24 space-y-3">
+
+        {/* Items card — totals appended at bottom for person tabs */}
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-2">
             <h2 className="font-semibold text-base">
-              {isAllTab ? "Items" : `${getPersonById(selectedTab)?.name}'s Items`}
+              {isAllTab ? "Items" : `${firstNameOnly(selectedPerson?.name ?? "")}'s Items`}
             </h2>
           </CardHeader>
-          <CardContent className="divide-y">
-            {filteredItems.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-3">No items assigned.</p>
-            ) : (
-              filteredItems.map(item => {
-                const assignedPeople = (item.assignedTo as string[]) || [];
-                const isAssigned = assignedPeople.length > 0;
-                const qtys = (item.assignedQuantities as Record<string, number>) || {};
-                const totalQty = assignedPeople.reduce((s, pid) => s + (qtys[pid] ?? 1), 0);
 
-                const myQty = !isAllTab ? (qtys[selectedTab] ?? 1) : 1;
-                let displayPrice = parseFloat(item.price) || 0;
-                if (!isAllTab && isAssigned) {
-                  displayPrice = totalQty > 0
-                    ? (myQty / totalQty) * displayPrice
-                    : displayPrice / assignedPeople.length;
-                }
-                // Compute a single effective-qty badge for person tabs
-                const itemQty = item.quantity || 1;
-                const effNum = itemQty * myQty;
-                const effDen = isAllTab ? 1 : totalQty;
-                const g = gcd(effNum, effDen);
-                const sNum = effNum / g;
-                const sDen = effDen / g;
-                const effBadge = isAllTab
-                  ? (itemQty > 1 ? `${itemQty}x` : null)
-                  : isAssigned && !(sNum === 1 && sDen === 1)
-                    ? (sDen === 1 ? `${sNum}x` : `${sNum}/${sDen}`)
-                    : null;
+          <CardContent className="p-0">
+            <div className="divide-y px-4">
+              {filteredItems.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-3">No items assigned.</p>
+              ) : (
+                filteredItems.map(item => {
+                  const assignedPeople = (item.assignedTo as string[]) || [];
+                  const isAssigned = assignedPeople.length > 0;
+                  const qtys = (item.assignedQuantities as Record<string, number>) || {};
+                  const totalQty = assignedPeople.reduce((s, pid) => s + (qtys[pid] ?? 1), 0);
 
-                return (
-                  <div
-                    key={item.id}
-                    className={`flex items-center gap-3 py-3 ${!isAssigned ? 'opacity-60' : ''}`}
-                    data-testid={`item-row-${item.id}`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2">
-                        {effBadge && (
-                          <Badge variant="outline" className="text-xs px-1.5 shrink-0">
-                            {effBadge}
-                          </Badge>
-                        )}
-                        <span className="font-medium text-sm truncate">{item.name}</span>
+                  const myQty = !isAllTab ? (qtys[selectedTab] ?? 1) : 1;
+                  let displayPrice = parseFloat(item.price) || 0;
+                  if (!isAllTab && isAssigned) {
+                    displayPrice = totalQty > 0
+                      ? (myQty / totalQty) * displayPrice
+                      : displayPrice / assignedPeople.length;
+                  }
+
+                  const itemQty = item.quantity || 1;
+                  const effNum = itemQty * myQty;
+                  const effDen = isAllTab ? 1 : totalQty;
+                  const g = gcd(effNum, effDen);
+                  const sNum = effNum / g;
+                  const sDen = effDen / g;
+                  const effBadge = isAllTab
+                    ? (itemQty > 1 ? `${itemQty}x` : null)
+                    : isAssigned && !(sNum === 1 && sDen === 1)
+                      ? (sDen === 1 ? `${sNum}x` : `${sNum}/${sDen}`)
+                      : null;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className={`flex items-center gap-3 py-3 ${!isAssigned ? 'opacity-60' : ''}`}
+                      data-testid={`item-row-${item.id}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2">
+                          {effBadge && (
+                            <Badge variant="outline" className="text-xs px-1.5 shrink-0">
+                              {effBadge}
+                            </Badge>
+                          )}
+                          <span className="font-medium text-sm truncate">{item.name}</span>
+                        </div>
+                        <span className="text-base font-semibold">${displayPrice.toFixed(2)}</span>
                       </div>
-                      <span className="text-base font-semibold">
-                        ${displayPrice.toFixed(2)}
-                      </span>
+
+                      {isAllTab && isAssigned && (
+                        <div className="flex -space-x-1 shrink-0">
+                          {assignedPeople.map((personId, idx) => (
+                            <div
+                              key={idx}
+                              className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center ring-2 ring-background"
+                              style={{ backgroundColor: getColorForPerson(personId) }}
+                            >
+                              {getInitialsForPerson(personId)}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
+                  );
+                })
+              )}
+            </div>
 
-                    {isAllTab && isAssigned && (
-                      <div className="flex -space-x-1 shrink-0">
-                        {assignedPeople.map((personId, idx) => (
-                          <div
-                            key={idx}
-                            className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center ring-2 ring-background"
-                            style={{ backgroundColor: getColorForPerson(personId) }}
-                          >
-                            {getInitialsForPerson(personId)}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+            {/* Person-tab totals — connected at the bottom of the items card */}
+            {!isAllTab && myTotals && (
+              <div className="border-t mx-0 px-4 pt-3 pb-4 space-y-2 mt-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span>${myTotals.subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Tax</span>
+                  <span>${myTotals.tax.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Tip</span>
+                  <span>${myTotals.tip.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold pt-2 border-t">
+                  <span>Total</span>
+                  <span data-testid={`text-person-total-${selectedTab}`}>${myTotals.total.toFixed(2)}</span>
+                </div>
+
+                {payerVenmo && selectedTab !== receipt.paidById && (
+                  <Button
+                    className="w-full mt-1"
+                    onClick={() => {
+                      const username = encodeURIComponent(payerVenmo);
+                      const amount = myTotals.total.toFixed(2);
+                      const note = encodeURIComponent(`Tab Splits - ${receipt.restaurantName || 'Receipt'}`);
+                      window.location.href = `venmo://paycharge?txn=pay&recipients=${username}&amount=${amount}&note=${note}`;
+                    }}
+                    data-testid={`button-pay-venmo-${selectedTab}`}
+                  >
+                    Pay @{payerVenmo} on Venmo
+                  </Button>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Person-tab: single summary breakdown */}
-        {!isAllTab && myTotals && (
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-8 h-8 rounded-full text-white text-xs font-semibold flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: getColorForPerson(selectedTab) }}
-                >
-                  {getInitialsForPerson(selectedTab)}
-                </div>
-                <h2 className="font-semibold text-base">{getPersonById(selectedTab)?.name}'s Total</h2>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span>${myTotals.subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Tax</span>
-                <span>${myTotals.tax.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Tip</span>
-                <span>${myTotals.tip.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-xl font-bold pt-2 border-t">
-                <span>Total</span>
-                <span data-testid={`text-person-total-${selectedTab}`}>${myTotals.total.toFixed(2)}</span>
-              </div>
-
-              {/* Venmo pay CTA */}
-              {payerVenmo && selectedTab !== receipt.paidById && (
-                <Button
-                  className="w-full mt-2"
-                  onClick={() => {
-                    const username = encodeURIComponent(payerVenmo);
-                    const amount = myTotals.total.toFixed(2);
-                    const note = encodeURIComponent(`Tab Splits - ${receipt.restaurantName || 'Receipt'}`);
-                    window.location.href = `venmo://paycharge?txn=pay&recipients=${username}&amount=${amount}&note=${note}`;
-                  }}
-                  data-testid={`button-pay-venmo-${selectedTab}`}
-                >
-                  Pay @{payerVenmo} on Venmo
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* All tab: per-person summary list */}
-        {isAllTab && filteredPersonTotals.length > 0 && (
-          <Card>
-            <CardHeader className="pb-3">
-              <h2 className="font-semibold text-base">Per Person Summary</h2>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {filteredPersonTotals.map(([personId, totals]) => {
-                const person = getPersonById(personId);
-                if (!person) return null;
-                return (
-                  <div key={personId} className="p-3 border rounded-lg" data-testid={`person-summary-${personId}`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <div
-                        className="w-8 h-8 rounded-full text-white text-xs font-semibold flex items-center justify-center shrink-0"
-                        style={{ backgroundColor: getColorForPerson(personId) }}
-                      >
-                        {getInitialsForPerson(personId)}
-                      </div>
-                      <span className="font-semibold" data-testid={`text-person-name-${personId}`}>{person.name}</span>
-                    </div>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Subtotal</span>
-                        <span>${totals.subtotal.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Tax</span>
-                        <span>${totals.tax.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Tip</span>
-                        <span>${totals.tip.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between font-bold pt-1 border-t">
-                        <span>Total</span>
-                        <span data-testid={`text-person-total-${personId}`}>${totals.total.toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Who Paid */}
-        {payments.length > 0 && (
-          <Card className="bg-primary/5 border-primary/20">
-            <CardHeader className="pb-2">
-              <h2 className="font-semibold text-base flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-primary" />
-                Who Paid
-              </h2>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {payments.map(payment => {
-                const payer = getPersonById(payment.personId);
-                if (!payer) return null;
-                return (
-                  <div key={payment.id} className="flex items-center justify-between" data-testid={`payment-info-${payment.id}`}>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-8 h-8 rounded-full text-white text-xs font-semibold flex items-center justify-center shrink-0"
-                        style={{ backgroundColor: getColorForPerson(payment.personId) }}
-                      >
-                        {getInitialsForPerson(payment.personId)}
-                      </div>
-                      <div>
-                        <p className="font-medium" data-testid={`text-payer-name-${payment.id}`}>{payer.name}</p>
-                        {payer.venmoUsername && (
-                          <button
-                            className="text-xs text-primary hover:underline"
-                            onClick={() => {
-                              window.location.href = `venmo://users?username=${encodeURIComponent(payer.venmoUsername || "")}`;
-                            }}
-                            data-testid={`button-venmo-${payment.id}`}
-                          >
-                            @{payer.venmoUsername}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <span className="font-semibold text-primary" data-testid={`text-payment-amount-${payment.id}`}>
-                      ${parseFloat(payment.amount).toFixed(2)}
-                    </span>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Receipt total — All tab only */}
+        {/* All tab: Receipt total + who paid — one unified card */}
         {isAllTab && (
           <Card>
-            <CardHeader className="pb-3">
-              <h2 className="font-semibold text-base">Receipt Total</h2>
-            </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="pt-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
                 <span data-testid="text-receipt-subtotal">${subtotal.toFixed(2)}</span>
@@ -464,10 +342,47 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
                 <span className="text-muted-foreground">Tip</span>
                 <span data-testid="text-receipt-tip">${tip.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-xl font-bold pt-2 border-t">
+              <div className="flex justify-between text-lg font-bold pt-2 border-t">
                 <span>Total</span>
                 <span data-testid="text-receipt-total">${total.toFixed(2)}</span>
               </div>
+
+              {/* Who paid — slim inline row */}
+              {payments.map(payment => {
+                const payerPerson = getPersonById(payment.personId);
+                if (!payerPerson) return null;
+                return (
+                  <div
+                    key={payment.id}
+                    className="flex items-center gap-2 pt-2 border-t"
+                    data-testid={`payment-info-${payment.id}`}
+                  >
+                    <div
+                      className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: getColorForPerson(payment.personId) }}
+                    >
+                      {getInitialsForPerson(payment.personId)}
+                    </div>
+                    <span className="text-sm font-medium" data-testid={`text-payer-name-${payment.id}`}>
+                      {firstNameOnly(payerPerson.name)} paid
+                    </span>
+                    {payerPerson.venmoUsername && (
+                      <button
+                        className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                        onClick={() => {
+                          window.location.href = `venmo://users?username=${encodeURIComponent(payerPerson.venmoUsername || "")}`;
+                        }}
+                        data-testid={`button-venmo-${payment.id}`}
+                      >
+                        @{payerPerson.venmoUsername}
+                      </button>
+                    )}
+                    <span className="ml-auto text-sm font-semibold" data-testid={`text-payment-amount-${payment.id}`}>
+                      ${parseFloat(payment.amount).toFixed(2)}
+                    </span>
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
         )}
