@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import type { Receipt, ReceiptItem, Person, Payment } from "@shared/schema";
 import { ArrowLeft, Image, DollarSign } from "lucide-react";
 import { useLocation } from "wouter";
+import { getDisplayNames } from "@/lib/personDisplay";
 
 function gcd(a: number, b: number): number { return b === 0 ? a : gcd(b, a % b); }
 
@@ -129,6 +130,7 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
 
   // Only show people who have assigned items in the tab row
   const peopleInTabs = peopleWithColors.filter(p => personTotals.has(p.id));
+  const displayNames = getDisplayNames(peopleInTabs);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -214,7 +216,7 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
                     style={{ backgroundColor: person.color }}
                   />
                 )}
-                {person.name}
+                {displayNames.get(person.id) ?? person.name}
               </button>
             );
           })}

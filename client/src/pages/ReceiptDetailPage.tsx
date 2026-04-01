@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { getDisplayNames } from "@/lib/personDisplay";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -741,6 +742,8 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     }));
   }, [receiptPeople]);
 
+  const displayNames = useMemo(() => getDisplayNames(peopleWithColors), [peopleWithColors]);
+
   const subtotal = receipt ? (parseFloat(receipt.subtotal) || 0) : 0;
   const tax = receipt ? (parseFloat(receipt.tax) || 0) : 0;
   const tipAmount = receipt ? (parseFloat(receipt.tip) || 0) : subtotal * 0.2;
@@ -1470,7 +1473,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                 >
                   {getInitialsForPerson(person.id)}
                 </div>
-                <span>{person.name}</span>
+                <span>{displayNames.get(person.id) ?? person.name}</span>
                 <span className="font-semibold">${personTotal.total.toFixed(2)}</span>
               </Button>
             );

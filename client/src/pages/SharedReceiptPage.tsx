@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import type { ReceiptItem } from "@shared/schema";
 import { Image, DollarSign, ChevronRight } from "lucide-react";
+import { getDisplayNames } from "@/lib/personDisplay";
 
 interface RedactedPerson {
   id: string;
@@ -70,6 +71,7 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
     color: PERSON_COLORS[idx % PERSON_COLORS.length],
   }));
 
+  const displayNames = getDisplayNames(peopleWithColors);
   const getPersonById = (id: string) => peopleWithColors.find(p => p.id === id);
   const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   const getColorForPerson = (id: string) => getPersonById(id)?.color || PERSON_COLORS[0];
@@ -292,7 +294,7 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
                     style={{ backgroundColor: person.color }}
                   />
                 )}
-                {person.name}
+                {displayNames.get(person.id) ?? person.name}
               </button>
             );
           })}
