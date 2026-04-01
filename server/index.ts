@@ -7,6 +7,9 @@ import { pool } from "./db";
 
 const app = express();
 
+// Trust Replit's reverse proxy so secure cookies work in production
+app.set("trust proxy", 1);
+
 declare module 'http' {
   interface IncomingMessage {
     rawBody: unknown
