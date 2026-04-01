@@ -8,6 +8,8 @@ import type { Receipt, ReceiptItem, Person, Payment } from "@shared/schema";
 import { ArrowLeft, Image, DollarSign } from "lucide-react";
 import { useLocation } from "wouter";
 
+function gcd(a: number, b: number): number { return b === 0 ? a : gcd(b, a % b); }
+
 const PERSON_COLORS = [
   'hsl(330, 75%, 65%)',
   'hsl(340, 80%, 60%)',
@@ -237,7 +239,18 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
                     ? (myQty / totalQty) * displayPrice
                     : displayPrice / assignedPeople.length;
                 }
-                const showFraction = !isAllTab && isAssigned && assignedPeople.length > 1;
+                // Compute a single effective-qty badge for person tabs
+                const itemQty = item.quantity || 1;
+                const effNum = itemQty * myQty;
+                const effDen = isAllTab ? 1 : totalQty;
+                const g = gcd(effNum, effDen);
+                const sNum = effNum / g;
+                const sDen = effDen / g;
+                const effBadge = isAllTab
+                  ? (itemQty > 1 ? `${itemQty}x` : null)
+                  : isAssigned && !(sNum === 1 && sDen === 1)
+                    ? (sDen === 1 ? `${sNum}x` : `${sNum}/${sDen}`)
+                    : null;
 
                 return (
                   <div
@@ -247,14 +260,9 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2">
-                        {(item.quantity || 1) > 1 && (
+                        {effBadge && (
                           <Badge variant="outline" className="text-xs px-1.5 shrink-0">
-                            {item.quantity}x
-                          </Badge>
-                        )}
-                        {showFraction && (
-                          <Badge variant="outline" className="text-xs px-1.5 shrink-0">
-                            {myQty}/{totalQty}
+                            {effBadge}
                           </Badge>
                         )}
                         <span className="font-medium text-sm truncate">{item.name}</span>
