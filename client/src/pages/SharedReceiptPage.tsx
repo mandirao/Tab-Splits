@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import type { ReceiptItem } from "@shared/schema";
-import { Image, DollarSign, ChevronRight, ArrowRight } from "lucide-react";
+import { Image, ChevronRight, ArrowRight } from "lucide-react";
 import logoUrl from "@assets/icon-1024_1775014486817.png";
 import { getDisplayNames } from "@/lib/personDisplay";
 
@@ -37,17 +37,19 @@ interface SharedReceiptPayload {
 function gcd(a: number, b: number): number { return b === 0 ? a : gcd(b, a % b); }
 
 const PERSON_COLORS = [
-  'hsl(330, 75%, 65%)',
-  'hsl(340, 80%, 60%)',
-  'hsl(25, 90%, 62%)',
-  'hsl(15, 85%, 65%)',
-  'hsl(45, 95%, 65%)',
-  'hsl(185, 65%, 70%)',
-  'hsl(195, 70%, 65%)',
-  'hsl(280, 55%, 68%)',
-  'hsl(270, 60%, 70%)',
-  'hsl(35, 85%, 68%)',
+  'hsl(38, 92%, 50%)',   // Amber
+  'hsl(17, 81%, 53%)',   // Coral
+  'hsl(345, 77%, 57%)',  // Raspberry
+  'hsl(258, 90%, 66%)',  // Violet
+  'hsl(217, 91%, 60%)',  // Blue
+  'hsl(164, 87%, 39%)',  // Teal
+  'hsl(142, 71%, 45%)',  // Lime
+  'hsl(330, 81%, 60%)',  // Pink
 ];
+
+function firstNameOnly(fullName: string) {
+  return fullName.trim().split(/\s+/)[0] ?? fullName;
+}
 
 export default function SharedReceiptPage({ params }: { params: { token: string } }) {
   const shareToken = params?.token || window.location.pathname.split('/').pop();
@@ -214,12 +216,13 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
     ? items
     : items.filter(item => (item.assignedTo as string[] || []).includes(selectedTab));
 
-  const filteredPersonTotals = isAllTab
-    ? Array.from(personTotals.entries())
-    : Array.from(personTotals.entries()).filter(([id]) => id === selectedTab);
-
-  // For the "my tab" summary totals when a person tab is active
   const myTotals = !isAllTab ? personTotals.get(selectedTab) : null;
+
+  // Only show tabs for people who have at least one item assigned
+  const peopleInTabs = peopleWithColors.filter(p => personTotals.has(p.id));
+
+  // Payer from receipt data
+  const payer = receipt.paidById ? getPersonById(receipt.paidById) : null;
 
   // ── Main view ─────────────────────────────────────────────────────────────────
   return (
@@ -283,7 +286,7 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
           </button>
 
           {/* Per-person tabs */}
-          {peopleWithColors.map(person => {
+          {peopleInTabs.map(person => {
             const isActive = selectedTab === person.id;
             return (
               <button
@@ -311,237 +314,168 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
         </div>
       </div>
 
-      <main className="p-4 pb-6 space-y-4">
+      <main className="p-4 pb-24 space-y-3">
 
-        {/* Items card */}
+        {/* Items card — totals appended at bottom for person tabs */}
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-2">
             <h2 className="font-semibold text-base">
-              {isAllTab ? "Items" : `${getPersonById(selectedTab)?.name}'s Items`}
+              {isAllTab ? "Items" : `${firstNameOnly(getPersonById(selectedTab)?.name ?? "")}'s Items`}
             </h2>
           </CardHeader>
-          <CardContent className="divide-y">
-            {filteredItems.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-3">No items assigned.</p>
-            ) : (
-              filteredItems.map(item => {
-                const assignedPeople = (item.assignedTo as string[]) || [];
-                const isAssigned = assignedPeople.length > 0;
-                const qtys = (item.assignedQuantities as Record<string, number>) || {};
-                const totalQty = assignedPeople.reduce((s, pid) => s + (qtys[pid] ?? 1), 0);
+          <CardContent className="p-0">
+            <div className="divide-y px-4">
+              {filteredItems.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-3">No items assigned.</p>
+              ) : (
+                filteredItems.map(item => {
+                  const assignedPeople = (item.assignedTo as string[]) || [];
+                  const isAssigned = assignedPeople.length > 0;
+                  const qtys = (item.assignedQuantities as Record<string, number>) || {};
+                  const totalQty = assignedPeople.reduce((s, pid) => s + (qtys[pid] ?? 1), 0);
 
-                // Per-person share for this item (when on a person tab)
-                const myQty = !isAllTab ? (qtys[selectedTab] ?? 1) : 1;
-                let displayPrice = parseFloat(item.price) || 0;
-                if (!isAllTab && isAssigned) {
-                  displayPrice = totalQty > 0
-                    ? (myQty / totalQty) * displayPrice
-                    : displayPrice / assignedPeople.length;
-                }
-                // Compute a single effective-qty badge for person tabs
-                const itemQty = item.quantity || 1;
-                const effNum = itemQty * myQty;
-                const effDen = isAllTab ? 1 : totalQty;
-                const g = gcd(effNum, effDen);
-                const sNum = effNum / g;
-                const sDen = effDen / g;
-                const effBadge = isAllTab
-                  ? (itemQty > 1 ? `${itemQty}x` : null)
-                  : isAssigned && !(sNum === 1 && sDen === 1)
-                    ? (sDen === 1 ? `${sNum}x` : `${sNum}/${sDen}`)
-                    : null;
+                  const myQty = !isAllTab ? (qtys[selectedTab] ?? 1) : 1;
+                  let displayPrice = parseFloat(item.price) || 0;
+                  if (!isAllTab && isAssigned) {
+                    displayPrice = totalQty > 0
+                      ? (myQty / totalQty) * displayPrice
+                      : displayPrice / assignedPeople.length;
+                  }
 
-                return (
-                  <div
-                    key={item.id}
-                    className={`flex items-center gap-3 py-3 ${!isAssigned ? 'opacity-60' : ''}`}
-                    data-testid={`item-row-${item.id}`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2">
-                        {effBadge && (
-                          <Badge variant="outline" className="text-xs px-1.5 shrink-0">
-                            {effBadge}
-                          </Badge>
-                        )}
-                        <span className="font-medium text-sm truncate">{item.name}</span>
+                  const itemQty = item.quantity || 1;
+                  const effNum = itemQty * myQty;
+                  const effDen = isAllTab ? 1 : totalQty;
+                  const g = gcd(effNum, effDen);
+                  const sNum = effNum / g;
+                  const sDen = effDen / g;
+                  const effBadge = isAllTab
+                    ? (itemQty > 1 ? `${itemQty}x` : null)
+                    : isAssigned && !(sNum === 1 && sDen === 1)
+                      ? (sDen === 1 ? `${sNum}x` : `${sNum}/${sDen}`)
+                      : null;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className={`flex items-center gap-3 py-3 ${!isAssigned ? 'opacity-60' : ''}`}
+                      data-testid={`item-row-${item.id}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2">
+                          {effBadge && (
+                            <Badge variant="outline" className="text-xs px-1.5 shrink-0">
+                              {effBadge}
+                            </Badge>
+                          )}
+                          <span className="font-medium text-sm truncate">{item.name}</span>
+                        </div>
+                        <span className="text-base font-semibold">${displayPrice.toFixed(2)}</span>
                       </div>
-                      <span className="text-base font-semibold">
-                        ${displayPrice.toFixed(2)}
-                      </span>
+
+                      {isAllTab && isAssigned && (
+                        <div className="flex -space-x-1 shrink-0">
+                          {assignedPeople.map((pid, idx) => (
+                            <div
+                              key={idx}
+                              className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center ring-2 ring-background"
+                              style={{ backgroundColor: getColorForPerson(pid) }}
+                            >
+                              {getInitials(getPersonById(pid)?.name || "")}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
+                  );
+                })
+              )}
+            </div>
 
-                    {isAllTab && isAssigned && (
-                      <div className="flex -space-x-1 shrink-0">
-                        {assignedPeople.map((pid, idx) => (
-                          <div
-                            key={idx}
-                            className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center ring-2 ring-background"
-                            style={{ backgroundColor: getColorForPerson(pid) }}
-                          >
-                            {getInitials(getPersonById(pid)?.name || "")}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+            {/* Person-tab totals — connected at the bottom of the items card */}
+            {!isAllTab && myTotals && (
+              <div className="border-t mx-0 px-4 pt-3 pb-4 space-y-2 mt-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span>${myTotals.subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Tax</span>
+                  <span>${myTotals.tax.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Tip</span>
+                  <span>${myTotals.tip.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold pt-2 border-t">
+                  <span>Total</span>
+                  <span data-testid={`text-person-total-${selectedTab}`}>${myTotals.total.toFixed(2)}</span>
+                </div>
+
+                {receipt.paidByVenmo &&
+                 verifiedPersonId === selectedTab &&
+                 receipt.paidById !== selectedTab && (
+                  <Button
+                    className="w-full mt-1"
+                    onClick={() => {
+                      const username = encodeURIComponent(receipt.paidByVenmo || "");
+                      const amount = myTotals.total.toFixed(2);
+                      const note = encodeURIComponent(`Tab Splits - ${receipt.restaurantName || 'Receipt'}`);
+                      window.location.href = `venmo://paycharge?txn=pay&recipients=${username}&amount=${amount}&note=${note}`;
+                    }}
+                    data-testid={`button-pay-venmo-${selectedTab}`}
+                  >
+                    Pay @{receipt.paidByVenmo} on Venmo
+                  </Button>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Summary card — person-tab shows a single clean breakdown */}
-        {!isAllTab && myTotals ? (
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-8 h-8 rounded-full text-white text-xs font-semibold flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: getColorForPerson(selectedTab) }}
-                >
-                  {getInitials(getPersonById(selectedTab)?.name || "")}
-                </div>
-                <h2 className="font-semibold text-base">{getPersonById(selectedTab)?.name}'s Total</h2>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span>${myTotals.subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Tax</span>
-                <span>${myTotals.tax.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Tip</span>
-                <span>${myTotals.tip.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-xl font-bold pt-2 border-t">
-                <span>Total</span>
-                <span>${myTotals.total.toFixed(2)}</span>
-              </div>
-
-              {/* Venmo pay button */}
-              {receipt.paidByVenmo &&
-               verifiedPersonId === selectedTab &&
-               receipt.paidById !== selectedTab && (
-                <Button
-                  className="w-full mt-2"
-                  onClick={() => {
-                    const username = encodeURIComponent(receipt.paidByVenmo || "");
-                    const amount = myTotals.total.toFixed(2);
-                    const note = encodeURIComponent(`Tab Splits - ${receipt.restaurantName || 'Receipt'}`);
-                    window.location.href = `venmo://paycharge?txn=pay&recipients=${username}&amount=${amount}&note=${note}`;
-                  }}
-                  data-testid={`button-pay-venmo-${selectedTab}`}
-                >
-                  Pay @{receipt.paidByVenmo} on Venmo
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ) : isAllTab ? (
-          /* All tab — per-person summary list */
-          <Card>
-            <CardHeader className="pb-3">
-              <h2 className="font-semibold text-base">Per Person Summary</h2>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {filteredPersonTotals.map(([personId, totals]) => {
-                const person = getPersonById(personId);
-                if (!person) return null;
-                return (
-                  <div key={personId} className="p-3 border rounded-lg space-y-1.5">
-                    <div className="flex items-center gap-2 mb-1">
-                      <div
-                        className="w-8 h-8 rounded-full text-white text-xs font-semibold flex items-center justify-center shrink-0"
-                        style={{ backgroundColor: getColorForPerson(personId) }}
-                      >
-                        {getInitials(person.name)}
-                      </div>
-                      <span className="font-semibold">{person.name}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Subtotal</span>
-                      <span>${totals.subtotal.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Tax</span>
-                      <span>${totals.tax.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Tip</span>
-                      <span>${totals.tip.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between font-bold text-sm pt-1 border-t">
-                      <span>Total</span>
-                      <span>${totals.total.toFixed(2)}</span>
-                    </div>
-                    {receipt.paidByVenmo &&
-                     verifiedPersonId === personId &&
-                     receipt.paidById !== personId && (
-                      <Button
-                        className="w-full mt-1"
-                        onClick={() => {
-                          const username = encodeURIComponent(receipt.paidByVenmo || "");
-                          const amount = totals.total.toFixed(2);
-                          const note = encodeURIComponent(`Tab Splits - ${receipt.restaurantName || 'Receipt'}`);
-                          window.location.href = `venmo://paycharge?txn=pay&recipients=${username}&amount=${amount}&note=${note}`;
-                        }}
-                        data-testid={`button-pay-venmo-${personId}`}
-                      >
-                        Pay @{receipt.paidByVenmo} on Venmo
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        ) : null}
-
-        {/* Paid by banner */}
-        {receipt.paidByName && (
-          <Card className="bg-primary/5 border-primary/20">
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-3">
-                <DollarSign className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <p className="font-medium">{receipt.paidByName} paid the bill</p>
-                  {receipt.paidByVenmo && (
-                    <p className="text-sm text-muted-foreground">Venmo: @{receipt.paidByVenmo}</p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Receipt total — All tab only */}
+        {/* All tab: Receipt total + who paid — one unified card */}
         {isAllTab && (
           <Card>
-            <CardHeader className="pb-3">
-              <h2 className="font-semibold text-base">Receipt Total</h2>
-            </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="pt-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span>${subtotal.toFixed(2)}</span>
+                <span data-testid="text-receipt-subtotal">${subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Tax</span>
-                <span>${tax.toFixed(2)}</span>
+                <span data-testid="text-receipt-tax">${tax.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Tip</span>
-                <span>${tip.toFixed(2)}</span>
+                <span data-testid="text-receipt-tip">${tip.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-xl font-bold pt-2 border-t">
+              <div className="flex justify-between text-lg font-bold pt-2 border-t">
                 <span>Total</span>
-                <span>${total.toFixed(2)}</span>
+                <span data-testid="text-receipt-total">${total.toFixed(2)}</span>
               </div>
+
+              {/* Who paid — slim inline row */}
+              {payer && (
+                <div className="flex items-center gap-2 pt-2 border-t">
+                  <div
+                    className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center shrink-0"
+                    style={{ backgroundColor: getColorForPerson(payer.id) }}
+                  >
+                    {getInitials(payer.name)}
+                  </div>
+                  <span className="text-sm font-medium">{firstNameOnly(payer.name)} paid</span>
+                  {receipt.paidByVenmo && (
+                    <button
+                      className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                      onClick={() => {
+                        window.location.href = `venmo://users?username=${encodeURIComponent(receipt.paidByVenmo || "")}`;
+                      }}
+                      data-testid="button-venmo-payer"
+                    >
+                      @{receipt.paidByVenmo}
+                    </button>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
