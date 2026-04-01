@@ -5,13 +5,15 @@
 Tab Splits is a mobile-first bill splitting application that helps groups divide restaurant bills fairly and efficiently. The app allows users to scan receipts, manually add items, assign items to different people, calculate individual shares including tax and tip, and share payment summaries. Built with a focus on simplicity and ease of use at the dining table, it follows Apple Human Interface Guidelines for an intuitive iOS-like experience.
 
 ### Key Features
+- Email + password authentication with persistent sessions (PostgreSQL-backed)
+- Multi-account support: each admin has their own isolated receipts and people
 - Receipt scanning via OCR (OpenAI Vision API)
 - Manual item addition and deletion
 - Running total verification (items vs receipt subtotal)
 - Person assignment with colorful visual indicators
 - Proportional tax/tip calculation
 - Payment tracking and settlement calculation
-- Secure public receipt sharing via QR code or SMS
+- Secure public receipt sharing via QR code or SMS (no auth needed for diners)
 - Scanned receipt image viewing on shared tabs for independent verification
 - "Paid by" selector to mark who paid the bill with Venmo username
 - One-tap Venmo payment from shared receipt (opens Venmo app with correct amount)

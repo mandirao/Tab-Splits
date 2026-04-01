@@ -18,11 +18,12 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import ReceiptCard from "@/components/ReceiptCard";
-import { Camera, Search, Users, Pencil, Trash2, Check, X, Phone } from "lucide-react";
+import { Camera, Search, Users, Pencil, Trash2, Check, X, Phone, LogOut } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import type { Receipt, ReceiptItem, Person } from "@shared/schema";
 
 interface ReceiptWithDetails extends Receipt {
@@ -224,6 +225,7 @@ export default function HomePage() {
   const [receiptToDelete, setReceiptToDelete] = useState<Receipt | null>(null);
   const [manageDinersOpen, setManageDinersOpen] = useState(false);
   const { toast } = useToast();
+  const { user, logout } = useAuth();
 
   const { data: receipts = [], isLoading } = useQuery<Receipt[]>({
     queryKey: ["/api/receipts"],
@@ -294,16 +296,30 @@ export default function HomePage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold">Tab Splits</h1>
+            {user && (
+              <p className="text-xs text-muted-foreground">{user.name}</p>
+            )}
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setManageDinersOpen(true)}
-            data-testid="button-manage-diners"
-            title="Manage diners"
-          >
-            <Users className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setManageDinersOpen(true)}
+              data-testid="button-manage-diners"
+              title="Manage diners"
+            >
+              <Users className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => logout()}
+              data-testid="button-logout"
+              title="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         
         <div className="relative">

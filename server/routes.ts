@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
@@ -8,29 +8,203 @@ import {
   insertPaymentSchema,
   updateReceiptSchema,
   updateReceiptItemSchema,
-  updatePersonSchema
+  updatePersonSchema,
+  registerSchema,
+  loginSchema,
 } from "@shared/schema";
 import { fromError } from "zod-validation-error";
 import OpenAI from "openai";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import bcrypt from "bcrypt";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
+// ─── Auth middleware ──────────────────────────────────────────────────────────
+
+function requireAuth(req: Request, res: Response, next: NextFunction) {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  next();
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Register object storage routes for file uploads
   registerObjectStorageRoutes(app);
-  
-  // Receipt scanning with OpenAI Vision
-  app.post("/api/scan-receipt", async (req, res) => {
+
+  // ─── Auth routes (public) ────────────────────────────────────────────────
+
+  app.get("/api/auth/me", (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    res.json({
+      id: req.session.userId,
+      email: req.session.userEmail,
+      name: req.session.userName,
+    });
+  });
+
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const { email, password, name } = registerSchema.parse(req.body);
+      const existing = await storage.getUserByEmail(email);
+      if (existing) {
+        return res.status(409).json({ message: "An account with this email already exists" });
+      }
+      const passwordHash = await bcrypt.hash(password, 12);
+      const user = await storage.createUser(email.toLowerCase(), passwordHash, name);
+      req.session.userId = user.id;
+      req.session.userEmail = user.email;
+      req.session.userName = user.name;
+      res.status(201).json({ id: user.id, email: user.email, name: user.name });
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: fromError(error).toString() });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { email, password } = loginSchema.parse(req.body);
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+      const valid = await bcrypt.compare(password, user.passwordHash);
+      if (!valid) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+      req.session.userId = user.id;
+      req.session.userEmail = user.email;
+      req.session.userName = user.name;
+      res.json({ id: user.id, email: user.email, name: user.name });
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: fromError(error).toString() });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy(() => {
+      res.clearCookie("connect.sid");
+      res.status(204).send();
+    });
+  });
+
+  // ─── Shared receipt routes (public — no auth required) ───────────────────
+
+  app.get("/api/share/:token", async (req, res) => {
+    try {
+      const receipt = await storage.getReceiptByShareToken(req.params.token);
+      if (!receipt) {
+        return res.status(404).json({ message: "Receipt not found" });
+      }
+      
+      const items = await storage.getReceiptItems(receipt.id);
+      const receiptPeople = await storage.getReceiptPeople(receipt.id);
+      
+      const paidByPerson = receipt.paidById
+        ? receiptPeople.find(p => p.id === receipt.paidById) ?? await storage.getPerson(receipt.paidById)
+        : null;
+      
+      const assignedPersonIds = new Set<string>();
+      items.forEach(item => {
+        ((item.assignedTo as string[]) || []).forEach(id => assignedPersonIds.add(id));
+      });
+
+      const redactedPeople = receiptPeople
+        .filter(person => assignedPersonIds.has(person.id))
+        .map(person => ({ id: person.id, name: person.name }));
+      
+      const redactedReceipt = {
+        id: receipt.id,
+        restaurantName: receipt.restaurantName,
+        date: receipt.date,
+        subtotal: receipt.subtotal,
+        tax: receipt.tax,
+        tip: receipt.tip,
+        total: receipt.total,
+        imageUrl: receipt.imageUrl,
+        paidById: receipt.paidById,
+        paidByName: paidByPerson?.name || null,
+        paidByVenmo: (paidByPerson as any)?.venmoUsername || null,
+      };
+      
+      res.json({ receipt: redactedReceipt, items, people: redactedPeople });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/share/:token/verify-phone", async (req, res) => {
+    try {
+      const { phone } = req.body;
+      if (!phone) return res.status(400).json({ message: "Phone number is required" });
+
+      const receipt = await storage.getReceiptByShareToken(req.params.token);
+      if (!receipt) return res.status(404).json({ message: "Receipt not found" });
+
+      const receiptPeople = await storage.getReceiptPeople(receipt.id);
+      const matchingPerson = receiptPeople.find(p => p.phone === phone);
+      
+      if (matchingPerson) {
+        return res.json({ verified: true, personId: matchingPerson.id, personName: matchingPerson.name });
+      }
+
+      const unmatchedPeople = receiptPeople
+        .filter(p => !p.phone)
+        .map(p => ({ id: p.id, name: p.name }));
+
+      res.json({ verified: false, unmatchedPeople });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/share/:token/link-phone", async (req, res) => {
+    try {
+      const { phone, personId, name } = req.body;
+      if (!phone) return res.status(400).json({ message: "Phone number is required" });
+
+      const receipt = await storage.getReceiptByShareToken(req.params.token);
+      if (!receipt) return res.status(404).json({ message: "Receipt not found" });
+
+      const receiptPeople = await storage.getReceiptPeople(receipt.id);
+      const assignedPersonIds = new Set(receiptPeople.map(p => p.id));
+
+      let person;
+      if (personId) {
+        if (!assignedPersonIds.has(personId)) {
+          return res.status(403).json({ message: "This person is not assigned to this receipt" });
+        }
+        await storage.updatePerson(personId, { phone });
+        person = await storage.getPerson(personId);
+        if (!person) return res.status(404).json({ message: "Person not found" });
+      } else if (name) {
+        person = await storage.createPerson({ name, phone });
+      } else {
+        return res.status(400).json({ message: "Either personId or name is required" });
+      }
+
+      res.json({ verified: true, personId: person.id, personName: person.name });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ─── All routes below require auth ───────────────────────────────────────
+
+  app.post("/api/scan-receipt", requireAuth, async (req, res) => {
     try {
       const { image } = req.body;
-      
-      if (!image) {
-        return res.status(400).json({ message: "No image provided" });
-      }
+      if (!image) return res.status(400).json({ message: "No image provided" });
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o",
@@ -79,9 +253,7 @@ Return ONLY the JSON object, no additional text.`
               },
               {
                 type: "image_url",
-                image_url: {
-                  url: `data:image/jpeg;base64,${image}`
-                }
+                image_url: { url: `data:image/jpeg;base64,${image}` }
               }
             ]
           }
@@ -90,19 +262,13 @@ Return ONLY the JSON object, no additional text.`
       });
 
       const content = completion.choices[0]?.message?.content;
-      if (!content) {
-        throw new Error("No response from vision model");
-      }
+      if (!content) throw new Error("No response from vision model");
 
       const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("Could not parse JSON from response");
-      }
+      if (!jsonMatch) throw new Error("Could not parse JSON from response");
 
       const data = JSON.parse(jsonMatch[0]);
 
-      // Post-processing pass 1: Remove any gratuity/service-charge line items.
-      // The AI sometimes includes them in both the items list AND the tip field.
       const GRATUITY_PATTERN = /auto.?grat|gratuity|service.?charge|mandatory.?grat|suggested.?grat|included.?tip|auto.?tip/i;
       if (Array.isArray(data.items)) {
         const gratItems: any[] = [];
@@ -115,39 +281,26 @@ Return ONLY the JSON object, no additional text.`
           }
         }
         if (gratItems.length > 0) {
-          const gratTotal = gratItems.reduce((sum: number, it: any) => {
-            return sum + (Number(it.price) * (Number(it.quantity) || 1));
-          }, 0);
+          const gratTotal = gratItems.reduce((sum: number, it: any) => sum + (Number(it.price) * (Number(it.quantity) || 1)), 0);
           data.items = cleanItems;
-          // Subtract the gratuity from the subtotal (it was being double-counted)
           data.subtotal = Math.max(0, Number(data.subtotal ?? 0) - gratTotal);
-          // Only add to tip if the AI didn't already put it there
           const currentTip = Number(data.tip ?? 0);
-          if (currentTip < gratTotal - 0.01) {
-            data.tip = currentTip + gratTotal;
-          }
-          // Recalculate total
+          if (currentTip < gratTotal - 0.01) data.tip = currentTip + gratTotal;
           data.total = Number(data.subtotal) + Number(data.tax ?? 0) + Number(data.tip);
         }
       }
 
-      // Post-processing pass 2: Detect when the auto-gratuity is baked into the printed
-      // subtotal but the AI correctly moved it to the tip field (no line item left).
-      // Indicator: subtotal + tax ≈ total  (tip was already inside the "subtotal" column on the bill)
       {
         const s = Number(data.subtotal ?? 0);
         const x = Number(data.tax ?? 0);
         const t = Number(data.tip ?? 0);
         const tot = Number(data.total ?? 0);
         if (t > 0 && Math.abs((s + x) - tot) < 0.05) {
-          // The printed subtotal includes the auto-gratuity – strip it out
           data.subtotal = +(s - t).toFixed(2);
-          // Total is already correct as printed; keep it unchanged
         }
       }
 
       res.json(data);
-      
     } catch (error: any) {
       console.error("Vision API Error:", error);
       res.status(500).json({ message: error.message || "Failed to scan receipt" });
@@ -155,9 +308,12 @@ Return ONLY the JSON object, no additional text.`
   });
 
   // Receipt routes
-  app.post("/api/receipts", async (req, res) => {
+  app.post("/api/receipts", requireAuth, async (req, res) => {
     try {
-      const validatedData = insertReceiptSchema.parse(req.body);
+      const validatedData = insertReceiptSchema.parse({
+        ...req.body,
+        userId: req.session.userId,
+      });
       const receipt = await storage.createReceipt(validatedData);
       res.json(receipt);
     } catch (error: any) {
@@ -165,28 +321,26 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
-  app.get("/api/receipts", async (_req, res) => {
+  app.get("/api/receipts", requireAuth, async (req, res) => {
     try {
-      const receipts = await storage.getAllReceipts();
+      const receipts = await storage.getAllReceipts(req.session.userId!);
       res.json(receipts);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  app.get("/api/receipts/:id", async (req, res) => {
+  app.get("/api/receipts/:id", requireAuth, async (req, res) => {
     try {
       const receipt = await storage.getReceipt(req.params.id);
-      if (!receipt) {
-        return res.status(404).json({ message: "Receipt not found" });
-      }
+      if (!receipt) return res.status(404).json({ message: "Receipt not found" });
       res.json(receipt);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  app.patch("/api/receipts/:id", async (req, res) => {
+  app.patch("/api/receipts/:id", requireAuth, async (req, res) => {
     try {
       const validatedData = updateReceiptSchema.parse(req.body);
       const receipt = await storage.updateReceipt(req.params.id, validatedData);
@@ -196,20 +350,17 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
-  app.delete("/api/receipts/:id", async (req, res) => {
+  app.delete("/api/receipts/:id", requireAuth, async (req, res) => {
     try {
-      console.log(`Deleting receipt: ${req.params.id}`);
       await storage.deleteReceipt(req.params.id);
-      console.log(`Successfully deleted receipt: ${req.params.id}`);
       res.status(204).send();
     } catch (error: any) {
-      console.error(`Error deleting receipt ${req.params.id}:`, error);
       res.status(500).json({ message: error.message });
     }
   });
 
   // Receipt Item routes
-  app.post("/api/receipts/:receiptId/items", async (req, res) => {
+  app.post("/api/receipts/:receiptId/items", requireAuth, async (req, res) => {
     try {
       const validatedData = insertReceiptItemSchema.parse({
         ...req.body,
@@ -222,7 +373,7 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
-  app.get("/api/receipts/:receiptId/items", async (req, res) => {
+  app.get("/api/receipts/:receiptId/items", requireAuth, async (req, res) => {
     try {
       const items = await storage.getReceiptItems(req.params.receiptId);
       res.json(items);
@@ -231,7 +382,7 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
-  app.patch("/api/items/:id", async (req, res) => {
+  app.patch("/api/items/:id", requireAuth, async (req, res) => {
     try {
       const validatedData = updateReceiptItemSchema.parse(req.body);
       const item = await storage.updateReceiptItem(req.params.id, validatedData);
@@ -241,7 +392,7 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
-  app.delete("/api/items/:id", async (req, res) => {
+  app.delete("/api/items/:id", requireAuth, async (req, res) => {
     try {
       await storage.deleteReceiptItem(req.params.id);
       res.status(204).send();
@@ -250,8 +401,7 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
-  // Clear all items for a receipt (used by ReScan)
-  app.delete("/api/receipts/:id/items", async (req, res) => {
+  app.delete("/api/receipts/:id/items", requireAuth, async (req, res) => {
     try {
       await storage.clearReceiptItems(req.params.id);
       res.status(204).send();
@@ -261,9 +411,12 @@ Return ONLY the JSON object, no additional text.`
   });
 
   // People routes
-  app.post("/api/people", async (req, res) => {
+  app.post("/api/people", requireAuth, async (req, res) => {
     try {
-      const validatedData = insertPersonSchema.parse(req.body);
+      const validatedData = insertPersonSchema.parse({
+        ...req.body,
+        userId: req.session.userId,
+      });
       const person = await storage.createPerson(validatedData);
       res.json(person);
     } catch (error: any) {
@@ -271,25 +424,25 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
-  app.get("/api/people", async (_req, res) => {
+  app.get("/api/people", requireAuth, async (req, res) => {
     try {
-      const people = await storage.getAllPeople();
-      res.json(people);
+      const allPeople = await storage.getAllPeople(req.session.userId!);
+      res.json(allPeople);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  app.get("/api/people/regulars", async (_req, res) => {
+  app.get("/api/people/regulars", requireAuth, async (req, res) => {
     try {
-      const regulars = await storage.getRegulars();
+      const regulars = await storage.getRegulars(req.session.userId!);
       res.json(regulars);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  app.patch("/api/people/:id", async (req, res) => {
+  app.patch("/api/people/:id", requireAuth, async (req, res) => {
     try {
       const validatedData = updatePersonSchema.parse(req.body);
       const person = await storage.updatePerson(req.params.id, validatedData);
@@ -299,7 +452,7 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
-  app.delete("/api/people/:id", async (req, res) => {
+  app.delete("/api/people/:id", requireAuth, async (req, res) => {
     try {
       await storage.deletePerson(req.params.id);
       res.status(204).send();
@@ -309,7 +462,7 @@ Return ONLY the JSON object, no additional text.`
   });
 
   // Receipt People routes
-  app.get("/api/receipts/:id/people", async (req, res) => {
+  app.get("/api/receipts/:id/people", requireAuth, async (req, res) => {
     try {
       const people = await storage.getReceiptPeople(req.params.id);
       res.json(people);
@@ -318,12 +471,10 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
-  app.post("/api/receipts/:id/people", async (req, res) => {
+  app.post("/api/receipts/:id/people", requireAuth, async (req, res) => {
     try {
       const { personId } = req.body;
-      if (!personId) {
-        return res.status(400).json({ message: "personId is required" });
-      }
+      if (!personId) return res.status(400).json({ message: "personId is required" });
       const receiptPerson = await storage.addPersonToReceipt(req.params.id, personId);
       res.json(receiptPerson);
     } catch (error: any) {
@@ -331,7 +482,7 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
-  app.delete("/api/receipts/:id/people/:personId", async (req, res) => {
+  app.delete("/api/receipts/:id/people/:personId", requireAuth, async (req, res) => {
     try {
       await storage.removePersonFromReceipt(req.params.id, req.params.personId);
       res.status(204).send();
@@ -340,160 +491,19 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
-  // Share routes
-  app.post("/api/receipts/:id/generate-share-token", async (req, res) => {
+  // Share token generation
+  app.post("/api/receipts/:id/generate-share-token", requireAuth, async (req, res) => {
     try {
       const receipt = await storage.generateShareToken(req.params.id);
-      if (!receipt) {
-        return res.status(404).json({ message: "Receipt not found" });
-      }
+      if (!receipt) return res.status(404).json({ message: "Receipt not found" });
       res.json({ shareToken: receipt.shareToken });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  app.post("/api/share/:token/verify-phone", async (req, res) => {
-    try {
-      const { phone } = req.body;
-      if (!phone) {
-        return res.status(400).json({ message: "Phone number is required" });
-      }
-
-      const receipt = await storage.getReceiptByShareToken(req.params.token);
-      if (!receipt) {
-        return res.status(404).json({ message: "Receipt not found" });
-      }
-
-      const items = await storage.getReceiptItems(receipt.id);
-      const allPeople = await storage.getAllPeople();
-      
-      const assignedPersonIds = new Set<string>();
-      items.forEach(item => {
-        const assigned = (item.assignedTo as string[]) || [];
-        assigned.forEach(id => assignedPersonIds.add(id));
-      });
-
-      const assignedPeople = allPeople.filter(person => assignedPersonIds.has(person.id));
-      
-      const matchingPerson = assignedPeople.find(p => p.phone === phone);
-      
-      if (matchingPerson) {
-        return res.json({ 
-          verified: true, 
-          personId: matchingPerson.id,
-          personName: matchingPerson.name
-        });
-      }
-
-      const unmatchedPeople = assignedPeople
-        .filter(p => !p.phone)
-        .map(p => ({ id: p.id, name: p.name }));
-
-      res.json({ 
-        verified: false, 
-        unmatchedPeople 
-      });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  app.post("/api/share/:token/link-phone", async (req, res) => {
-    try {
-      const { phone, personId, name } = req.body;
-      if (!phone) {
-        return res.status(400).json({ message: "Phone number is required" });
-      }
-
-      const receipt = await storage.getReceiptByShareToken(req.params.token);
-      if (!receipt) {
-        return res.status(404).json({ message: "Receipt not found" });
-      }
-
-      const items = await storage.getReceiptItems(receipt.id);
-      const allPeople = await storage.getAllPeople();
-      
-      const assignedPersonIds = new Set<string>();
-      items.forEach(item => {
-        const assigned = (item.assignedTo as string[]) || [];
-        assigned.forEach(id => assignedPersonIds.add(id));
-      });
-
-      let person;
-      if (personId) {
-        if (!assignedPersonIds.has(personId)) {
-          return res.status(403).json({ message: "This person is not assigned to this receipt" });
-        }
-        
-        await storage.updatePerson(personId, { phone });
-        person = await storage.getPerson(personId);
-        if (!person) {
-          return res.status(404).json({ message: "Person not found" });
-        }
-      } else if (name) {
-        person = await storage.createPerson({ name, phone });
-      } else {
-        return res.status(400).json({ message: "Either personId or name is required" });
-      }
-
-      res.json({ 
-        verified: true, 
-        personId: person.id,
-        personName: person.name
-      });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  app.get("/api/share/:token", async (req, res) => {
-    try {
-      const receipt = await storage.getReceiptByShareToken(req.params.token);
-      if (!receipt) {
-        return res.status(404).json({ message: "Receipt not found" });
-      }
-      
-      const items = await storage.getReceiptItems(receipt.id);
-      const allPeople = await storage.getAllPeople();
-      
-      const assignedPersonIds = new Set<string>();
-      items.forEach(item => {
-        const assigned = (item.assignedTo as string[]) || [];
-        assigned.forEach(id => assignedPersonIds.add(id));
-      });
-      
-      const paidByPerson = receipt.paidById ? allPeople.find(p => p.id === receipt.paidById) : null;
-      
-      const redactedPeople = allPeople
-        .filter(person => assignedPersonIds.has(person.id))
-        .map(person => ({
-          id: person.id,
-          name: person.name
-        }));
-      
-      const redactedReceipt = {
-        id: receipt.id,
-        restaurantName: receipt.restaurantName,
-        date: receipt.date,
-        subtotal: receipt.subtotal,
-        tax: receipt.tax,
-        tip: receipt.tip,
-        total: receipt.total,
-        imageUrl: receipt.imageUrl,
-        paidById: receipt.paidById,
-        paidByName: paidByPerson?.name || null,
-        paidByVenmo: paidByPerson?.venmoUsername || null
-      };
-      
-      res.json({ receipt: redactedReceipt, items, people: redactedPeople });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
   // Payment routes
-  app.post("/api/receipts/:receiptId/payments", async (req, res) => {
+  app.post("/api/receipts/:receiptId/payments", requireAuth, async (req, res) => {
     try {
       const validatedData = insertPaymentSchema.parse({
         ...req.body,
@@ -506,7 +516,7 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
-  app.get("/api/receipts/:receiptId/payments", async (req, res) => {
+  app.get("/api/receipts/:receiptId/payments", requireAuth, async (req, res) => {
     try {
       const payments = await storage.getPayments(req.params.receiptId);
       res.json(payments);
@@ -515,7 +525,7 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
-  app.delete("/api/payments/:id", async (req, res) => {
+  app.delete("/api/payments/:id", requireAuth, async (req, res) => {
     try {
       await storage.deletePayment(req.params.id);
       res.status(204).send();
@@ -524,7 +534,7 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
-  app.get("/api/receipts/:receiptId/settlement", async (req, res) => {
+  app.get("/api/receipts/:receiptId/settlement", requireAuth, async (req, res) => {
     try {
       const settlement = await storage.calculateSettlement(req.params.receiptId);
       res.json(settlement);

@@ -3,8 +3,17 @@ import { pgTable, text, varchar, numeric, integer, jsonb, timestamp } from "driz
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const receipts = pgTable("receipts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
   restaurantName: text("restaurant_name"),
   date: timestamp("date").notNull().defaultNow(),
   subtotal: numeric("subtotal", { precision: 10, scale: 2 }).notNull(),
@@ -28,6 +37,7 @@ export const receiptItems = pgTable("receipt_items", {
 
 export const people = pgTable("people", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
   name: text("name").notNull(),
   phone: text("phone"),
   email: text("email"),
@@ -51,11 +61,23 @@ export const payments = pgTable("payments", {
 
 const numericStringSchema = z.string().regex(/^\d+(\.\d{1,2})?$/, "Must be a valid numeric string");
 
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertReceiptSchema = createInsertSchema(receipts).omit({ id: true });
 export const insertReceiptItemSchema = createInsertSchema(receiptItems).omit({ id: true });
 export const insertPersonSchema = createInsertSchema(people).omit({ id: true });
 export const insertReceiptPersonSchema = createInsertSchema(receiptPeople).omit({ id: true });
 export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, createdAt: true });
+
+export const registerSchema = z.object({
+  email: z.string().email("Please enter a valid email"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  name: z.string().min(1, "Name is required"),
+});
+
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
 
 export const updateReceiptSchema = z.object({
   restaurantName: z.string().optional(),
@@ -83,6 +105,8 @@ export const updatePersonSchema = z.object({
   isRegular: z.number().int().min(0).max(1).optional(),
 }).strict();
 
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertReceipt = z.infer<typeof insertReceiptSchema>;
 export type Receipt = typeof receipts.$inferSelect;
 export type InsertReceiptItem = z.infer<typeof insertReceiptItemSchema>;

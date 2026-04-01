@@ -9,20 +9,27 @@ import {
   type InsertReceiptPerson,
   type Payment,
   type InsertPayment,
+  type User,
   receipts,
   receiptItems,
   people,
   receiptPeople,
-  payments
+  payments,
+  users,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull, or } from "drizzle-orm";
 
 export interface IStorage {
+  // Auth / User operations
+  createUser(email: string, passwordHash: string, name: string): Promise<User>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUserById(id: string): Promise<User | undefined>;
+
   // Receipt operations
   createReceipt(receipt: InsertReceipt): Promise<Receipt>;
   getReceipt(id: string): Promise<Receipt | undefined>;
-  getAllReceipts(): Promise<Receipt[]>;
+  getAllReceipts(userId: string): Promise<Receipt[]>;
   updateReceipt(id: string, receipt: Partial<InsertReceipt>): Promise<Receipt>;
   deleteReceipt(id: string): Promise<void>;
   generateShareToken(id: string): Promise<Receipt | undefined>;
@@ -38,8 +45,8 @@ export interface IStorage {
   // People operations
   createPerson(person: InsertPerson): Promise<Person>;
   getPerson(id: string): Promise<Person | undefined>;
-  getAllPeople(): Promise<Person[]>;
-  getRegulars(): Promise<Person[]>;
+  getAllPeople(userId: string): Promise<Person[]>;
+  getRegulars(userId: string): Promise<Person[]>;
   updatePerson(id: string, person: Partial<InsertPerson>): Promise<Person>;
   deletePerson(id: string): Promise<void>;
 
@@ -56,6 +63,22 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // Auth / User operations
+  async createUser(email: string, passwordHash: string, name: string): Promise<User> {
+    const [result] = await db.insert(users).values({ email, passwordHash, name }).returning();
+    return result;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [result] = await db.select().from(users).where(eq(users.email, email.toLowerCase()));
+    return result;
+  }
+
+  async getUserById(id: string): Promise<User | undefined> {
+    const [result] = await db.select().from(users).where(eq(users.id, id));
+    return result;
+  }
+
   // Receipt operations
   async createReceipt(receipt: InsertReceipt): Promise<Receipt> {
     const [result] = await db.insert(receipts).values(receipt).returning();
@@ -67,8 +90,12 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getAllReceipts(): Promise<Receipt[]> {
-    return await db.select().from(receipts).orderBy(receipts.date);
+  async getAllReceipts(userId: string): Promise<Receipt[]> {
+    return await db
+      .select()
+      .from(receipts)
+      .where(eq(receipts.userId, userId))
+      .orderBy(receipts.date);
   }
 
   async updateReceipt(id: string, receipt: Partial<InsertReceipt>): Promise<Receipt> {
@@ -156,12 +183,18 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getAllPeople(): Promise<Person[]> {
-    return await db.select().from(people);
+  async getAllPeople(userId: string): Promise<Person[]> {
+    return await db
+      .select()
+      .from(people)
+      .where(eq(people.userId, userId));
   }
 
-  async getRegulars(): Promise<Person[]> {
-    return await db.select().from(people).where(eq(people.isRegular, 1));
+  async getRegulars(userId: string): Promise<Person[]> {
+    return await db
+      .select()
+      .from(people)
+      .where(and(eq(people.userId, userId), eq(people.isRegular, 1)));
   }
 
   async updatePerson(id: string, person: Partial<InsertPerson>): Promise<Person> {
@@ -196,7 +229,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async removePersonFromReceipt(receiptId: string, personId: string): Promise<void> {
-    // Check if person has items assigned on this receipt
     const items = await db
       .select()
       .from(receiptItems)
@@ -224,6 +256,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .select({
         id: people.id,
+        userId: people.userId,
         name: people.name,
         phone: people.phone,
         email: people.email,
@@ -264,10 +297,7 @@ export class DatabaseStorage implements IStorage {
     const receiptPayments = await this.getPayments(receiptId);
     const receiptPeopleList = await this.getReceiptPeople(receiptId);
 
-    // Calculate what each person owes based on their items
     const owedByPerson = new Map<string, number>();
-    
-    // Initialize everyone to 0
     receiptPeopleList.forEach(person => {
       owedByPerson.set(person.id, 0);
     });
@@ -275,15 +305,12 @@ export class DatabaseStorage implements IStorage {
     const subtotalNum = parseFloat(receipt.subtotal);
     const taxNum = parseFloat(receipt.tax);
     const tipNum = parseFloat(receipt.tip);
-    const totalNum = parseFloat(receipt.total);
 
-    // Calculate each person's subtotal
     items.forEach(item => {
       const assignedTo = (item.assignedTo as string[]) || [];
       if (assignedTo.length > 0) {
         const itemPrice = parseFloat(item.price) * item.quantity;
         const pricePerPerson = itemPrice / assignedTo.length;
-        
         assignedTo.forEach(personId => {
           const current = owedByPerson.get(personId) || 0;
           owedByPerson.set(personId, current + pricePerPerson);
@@ -291,25 +318,20 @@ export class DatabaseStorage implements IStorage {
       }
     });
 
-    // Calculate proportional tax and tip for each person
     const taxTipMultiplier = subtotalNum > 0 ? (taxNum + tipNum) / subtotalNum : 0;
     owedByPerson.forEach((subtotal, personId) => {
-      const taxTip = subtotal * taxTipMultiplier;
-      owedByPerson.set(personId, subtotal + taxTip);
+      owedByPerson.set(personId, subtotal + subtotal * taxTipMultiplier);
     });
 
-    // Calculate what each person paid
     const paidByPerson = new Map<string, number>();
     receiptPeopleList.forEach(person => {
       paidByPerson.set(person.id, 0);
     });
-
     receiptPayments.forEach(payment => {
       const current = paidByPerson.get(payment.personId) || 0;
       paidByPerson.set(payment.personId, current + parseFloat(payment.amount));
     });
 
-    // Calculate balances (positive = overpaid, negative = underpaid)
     const balances = new Map<string, number>();
     receiptPeopleList.forEach(person => {
       const owed = owedByPerson.get(person.id) || 0;
@@ -317,7 +339,6 @@ export class DatabaseStorage implements IStorage {
       balances.set(person.id, paid - owed);
     });
 
-    // Simplify debts - find who owes who
     const settlements: Array<{ from: Person; to: Person; amount: string }> = [];
     const creditors: Array<{ person: Person; amount: number }> = [];
     const debtors: Array<{ person: Person; amount: number }> = [];
@@ -325,7 +346,6 @@ export class DatabaseStorage implements IStorage {
     balances.forEach((balance, personId) => {
       const person = receiptPeopleList.find(p => p.id === personId);
       if (!person) return;
-
       if (balance > 0.01) {
         creditors.push({ person, amount: balance });
       } else if (balance < -0.01) {
@@ -333,16 +353,13 @@ export class DatabaseStorage implements IStorage {
       }
     });
 
-    // Match debtors with creditors
     let creditorIndex = 0;
     let debtorIndex = 0;
 
     while (creditorIndex < creditors.length && debtorIndex < debtors.length) {
       const creditor = creditors[creditorIndex];
       const debtor = debtors[debtorIndex];
-
       const settlementAmount = Math.min(creditor.amount, debtor.amount);
-
       if (settlementAmount > 0.01) {
         settlements.push({
           from: debtor.person,
@@ -350,10 +367,8 @@ export class DatabaseStorage implements IStorage {
           amount: settlementAmount.toFixed(2)
         });
       }
-
       creditor.amount -= settlementAmount;
       debtor.amount -= settlementAmount;
-
       if (creditor.amount < 0.01) creditorIndex++;
       if (debtor.amount < 0.01) debtorIndex++;
     }
