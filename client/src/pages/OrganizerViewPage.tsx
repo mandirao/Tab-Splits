@@ -230,13 +230,14 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
                 const qtys = (item.assignedQuantities as Record<string, number>) || {};
                 const totalQty = assignedPeople.reduce((s, pid) => s + (qtys[pid] ?? 1), 0);
 
+                const myQty = !isAllTab ? (qtys[selectedTab] ?? 1) : 1;
                 let displayPrice = parseFloat(item.price) || 0;
                 if (!isAllTab && isAssigned) {
-                  const myQty = qtys[selectedTab] ?? 1;
                   displayPrice = totalQty > 0
                     ? (myQty / totalQty) * displayPrice
                     : displayPrice / assignedPeople.length;
                 }
+                const showFraction = !isAllTab && isAssigned && assignedPeople.length > 1;
 
                 return (
                   <div
@@ -251,13 +252,15 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
                             {item.quantity}x
                           </Badge>
                         )}
+                        {showFraction && (
+                          <Badge variant="outline" className="text-xs px-1.5 shrink-0">
+                            {myQty}/{totalQty}
+                          </Badge>
+                        )}
                         <span className="font-medium text-sm truncate">{item.name}</span>
                       </div>
                       <span className="text-base font-semibold">
                         ${displayPrice.toFixed(2)}
-                        {!isAllTab && assignedPeople.length > 1 && (
-                          <span className="text-xs text-muted-foreground font-normal ml-1">(your share)</span>
-                        )}
                       </span>
                     </div>
 
