@@ -1,5 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+import { randomBytes } from "crypto";
 import { storage } from "./storage";
 import { 
   insertReceiptSchema, 
@@ -109,7 +110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.json({ resetUrl: null });
       }
-      const token = require("crypto").randomBytes(32).toString("hex");
+      const token = randomBytes(32).toString("hex");
       const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
       await storage.setUserResetToken(user.id, token, expiry);
       const resetUrl = `/reset-password?token=${token}`;
