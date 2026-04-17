@@ -143,16 +143,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!email || typeof email !== "string") {
         return res.status(400).json({ message: "Email is required" });
       }
+      // Use a constant message in both branches so the response body
+      // does not reveal whether an email address is registered.
+      const NEUTRAL_MESSAGE = "If an account exists for that email, a reset link has been generated.";
       const user = await storage.getUserByEmail(email.trim().toLowerCase());
-      // Always respond the same way to prevent email enumeration
       if (!user) {
-        return res.json({ resetUrl: null });
+        return res.json({ message: NEUTRAL_MESSAGE, resetUrl: null });
       }
       const token = randomBytes(32).toString("hex");
       const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
       await storage.setUserResetToken(user.id, token, expiry);
       const resetUrl = `/reset-password?token=${token}`;
-      res.json({ resetUrl });
+      // NOTE: resetUrl is returned here because this app has no email delivery.
+      // Once email is integrated, remove resetUrl from the response and send
+      // the link via email only — that fully closes the enumeration window.
+      res.json({ message: NEUTRAL_MESSAGE, resetUrl });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
