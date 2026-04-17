@@ -12,6 +12,8 @@ import {
   updatePersonSchema,
   registerSchema,
   loginSchema,
+  type Receipt,
+  type Person,
 } from "@shared/schema";
 import { fromError } from "zod-validation-error";
 import OpenAI from "openai";
@@ -30,6 +32,42 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
     return res.status(401).json({ message: "Unauthorized" });
   }
   next();
+}
+
+// ─── Ownership helpers ────────────────────────────────────────────────────────
+
+async function getOwnedReceipt(
+  receiptId: string,
+  userId: string,
+  res: Response
+): Promise<Receipt | null> {
+  const receipt = await storage.getReceipt(receiptId);
+  if (!receipt) {
+    res.status(404).json({ message: "Receipt not found" });
+    return null;
+  }
+  if (receipt.userId !== userId) {
+    res.status(403).json({ message: "Forbidden" });
+    return null;
+  }
+  return receipt;
+}
+
+async function getOwnedPerson(
+  personId: string,
+  userId: string,
+  res: Response
+): Promise<Person | null> {
+  const person = await storage.getPerson(personId);
+  if (!person) {
+    res.status(404).json({ message: "Person not found" });
+    return null;
+  }
+  if (person.userId !== userId) {
+    res.status(403).json({ message: "Forbidden" });
+    return null;
+  }
+  return person;
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -353,7 +391,8 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
-  // Receipt routes
+  // ─── Receipt routes ───────────────────────────────────────────────────────
+
   app.post("/api/receipts", requireAuth, async (req, res) => {
     try {
       const validatedData = insertReceiptSchema.parse({
@@ -378,8 +417,8 @@ Return ONLY the JSON object, no additional text.`
 
   app.get("/api/receipts/:id", requireAuth, async (req, res) => {
     try {
-      const receipt = await storage.getReceipt(req.params.id);
-      if (!receipt) return res.status(404).json({ message: "Receipt not found" });
+      const receipt = await getOwnedReceipt(req.params.id, req.session.userId!, res);
+      if (!receipt) return;
       res.json(receipt);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -388,6 +427,8 @@ Return ONLY the JSON object, no additional text.`
 
   app.patch("/api/receipts/:id", requireAuth, async (req, res) => {
     try {
+      const owned = await getOwnedReceipt(req.params.id, req.session.userId!, res);
+      if (!owned) return;
       const validatedData = updateReceiptSchema.parse(req.body);
       const receipt = await storage.updateReceipt(req.params.id, validatedData);
       res.json(receipt);
@@ -398,6 +439,8 @@ Return ONLY the JSON object, no additional text.`
 
   app.delete("/api/receipts/:id", requireAuth, async (req, res) => {
     try {
+      const owned = await getOwnedReceipt(req.params.id, req.session.userId!, res);
+      if (!owned) return;
       await storage.deleteReceipt(req.params.id);
       res.status(204).send();
     } catch (error: any) {
@@ -405,9 +448,12 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
-  // Receipt Item routes
+  // ─── Receipt Item routes ──────────────────────────────────────────────────
+
   app.post("/api/receipts/:receiptId/items", requireAuth, async (req, res) => {
     try {
+      const owned = await getOwnedReceipt(req.params.receiptId, req.session.userId!, res);
+      if (!owned) return;
       const validatedData = insertReceiptItemSchema.parse({
         ...req.body,
         receiptId: req.params.receiptId
@@ -421,6 +467,8 @@ Return ONLY the JSON object, no additional text.`
 
   app.get("/api/receipts/:receiptId/items", requireAuth, async (req, res) => {
     try {
+      const owned = await getOwnedReceipt(req.params.receiptId, req.session.userId!, res);
+      if (!owned) return;
       const items = await storage.getReceiptItems(req.params.receiptId);
       res.json(items);
     } catch (error: any) {
@@ -430,9 +478,13 @@ Return ONLY the JSON object, no additional text.`
 
   app.patch("/api/items/:id", requireAuth, async (req, res) => {
     try {
+      const item = await storage.getReceiptItem(req.params.id);
+      if (!item) return res.status(404).json({ message: "Item not found" });
+      const owned = await getOwnedReceipt(item.receiptId, req.session.userId!, res);
+      if (!owned) return;
       const validatedData = updateReceiptItemSchema.parse(req.body);
-      const item = await storage.updateReceiptItem(req.params.id, validatedData);
-      res.json(item);
+      const updated = await storage.updateReceiptItem(req.params.id, validatedData);
+      res.json(updated);
     } catch (error: any) {
       res.status(400).json({ message: fromError(error).toString() });
     }
@@ -440,6 +492,10 @@ Return ONLY the JSON object, no additional text.`
 
   app.delete("/api/items/:id", requireAuth, async (req, res) => {
     try {
+      const item = await storage.getReceiptItem(req.params.id);
+      if (!item) return res.status(404).json({ message: "Item not found" });
+      const owned = await getOwnedReceipt(item.receiptId, req.session.userId!, res);
+      if (!owned) return;
       await storage.deleteReceiptItem(req.params.id);
       res.status(204).send();
     } catch (error: any) {
@@ -449,6 +505,8 @@ Return ONLY the JSON object, no additional text.`
 
   app.delete("/api/receipts/:id/items", requireAuth, async (req, res) => {
     try {
+      const owned = await getOwnedReceipt(req.params.id, req.session.userId!, res);
+      if (!owned) return;
       await storage.clearReceiptItems(req.params.id);
       res.status(204).send();
     } catch (error: any) {
@@ -456,7 +514,8 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
-  // People routes
+  // ─── People routes ────────────────────────────────────────────────────────
+
   app.post("/api/people", requireAuth, async (req, res) => {
     try {
       const validatedData = insertPersonSchema.parse({
@@ -490,6 +549,8 @@ Return ONLY the JSON object, no additional text.`
 
   app.patch("/api/people/:id", requireAuth, async (req, res) => {
     try {
+      const owned = await getOwnedPerson(req.params.id, req.session.userId!, res);
+      if (!owned) return;
       const validatedData = updatePersonSchema.parse(req.body);
       const person = await storage.updatePerson(req.params.id, validatedData);
       res.json(person);
@@ -500,6 +561,8 @@ Return ONLY the JSON object, no additional text.`
 
   app.delete("/api/people/:id", requireAuth, async (req, res) => {
     try {
+      const owned = await getOwnedPerson(req.params.id, req.session.userId!, res);
+      if (!owned) return;
       await storage.deletePerson(req.params.id);
       res.status(204).send();
     } catch (error: any) {
@@ -507,9 +570,12 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
-  // Receipt People routes
+  // ─── Receipt People routes ────────────────────────────────────────────────
+
   app.get("/api/receipts/:id/people", requireAuth, async (req, res) => {
     try {
+      const owned = await getOwnedReceipt(req.params.id, req.session.userId!, res);
+      if (!owned) return;
       const people = await storage.getReceiptPeople(req.params.id);
       res.json(people);
     } catch (error: any) {
@@ -519,6 +585,8 @@ Return ONLY the JSON object, no additional text.`
 
   app.post("/api/receipts/:id/people", requireAuth, async (req, res) => {
     try {
+      const owned = await getOwnedReceipt(req.params.id, req.session.userId!, res);
+      if (!owned) return;
       const { personId } = req.body;
       if (!personId) return res.status(400).json({ message: "personId is required" });
       const receiptPerson = await storage.addPersonToReceipt(req.params.id, personId);
@@ -530,6 +598,8 @@ Return ONLY the JSON object, no additional text.`
 
   app.delete("/api/receipts/:id/people/:personId", requireAuth, async (req, res) => {
     try {
+      const owned = await getOwnedReceipt(req.params.id, req.session.userId!, res);
+      if (!owned) return;
       await storage.removePersonFromReceipt(req.params.id, req.params.personId);
       res.status(204).send();
     } catch (error: any) {
@@ -537,9 +607,12 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
-  // Share token generation
+  // ─── Share token generation ───────────────────────────────────────────────
+
   app.post("/api/receipts/:id/generate-share-token", requireAuth, async (req, res) => {
     try {
+      const owned = await getOwnedReceipt(req.params.id, req.session.userId!, res);
+      if (!owned) return;
       const receipt = await storage.generateShareToken(req.params.id);
       if (!receipt) return res.status(404).json({ message: "Receipt not found" });
       res.json({ shareToken: receipt.shareToken });
@@ -548,9 +621,12 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
-  // Payment routes
+  // ─── Payment routes ───────────────────────────────────────────────────────
+
   app.post("/api/receipts/:receiptId/payments", requireAuth, async (req, res) => {
     try {
+      const owned = await getOwnedReceipt(req.params.receiptId, req.session.userId!, res);
+      if (!owned) return;
       const validatedData = insertPaymentSchema.parse({
         ...req.body,
         receiptId: req.params.receiptId
@@ -564,6 +640,8 @@ Return ONLY the JSON object, no additional text.`
 
   app.get("/api/receipts/:receiptId/payments", requireAuth, async (req, res) => {
     try {
+      const owned = await getOwnedReceipt(req.params.receiptId, req.session.userId!, res);
+      if (!owned) return;
       const payments = await storage.getPayments(req.params.receiptId);
       res.json(payments);
     } catch (error: any) {
@@ -573,6 +651,10 @@ Return ONLY the JSON object, no additional text.`
 
   app.delete("/api/payments/:id", requireAuth, async (req, res) => {
     try {
+      const payment = await storage.getPayment(req.params.id);
+      if (!payment) return res.status(404).json({ message: "Payment not found" });
+      const owned = await getOwnedReceipt(payment.receiptId, req.session.userId!, res);
+      if (!owned) return;
       await storage.deletePayment(req.params.id);
       res.status(204).send();
     } catch (error: any) {
@@ -582,6 +664,8 @@ Return ONLY the JSON object, no additional text.`
 
   app.get("/api/receipts/:receiptId/settlement", requireAuth, async (req, res) => {
     try {
+      const owned = await getOwnedReceipt(req.params.receiptId, req.session.userId!, res);
+      if (!owned) return;
       const settlement = await storage.calculateSettlement(req.params.receiptId);
       res.json(settlement);
     } catch (error: any) {

@@ -40,6 +40,7 @@ export interface IStorage {
 
   // Receipt Item operations
   createReceiptItem(item: InsertReceiptItem): Promise<ReceiptItem>;
+  getReceiptItem(id: string): Promise<ReceiptItem | undefined>;
   getReceiptItems(receiptId: string): Promise<ReceiptItem[]>;
   updateReceiptItem(id: string, item: Partial<InsertReceiptItem>): Promise<ReceiptItem>;
   deleteReceiptItem(id: string): Promise<void>;
@@ -60,6 +61,7 @@ export interface IStorage {
 
   // Payment operations
   createPayment(payment: InsertPayment): Promise<Payment>;
+  getPayment(id: string): Promise<Payment | undefined>;
   getPayments(receiptId: string): Promise<Payment[]>;
   deletePayment(id: string): Promise<void>;
   calculateSettlement(receiptId: string): Promise<Array<{ from: Person; to: Person; amount: string }>>;
@@ -151,6 +153,11 @@ export class DatabaseStorage implements IStorage {
   // Receipt Item operations
   async createReceiptItem(item: InsertReceiptItem): Promise<ReceiptItem> {
     const [result] = await db.insert(receiptItems).values(item as any).returning();
+    return result;
+  }
+
+  async getReceiptItem(id: string): Promise<ReceiptItem | undefined> {
+    const [result] = await db.select().from(receiptItems).where(eq(receiptItems.id, id));
     return result;
   }
 
@@ -289,6 +296,11 @@ export class DatabaseStorage implements IStorage {
   // Payment operations
   async createPayment(payment: InsertPayment): Promise<Payment> {
     const [result] = await db.insert(payments).values(payment).returning();
+    return result;
+  }
+
+  async getPayment(id: string): Promise<Payment | undefined> {
+    const [result] = await db.select().from(payments).where(eq(payments.id, id));
     return result;
   }
 
