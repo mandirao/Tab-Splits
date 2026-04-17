@@ -75,7 +75,6 @@ export default function LoginPage() {
   const switchMode = (next: Mode) => {
     setMode(next);
     setPassword("");
-    setResetUrl(null);
     if (next !== "forgot") setEmail("");
   };
 
