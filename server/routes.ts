@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { randomBytes } from "crypto";
 import { storage } from "./storage";
 import { getUncachableResendClient } from "./resend";
+import { ipRateLimit, userRateLimit } from "./rateLimit";
 import { 
   insertReceiptSchema, 
   insertReceiptItemSchema, 
@@ -87,7 +88,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.post("/api/auth/register", async (req, res) => {
+  app.post("/api/auth/register", ipRateLimit(5, 60 * 60 * 1000, "Too many accounts created from this device. Try again in an hour."), async (req, res) => {
     try {
       const { email, password, name } = registerSchema.parse(req.body);
       const existing = await storage.getUserByEmail(email);
@@ -108,7 +109,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/login", async (req, res) => {
+  app.post("/api/auth/login", ipRateLimit(10, 15 * 60 * 1000, "Too many sign-in attempts. Please wait 15 minutes and try again."), async (req, res) => {
     try {
       const { email, password } = loginSchema.parse(req.body);
       const user = await storage.getUserByEmail(email);
@@ -138,7 +139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.post("/api/auth/forgot-password", async (req, res) => {
+  app.post("/api/auth/forgot-password", ipRateLimit(5, 15 * 60 * 1000, "Too many reset attempts. Please wait 15 minutes and try again."), async (req, res) => {
     try {
       const { email } = req.body;
       if (!email || typeof email !== "string") {
@@ -197,7 +198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/reset-password", async (req, res) => {
+  app.post("/api/auth/reset-password", ipRateLimit(10, 15 * 60 * 1000), async (req, res) => {
     try {
       const { token, password } = req.body;
       if (!token || !password || typeof token !== "string" || typeof password !== "string") {
@@ -324,7 +325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ─── All routes below require auth ───────────────────────────────────────
 
-  app.post("/api/scan-receipt", requireAuth, async (req, res) => {
+  app.post("/api/scan-receipt", requireAuth, userRateLimit(30, 60 * 60 * 1000, "Scan limit reached. You can scan up to 30 receipts per hour."), async (req, res) => {
     try {
       const { image } = req.body;
       if (!image) return res.status(400).json({ message: "No image provided" });
