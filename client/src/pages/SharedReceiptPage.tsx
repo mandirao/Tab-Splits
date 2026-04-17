@@ -241,13 +241,14 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
           {receipt.imageUrl ? (
             <Dialog>
               <DialogTrigger asChild>
-                <Button size="icon" variant="ghost" data-testid="button-view-receipt-image">
-                  <Image className="h-5 w-5" />
+                <Button size="sm" variant="outline" className="gap-1.5 shrink-0" data-testid="button-view-receipt-image">
+                  <Image className="h-3.5 w-3.5" />
+                  <span>View photo</span>
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-auto" aria-describedby={undefined}>
                 <DialogHeader>
-                  <DialogTitle>Original Receipt</DialogTitle>
+                  <DialogTitle>Receipt Photo</DialogTitle>
                 </DialogHeader>
                 <div className="flex items-center justify-center">
                   <img
