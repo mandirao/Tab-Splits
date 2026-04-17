@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { randomBytes } from "crypto";
 import { storage } from "./storage";
+import { getUncachableResendClient } from "./resend";
 import { 
   insertReceiptSchema, 
   insertReceiptItemSchema, 
@@ -143,21 +144,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!email || typeof email !== "string") {
         return res.status(400).json({ message: "Email is required" });
       }
-      // Use a constant message in both branches so the response body
-      // does not reveal whether an email address is registered.
-      const NEUTRAL_MESSAGE = "If an account exists for that email, a reset link has been generated.";
+      // Always return the same response body so the API never reveals
+      // whether an email address is registered (prevents enumeration).
+      const NEUTRAL_MESSAGE = "If an account exists for that email, a reset link has been sent.";
       const user = await storage.getUserByEmail(email.trim().toLowerCase());
       if (!user) {
-        return res.json({ message: NEUTRAL_MESSAGE, resetUrl: null });
+        return res.json({ message: NEUTRAL_MESSAGE });
       }
       const token = randomBytes(32).toString("hex");
       const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
       await storage.setUserResetToken(user.id, token, expiry);
-      const resetUrl = `/reset-password?token=${token}`;
-      // NOTE: resetUrl is returned here because this app has no email delivery.
-      // Once email is integrated, remove resetUrl from the response and send
-      // the link via email only — that fully closes the enumeration window.
-      res.json({ message: NEUTRAL_MESSAGE, resetUrl });
+
+      // Determine the base URL from the request so the link works in both
+      // dev and production without hardcoding a domain.
+      const protocol = req.headers["x-forwarded-proto"] ?? req.protocol ?? "https";
+      const host = req.headers["x-forwarded-host"] ?? req.headers.host;
+      const baseUrl = `${protocol}://${host}`;
+      const resetUrl = `${baseUrl}/reset-password?token=${token}`;
+
+      try {
+        const { client, fromEmail } = await getUncachableResendClient();
+        await client.emails.send({
+          from: `Tab Splits <${fromEmail}>`,
+          to: user.email,
+          subject: "Reset your Tab Splits password",
+          html: `
+            <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
+              <h2 style="margin:0 0 8px;font-size:20px">Reset your password</h2>
+              <p style="color:#555;margin:0 0 24px">
+                We received a request to reset the password for your Tab Splits account.<br>
+                This link expires in 1 hour.
+              </p>
+              <a href="${resetUrl}"
+                 style="display:inline-block;padding:12px 24px;background:#f59e0b;color:#fff;
+                        text-decoration:none;border-radius:8px;font-weight:600">
+                Reset Password
+              </a>
+              <p style="color:#aaa;font-size:12px;margin-top:32px">
+                If you didn't request this, you can safely ignore this email.
+              </p>
+            </div>
+          `,
+        });
+      } catch (emailErr) {
+        console.error("Failed to send password reset email:", emailErr);
+        // Still return success — don't leak internal errors to the client
+      }
+
+      res.json({ message: NEUTRAL_MESSAGE });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

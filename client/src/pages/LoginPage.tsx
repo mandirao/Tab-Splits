@@ -19,7 +19,6 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [resetUrl, setResetUrl] = useState<string | null>(null);
 
   const loginMutation = useMutation({
     mutationFn: async (data: { email: string; password: string }) => {
@@ -50,9 +49,6 @@ export default function LoginPage() {
   const forgotMutation = useMutation({
     mutationFn: async (data: { email: string }) => {
       return await apiRequest("/api/auth/forgot-password", "POST", data);
-    },
-    onSuccess: (data: { resetUrl: string | null }) => {
-      setResetUrl(data.resetUrl);
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -101,24 +97,9 @@ export default function LoginPage() {
         {/* Forgot password success state */}
         {mode === "forgot" && forgotMutation.isSuccess ? (
           <div className="space-y-4">
-            {resetUrl ? (
-              <div className="space-y-3">
-                <p className="text-sm text-center text-muted-foreground">
-                  Your reset link is ready. Tap it to set a new password.
-                </p>
-                <a
-                  href={resetUrl}
-                  className="block w-full text-center text-sm font-medium text-primary underline underline-offset-4 break-all"
-                  data-testid="link-reset-url"
-                >
-                  Open reset link
-                </a>
-              </div>
-            ) : (
-              <p className="text-sm text-center text-muted-foreground">
-                If an account exists for that email, a reset link has been generated. Check with your admin or try signing in.
-              </p>
-            )}
+            <p className="text-sm text-center text-muted-foreground">
+              If an account exists for that email, a password reset link has been sent. Check your inbox and follow the link within 1 hour.
+            </p>
             <Button
               type="button"
               variant="outline"
