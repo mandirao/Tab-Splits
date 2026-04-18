@@ -1360,9 +1360,11 @@ function AssignCategorySection({ label, items, assigned, peopleWithColors, getPe
         {items.map(item => {
           const assignedPeople = (item.assignedTo as string[]) || [];
           const isAssigned = assignedPeople.length > 0;
+          const qty = item.quantity ?? 1;
+          const drawerLabel = qty > 1 ? `${qty}× ${item.name}` : item.name;
           return (
             <button key={item.id} type="button"
-              onClick={() => onAssignItem(item.id, item.name)}
+              onClick={() => onAssignItem(item.id, drawerLabel)}
               className="w-full flex items-center gap-3 px-4 py-2.5 hover-elevate active-elevate-2 text-left"
               data-testid={`button-assign-item-${item.id}`}>
               {/* Per-item indicator */}
@@ -1372,7 +1374,10 @@ function AssignCategorySection({ label, items, assigned, peopleWithColors, getPe
                 {isAssigned && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm truncate">{item.name}</p>
+                <p className="text-sm truncate">
+                  {qty > 1 && <span className="text-muted-foreground font-medium mr-1">{qty}×</span>}
+                  {item.name}
+                </p>
                 <p className="text-xs text-muted-foreground">${parseFloat(item.price).toFixed(2)}</p>
               </div>
               <div className="flex -space-x-1 flex-shrink-0">
