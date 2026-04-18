@@ -1791,11 +1791,46 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                 const catItems = filteredItems.filter(i => i.category === cat);
                 if (catItems.length === 0) return null;
                 const catLabel = { meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" }[cat];
+                const selectedCount = bulkAssignMode ? catItems.filter(i => bulkSelectedItems.has(i.id)).length : 0;
+                const allCatSelected = bulkAssignMode && selectedCount === catItems.length;
+                const someCatSelected = bulkAssignMode && selectedCount > 0 && !allCatSelected;
                 return (
                   <div key={cat}>
-                    <div className="px-6 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest bg-muted/50 border-y first:border-t-0">
-                      {catLabel}
-                    </div>
+                    {bulkAssignMode ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBulkSelectedItems(prev => {
+                            const next = new Set(prev);
+                            if (allCatSelected) {
+                              catItems.forEach(i => next.delete(i.id));
+                            } else {
+                              catItems.forEach(i => next.add(i.id));
+                            }
+                            return next;
+                          });
+                        }}
+                        className="w-full flex items-center gap-2 px-6 py-2 bg-muted/50 border-y first:border-t-0 hover-elevate active-elevate-2"
+                        data-testid={`button-select-category-${cat}`}
+                      >
+                        {allCatSelected
+                          ? <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                          : someCatSelected
+                            ? <MinusCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                            : <Circle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        }
+                        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest flex-1 text-left">
+                          {catLabel}
+                        </span>
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                          {selectedCount > 0 ? `${selectedCount}/${catItems.length}` : catItems.length}
+                        </span>
+                      </button>
+                    ) : (
+                      <div className="px-6 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest bg-muted/50 border-y first:border-t-0">
+                        {catLabel}
+                      </div>
+                    )}
                     <div className="divide-y px-6">
                       {catItems.map(renderItemRow)}
                     </div>
