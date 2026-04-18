@@ -552,7 +552,10 @@ export default function HomePage() {
         open={wizardOpen}
         onClose={(receiptId) => {
           setWizardOpen(false);
-          if (receiptId) setLocation(`/receipt/${receiptId}`);
+          if (receiptId) {
+            sessionStorage.setItem("wizard_done_receipt", receiptId);
+            setLocation(`/receipt/${receiptId}`);
+          }
         }}
       />
 

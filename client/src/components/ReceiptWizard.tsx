@@ -11,10 +11,9 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
   Camera, Upload, Loader2, RotateCw, RotateCcw, Check, ArrowLeft, ArrowRight,
-  Sparkles, Users, QrCode, Plus, X, CheckCircle2, Circle, AlertTriangle,
+  Sparkles, Users, Plus, X, CheckCircle2, Circle, AlertTriangle,
   Pencil, Trash2, Phone, MinusCircle, UserPlus,
 } from "lucide-react";
-import QRCodeLib from "qrcode";
 import type { Receipt, ReceiptItem, Person } from "@shared/schema";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -26,7 +25,7 @@ const PERSON_COLORS = [
   "hsl(60, 97%, 37%)",
 ];
 
-const STEP_LABELS = ["Scan", "Items", "Diners", "Assign", "Tip", "Paid by", "Share"];
+const STEP_LABELS = ["Scan", "Items", "Diners", "Assign", "Tip", "Paid by"];
 const STEP_SUBTITLES = [
   "Take or upload a photo of your receipt",
   "Verify items and review categories",
@@ -34,7 +33,6 @@ const STEP_SUBTITLES = [
   "Match items to people",
   "Confirm the tip amount",
   "Who covered the bill?",
-  "Send everyone their total",
 ];
 
 const CAT_LABELS: Record<string, string> = {
@@ -89,10 +87,6 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
   // Step 6 payer
   const [payerId, setPayerId] = useState<string | null>(null);
   const [venmoInput, setVenmoInput] = useState("");
-
-  // Step 7 share
-  const [shareToken, setShareToken] = useState<string | null>(null);
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
   // Reset wizard on open
   useEffect(() => {
@@ -162,19 +156,6 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
     }
   }, [receipt?.id]);
 
-  // Generate share token when reaching Step 6 (Share)
-  useEffect(() => {
-    if (step === 6 && receiptId && !shareToken) {
-      apiRequest(`/api/receipts/${receiptId}/generate-share-token`, "POST", {})
-        .then(async (data: { shareToken: string }) => {
-          setShareToken(data.shareToken);
-          const url = `${window.location.origin}/share/${data.shareToken}`;
-          const qr = await QRCodeLib.toDataURL(url, { width: 240, margin: 2 });
-          setQrDataUrl(qr);
-        })
-        .catch(() => {});
-    }
-  }, [step, receiptId]);
 
   // ─── Step 0: Scan helpers ─────────────────────────────────────────────────
   const getRotatedBase64 = (): Promise<string> =>
@@ -474,8 +455,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
   // ─── Navigation ───────────────────────────────────────────────────────────
   const handleNext = async () => {
     if (step === 4) await saveTip();
-    if (step === 5) await savePayer();
-    if (step === 6) { onClose(receiptId ?? undefined); return; }
+    if (step === 5) { await savePayer(); onClose(receiptId ?? undefined); return; }
     setStep(s => s + 1);
   };
 
@@ -511,32 +491,6 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
   const effectiveItemCost = (item: ReceiptItem) =>
     usePriceAsLineTotal ? parseFloat(item.price) : parseFloat(item.price) * item.quantity;
 
-  // Use whichever effective total best matches the receipt as the tax/tip denominator
-  const effectiveSubtotal = sub > 0 ? sub
-    : (usePriceAsLineTotal ? itemsSubtotalByLine : itemsSubtotalByUnit);
-
-  // Per-person totals (used on Share step)
-  const perPersonTotals: { person: typeof peopleWithColors[0]; subtotal: number; tax: number; tip: number; total: number }[] =
-    peopleWithColors.map(person => {
-      let psub = 0;
-      items.forEach(item => {
-        const assigned = (item.assignedTo as string[]) || [];
-        if (assigned.includes(person.id)) {
-          psub += effectiveItemCost(item) / assigned.length;
-        }
-      });
-      const share = effectiveSubtotal > 0 ? psub / effectiveSubtotal : 0;
-      return {
-        person,
-        subtotal: psub,
-        tax: tax * share,
-        tip: tipAmt * share,
-        total: psub + tax * share + tipAmt * share,
-      };
-    });
-
-  const shareUrl = shareToken ? `${window.location.origin}/share/${shareToken}` : "";
-
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col" data-testid="wizard-overlay">
 
@@ -544,7 +498,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
       <div className="flex-shrink-0 px-4 pt-safe-top pt-4 pb-2 border-b bg-card">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <p className="text-xs text-muted-foreground font-medium">Step {step + 1} of 7</p>
+            <p className="text-xs text-muted-foreground font-medium">Step {step + 1} of 6</p>
             <h1 className="text-lg font-bold leading-tight">{STEP_LABELS[step]}</h1>
             <p className="text-xs text-muted-foreground">{STEP_SUBTITLES[step]}</p>
           </div>
@@ -555,7 +509,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           )}
         </div>
         <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-          <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${((step + 1) / 7) * 100}%` }} />
+          <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${((step + 1) / 6) * 100}%` }} />
         </div>
         <div className="flex gap-1 mt-2 overflow-x-auto scrollbar-hide pb-0.5">
           {STEP_LABELS.map((label, i) => (
@@ -918,69 +872,6 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           </div>
         )}
 
-        {/* ────────────────────────────── STEP 6: SHARE ────────────────────────────── */}
-        {step === 6 && (
-          <div className="p-4 space-y-4">
-            {/* QR Code */}
-            <Card>
-              <CardContent className="p-4 flex flex-col items-center gap-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide self-start">Scan to view</p>
-                {qrDataUrl ? (
-                  <img src={qrDataUrl} alt="QR Code" className="rounded-lg border" data-testid="img-qr-code" />
-                ) : (
-                  <div className="w-60 h-60 rounded-lg bg-muted flex items-center justify-center">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
-                )}
-                {shareUrl && (
-                  <button type="button" onClick={() => navigator.clipboard.writeText(shareUrl).then(() => toast({ title: "Link copied!" }))}
-                    className="text-xs text-primary underline-offset-2 underline break-all text-center" data-testid="button-copy-link">
-                    {shareUrl}
-                  </button>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* SMS per diner */}
-            {receiptPeople.length > 0 && shareUrl && (
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Send to each diner</p>
-                  <div className="space-y-2">
-                    {receiptPeople.map((person, i) => {
-                      const color = PERSON_COLORS[i % PERSON_COLORS.length];
-                      const msg = `Hey ${person.name.split(" ")[0]}! Here's your share of the bill at ${receipt?.restaurantName ?? "the restaurant"}: ${shareUrl}`;
-                      const perPersonTotal = perPersonTotals.find(p => p.person.id === person.id);
-                      return (
-                        <div key={person.id} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0" style={{ backgroundColor: color }}>
-                              {getInitials(person.name)}
-                            </div>
-                            <div>
-                              <span className="text-sm font-medium">{person.name}</span>
-                              {perPersonTotal && <span className="ml-2 text-sm text-muted-foreground">${perPersonTotal.total.toFixed(2)}</span>}
-                            </div>
-                          </div>
-                          {(person as any).phone ? (
-                            <a href={`sms:${(person as any).phone}?body=${encodeURIComponent(msg)}`}
-                              className="flex items-center gap-1 text-sm text-primary font-medium" data-testid={`button-sms-${person.id}`}>
-                              <Phone className="h-4 w-4" /> Text
-                            </a>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">No phone</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            <p className="text-xs text-muted-foreground text-center">Diners can see their itemized share and pay with Venmo from the link.</p>
-          </div>
-        )}
       </div>
 
       {/* ── Bottom Navigation ── */}
@@ -995,14 +886,14 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
             {isScanning ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Scanning…</> : <>Scan Receipt <ArrowRight className="h-4 w-4 ml-2" /></>}
           </Button>
         )}
-        {step > 0 && step < 6 && (
+        {step > 0 && step < 5 && (
           <Button className="flex-1 h-12" onClick={handleNext} disabled={nextDisabled || tipSaving} data-testid="button-wizard-next">
             {tipSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Continue <ArrowRight className="h-4 w-4 ml-2" /></>}
           </Button>
         )}
-        {step === 6 && (
-          <Button className="flex-1 h-12" onClick={handleNext} data-testid="button-wizard-done">
-            <Check className="h-4 w-4 mr-2" /> Done — View Receipt
+        {step === 5 && (
+          <Button className="flex-1 h-12" onClick={handleNext} disabled={nextDisabled || tipSaving} data-testid="button-wizard-done">
+            {tipSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="h-4 w-4 mr-2" /> Done — View Receipt</>}
           </Button>
         )}
       </div>

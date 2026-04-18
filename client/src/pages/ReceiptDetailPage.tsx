@@ -833,6 +833,18 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     }
   }, [receipt?.shareToken]);
 
+  // Show success toast when landing here after wizard completion (from any page)
+  useEffect(() => {
+    const flag = sessionStorage.getItem("wizard_done_receipt");
+    if (flag && flag === receiptId) {
+      sessionStorage.removeItem("wizard_done_receipt");
+      toast({
+        title: "Tab is ready!",
+        description: "Do a final review, then tap Share when you're ready to send it.",
+      });
+    }
+  }, [receiptId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const updateReceiptMutation = useMutation({
     mutationFn: async (data: { tip: number }) => {
       return await apiRequest(`/api/receipts/${receiptId}`, "PATCH", {
@@ -2746,7 +2758,15 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       {/* Wizard — launched from "Guide me through this" button */}
       <ReceiptWizard
         open={wizardOpen}
-        onClose={() => setWizardOpen(false)}
+        onClose={(completedReceiptId) => {
+          setWizardOpen(false);
+          if (completedReceiptId) {
+            toast({
+              title: "Tab is ready!",
+              description: "Do a final review, then tap Share when you're ready to send it.",
+            });
+          }
+        }}
         initialReceiptId={receiptId}
       />
     </div>
