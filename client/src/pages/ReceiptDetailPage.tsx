@@ -10,7 +10,7 @@ import ReceiptItemRow from "@/components/ReceiptItemRow";
 import TipCalculator from "@/components/TipCalculator";
 import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
-import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw, ListChecks, Sparkles, UtensilsCrossed, GlassWater, Cake, Tag, Circle, CheckCircle2, MinusCircle, Wand2, Salad } from "lucide-react";
+import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw, ListChecks, Sparkles, UtensilsCrossed, GlassWater, Cake, Tag, Circle, CheckCircle2, MinusCircle, Wand2, Salad, ChevronDown } from "lucide-react";
 import logoUrl from "@assets/icon-1024_1775014486817.png";
 import {
   AlertDialog,
@@ -28,6 +28,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -1521,7 +1527,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               <span className="text-xs font-semibold tracking-wide text-primary">Tab Splits</span>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-1">
             {scannedImageUrl && (
               <Button 
                 size="icon" 
@@ -1547,23 +1553,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               data-testid="button-open-payments"
             >
               <DollarSign className="h-5 w-5" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => setWizardOpen(true)}
-              title="Guide me through this"
-              data-testid="button-open-wizard"
-            >
-              <Wand2 className="h-5 w-5" />
-            </Button>
-            <Button 
-              size="icon" 
-              variant="ghost"
-              onClick={handleShareClick}
-              data-testid="button-share-receipt"
-            >
-              <Share2 className="h-5 w-5" />
             </Button>
           </div>
         </div>
@@ -1608,6 +1597,37 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       {/* Horizontal Tabs */}
       <div className="flex-shrink-0 border-b bg-card overflow-x-auto scrollbar-hide">
         <div className="flex gap-2 p-2 min-w-max">
+          {/* Person tabs — first priority for per-person verification */}
+          {peopleWithColors.map((person) => {
+            const personTotal = personTotals.get(person.id);
+            if (!personTotal) return null;
+            return (
+              <Button
+                key={person.id}
+                variant={selectedTab === person.id ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedTab(person.id)}
+                className="whitespace-nowrap flex items-center gap-1.5"
+                style={{
+                  backgroundColor: selectedTab === person.id ? person.color : undefined,
+                  borderColor: person.color,
+                  color: selectedTab === person.id ? 'white' : undefined
+                }}
+                data-testid={`tab-person-${person.id}`}
+              >
+                <div
+                  className="w-4 h-4 rounded-full text-white text-[10px] font-semibold flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: person.color }}
+                >
+                  {getInitialsForPerson(person.id)}
+                </div>
+                <span>{displayNames.get(person.id) ?? person.name}</span>
+                <span className="font-semibold">${personTotal.total.toFixed(2)}</span>
+              </Button>
+            );
+          })}
+
+          {/* All Items */}
           <Button
             variant={selectedTab === "all" ? "default" : "outline"}
             size="sm"
@@ -1617,31 +1637,8 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           >
             All Items
           </Button>
-          
-          {/* Category tabs — only show after AI categorization */}
-          {hasCategoryData && (
-            <>
-              {(["appetizer", "meal", "dessert", "other", "drink"] as const).map(cat => {
-                const catCount = items.filter(i => i.category === cat).length;
-                if (catCount === 0) return null;
-                const catLabel = { appetizer: "Apps", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" }[cat];
-                return (
-                  <Button
-                    key={cat}
-                    variant={selectedTab === cat ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedTab(cat)}
-                    className="whitespace-nowrap"
-                    data-testid={`tab-category-${cat}`}
-                  >
-                    {catLabel}
-                    <span className="ml-1 opacity-60 text-xs">({catCount})</span>
-                  </Button>
-                );
-              })}
-            </>
-          )}
 
+          {/* Unassigned — only when needed */}
           {hasUnassignedItems && (
             <Button
               variant={selectedTab === "unassigned" ? "default" : "outline"}
@@ -1653,38 +1650,40 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               Unassigned
             </Button>
           )}
-          
-          {peopleWithColors.map((person) => {
-            const personTotal = personTotals.get(person.id);
-            if (!personTotal) return null;
-            
-            return (
-              <Button
-                key={person.id}
-                variant={selectedTab === person.id ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedTab(person.id)}
-                className="whitespace-nowrap flex items-center gap-2"
-                style={{
-                  backgroundColor: selectedTab === person.id ? person.color : undefined,
-                  borderColor: person.color,
-                  color: selectedTab === person.id ? 'white' : undefined
-                }}
-                data-testid={`tab-person-${person.id}`}
-              >
-                <div
-                  className="w-5 h-5 rounded-full text-white text-xs font-semibold flex items-center justify-center"
-                  style={{ backgroundColor: person.color }}
-                >
-                  {getInitialsForPerson(person.id)}
-                </div>
-                <span>{displayNames.get(person.id) ?? person.name}</span>
-                <span className="font-semibold">${personTotal.total.toFixed(2)}</span>
-              </Button>
-            );
-          })}
 
-          {/* Manage People tab button — always at far right */}
+          {/* Category tabs — collapsed into a dropdown at the end */}
+          {hasCategoryData && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant={CATEGORY_TABS.includes(selectedTab as any) ? "default" : "outline"}
+                  size="sm"
+                  className="whitespace-nowrap flex items-center gap-1"
+                  data-testid="tab-categories-menu"
+                >
+                  {CATEGORY_TABS.includes(selectedTab as any)
+                    ? ({ appetizer: "Apps", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" } as Record<string, string>)[selectedTab]
+                    : "Categories"}
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {(["appetizer", "meal", "dessert", "other", "drink"] as const).map(cat => {
+                  const catCount = items.filter(i => i.category === cat).length;
+                  if (catCount === 0) return null;
+                  const catLabel = { appetizer: "Appetizers", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" }[cat];
+                  return (
+                    <DropdownMenuItem key={cat} onClick={() => setSelectedTab(cat)} data-testid={`tab-category-${cat}`}>
+                      {catLabel}
+                      <span className="ml-auto pl-4 text-muted-foreground text-xs">{catCount}</span>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
+          {/* Manage People — always at far right */}
           <Button
             variant="outline"
             size="sm"
@@ -1917,22 +1916,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               </Button>
             </div>
           )}
-          {/* Running total comparison - only show on "all" tab */}
-          {selectedTab === "all" && (
-            <div className={`flex justify-between text-sm p-2 rounded-md ${totalsMatch ? 'bg-green-100 dark:bg-green-900/30' : 'bg-amber-100 dark:bg-amber-900/30'}`}>
-              <span className="text-muted-foreground">Items Total</span>
-              <div className="flex items-center gap-2">
-                <span data-testid="text-items-subtotal">${itemsSubtotal.toFixed(2)}</span>
-                {totalsMatch ? (
-                  <Check className="h-4 w-4 text-green-600" />
-                ) : (
-                  <span className="text-xs text-amber-600 dark:text-amber-400">
-                    ({itemsSubtotal > subtotal ? '+' : ''}${(itemsSubtotal - subtotal).toFixed(2)})
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Subtotal</span>
             <span data-testid="text-receipt-subtotal">${displayTotals.subtotal.toFixed(2)}</span>
@@ -1959,9 +1942,14 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               <span data-testid="text-receipt-tip">${displayTotals.tip.toFixed(2)}</span>
             </div>
           )}
-          <div className="flex justify-between text-xl font-bold pt-2 border-t">
+          <div className="flex justify-between items-center text-xl font-bold pt-2 border-t">
             <span>Total</span>
-            <span data-testid="text-receipt-total">${displayTotals.total.toFixed(2)}</span>
+            <div className="flex items-center gap-1.5">
+              <span data-testid="text-receipt-total">${displayTotals.total.toFixed(2)}</span>
+              {totalsMatch && selectedTab === "all" && (
+                <Check className="h-4 w-4 text-green-600 flex-shrink-0" title="Items total matches receipt subtotal" />
+              )}
+            </div>
           </div>
 
           {/* ── Dynamic CTA bar ── */}
