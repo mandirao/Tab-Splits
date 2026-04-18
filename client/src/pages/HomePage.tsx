@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import ReceiptWizard from "@/components/ReceiptWizard";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -389,6 +390,7 @@ export default function HomePage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [receiptToDelete, setReceiptToDelete] = useState<Receipt | null>(null);
   const [manageDinersOpen, setManageDinersOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const { toast } = useToast();
   const { user, logout } = useAuth();
 
@@ -536,7 +538,7 @@ export default function HomePage() {
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t">
         <Button 
           className="w-full h-12" 
-          onClick={() => setLocation("/scan")}
+          onClick={() => setWizardOpen(true)}
           data-testid="button-camera"
         >
           <Camera className="h-5 w-5 mr-2" />
@@ -545,6 +547,14 @@ export default function HomePage() {
       </div>
 
       <ManageDinersSheet open={manageDinersOpen} onOpenChange={setManageDinersOpen} />
+
+      <ReceiptWizard
+        open={wizardOpen}
+        onClose={(receiptId) => {
+          setWizardOpen(false);
+          if (receiptId) setLocation(`/receipt/${receiptId}`);
+        }}
+      />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
