@@ -482,8 +482,13 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
   // ─── Derived data for steps ───────────────────────────────────────────────
   const sub = parseFloat(receipt?.subtotal ?? "0") || 0;
   const tax = parseFloat(receipt?.tax ?? "0") || 0;
-  const itemsSubtotal = items.reduce((s, i) => s + parseFloat(i.price) * i.quantity, 0);
-  const subtotalDiff = Math.abs(itemsSubtotal - sub);
+  // OCR often stores line totals as the price (not unit prices), so we check both
+  // sum(price × qty) and sum(price) and use whichever is closer to the receipt subtotal.
+  const itemsSubtotalByUnit = items.reduce((s, i) => s + parseFloat(i.price) * i.quantity, 0);
+  const itemsSubtotalByLine = items.reduce((s, i) => s + parseFloat(i.price), 0);
+  const subtotalDiff = sub > 0
+    ? Math.min(Math.abs(itemsSubtotalByUnit - sub), Math.abs(itemsSubtotalByLine - sub))
+    : 0;
   const hasCategoryData = items.some(i => i.category);
   const hasServiceCharge = items.some(i =>
     SERVICE_CHARGE_TERMS.some(term => i.name.toLowerCase().includes(term))
@@ -1178,7 +1183,12 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
   };
 
   const sub = parseFloat(receipt?.subtotal ?? "0") || 0;
-  const itemsTotal = items.reduce((s, i) => s + parseFloat(i.price) * i.quantity, 0);
+  const itemsTotalUnit = items.reduce((s, i) => s + parseFloat(i.price) * i.quantity, 0);
+  const itemsTotalLine = items.reduce((s, i) => s + parseFloat(i.price), 0);
+  // Pick whichever total is closer to the receipt subtotal for display accuracy
+  const itemsTotal = sub > 0 && Math.abs(itemsTotalLine - sub) < Math.abs(itemsTotalUnit - sub)
+    ? itemsTotalLine
+    : itemsTotalUnit;
 
   return (
     <div className="p-4 space-y-4">
@@ -1228,7 +1238,7 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">{item.quantity > 1 ? `${item.quantity}× · ` : ""}${parseFloat(item.price).toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">${parseFloat(item.price).toFixed(2)}</p>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <Button size="icon" variant="ghost" onClick={() => startEdit(item)} className="h-8 w-8" data-testid={`button-edit-item-${item.id}`}><Pencil className="h-3.5 w-3.5" /></Button>
@@ -1360,11 +1370,9 @@ function AssignCategorySection({ label, items, assigned, peopleWithColors, getPe
         {items.map(item => {
           const assignedPeople = (item.assignedTo as string[]) || [];
           const isAssigned = assignedPeople.length > 0;
-          const qty = item.quantity ?? 1;
-          const drawerLabel = qty > 1 ? `${qty}× ${item.name}` : item.name;
           return (
             <button key={item.id} type="button"
-              onClick={() => onAssignItem(item.id, drawerLabel)}
+              onClick={() => onAssignItem(item.id, item.name)}
               className="w-full flex items-center gap-3 px-4 py-2.5 hover-elevate active-elevate-2 text-left"
               data-testid={`button-assign-item-${item.id}`}>
               {/* Per-item indicator */}
@@ -1374,10 +1382,7 @@ function AssignCategorySection({ label, items, assigned, peopleWithColors, getPe
                 {isAssigned && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm truncate">
-                  {qty > 1 && <span className="text-muted-foreground font-medium mr-1">{qty}×</span>}
-                  {item.name}
-                </p>
+                <p className="text-sm truncate">{item.name}</p>
                 <p className="text-xs text-muted-foreground">${parseFloat(item.price).toFixed(2)}</p>
               </div>
               <div className="flex -space-x-1 flex-shrink-0">
