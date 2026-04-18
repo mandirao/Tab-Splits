@@ -10,7 +10,7 @@ import ReceiptItemRow from "@/components/ReceiptItemRow";
 import TipCalculator from "@/components/TipCalculator";
 import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
-import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw } from "lucide-react";
+import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw, ListChecks } from "lucide-react";
 import logoUrl from "@assets/icon-1024_1775014486817.png";
 import {
   AlertDialog,
@@ -588,6 +588,11 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [newItemData, setNewItemData] = useState({ name: "", quantity: 1, price: "" });
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
+  const [bulkAssignMode, setBulkAssignMode] = useState(false);
+  const [bulkSelectedItems, setBulkSelectedItems] = useState<Set<string>>(new Set());
+  const [bulkAssignSheetOpen, setBulkAssignSheetOpen] = useState(false);
+  const [bulkSelectedPeople, setBulkSelectedPeople] = useState<string[]>([]);
+  const [bulkAssignedQuantities, setBulkAssignedQuantities] = useState<Record<string, number>>({});
 
   useEffect(() => {
     // Check if a scanned image exists for this receipt
@@ -989,6 +994,60 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       });
     }
   });
+
+  const bulkAssignMutation = useMutation({
+    mutationFn: async ({ itemIds, assignedTo, assignedQuantities }: { itemIds: string[]; assignedTo: string[]; assignedQuantities: Record<string, number> }) => {
+      await Promise.all(itemIds.map(id => apiRequest(`/api/items/${id}`, "PATCH", { assignedTo, assignedQuantities })));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
+      const n = bulkSelectedItems.size;
+      toast({ title: `Assigned ${n} item${n !== 1 ? "s" : ""}` });
+      exitBulkMode();
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to assign items", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const enterBulkMode = (initialItemId?: string) => {
+    setBulkAssignMode(true);
+    setBulkSelectedItems(initialItemId ? new Set([initialItemId]) : new Set());
+    setBulkSelectedPeople([]);
+    setBulkAssignedQuantities({});
+  };
+
+  const exitBulkMode = () => {
+    setBulkAssignMode(false);
+    setBulkSelectedItems(new Set());
+    setBulkAssignSheetOpen(false);
+    setBulkSelectedPeople([]);
+    setBulkAssignedQuantities({});
+  };
+
+  const toggleBulkItem = (itemId: string) => {
+    setBulkSelectedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  };
+
+  const handleBulkAssignClick = () => {
+    setBulkSelectedPeople([]);
+    setBulkAssignedQuantities({});
+    setBulkAssignSheetOpen(true);
+  };
+
+  const handleSaveBulkAssignment = () => {
+    bulkAssignMutation.mutate({
+      itemIds: Array.from(bulkSelectedItems),
+      assignedTo: bulkSelectedPeople,
+      assignedQuantities: bulkAssignedQuantities,
+    });
+    setBulkAssignSheetOpen(false);
+  };
 
   const handleTipChange = (amount: number) => {
     updateReceiptMutation.mutate({ tip: amount });
@@ -1503,34 +1562,68 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
-                <h2 className="font-semibold text-base truncate">
-                  {selectedTab === "all" 
-                    ? "All Items" 
-                    : selectedTab === "unassigned"
-                    ? "Unassigned Items"
-                    : `${getPersonById(selectedTab)?.name}'s Items`}
-                </h2>
-                <span className="text-xs text-muted-foreground flex-shrink-0">
-                  {filteredItems.length}
-                  {selectedTab === "all" && hasUnassignedItems && (
-                    <span className="ml-1.5 text-amber-600 dark:text-amber-400 font-medium">
-                      · {items.filter(i => (i.assignedTo as string[] || []).length === 0).length} unassigned
+                {bulkAssignMode ? (
+                  <h2 className="font-semibold text-base">
+                    {bulkSelectedItems.size === 0
+                      ? "Tap to select items"
+                      : `${bulkSelectedItems.size} selected`}
+                  </h2>
+                ) : (
+                  <>
+                    <h2 className="font-semibold text-base truncate">
+                      {selectedTab === "all"
+                        ? "All Items"
+                        : selectedTab === "unassigned"
+                        ? "Unassigned Items"
+                        : `${getPersonById(selectedTab)?.name}'s Items`}
+                    </h2>
+                    <span className="text-xs text-muted-foreground flex-shrink-0">
+                      {filteredItems.length}
+                      {selectedTab === "all" && hasUnassignedItems && (
+                        <span className="ml-1.5 text-amber-600 dark:text-amber-400 font-medium">
+                          · {items.filter(i => (i.assignedTo as string[] || []).length === 0).length} unassigned
+                        </span>
+                      )}
                     </span>
-                  )}
-                </span>
+                  </>
+                )}
               </div>
-              {selectedTab === "all" && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setAddItemBottomSheetOpen(true)}
-                  className="flex-shrink-0 flex items-center gap-1"
-                  data-testid="button-add-item"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add Item
-                </Button>
-              )}
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {bulkAssignMode ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={exitBulkMode}
+                    data-testid="button-exit-bulk-mode"
+                  >
+                    Cancel
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => enterBulkMode()}
+                      title="Select multiple items to assign"
+                      data-testid="button-enter-bulk-mode"
+                    >
+                      <ListChecks className="h-4 w-4" />
+                    </Button>
+                    {selectedTab === "all" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setAddItemBottomSheetOpen(true)}
+                        className="flex items-center gap-1"
+                        data-testid="button-add-item"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Add Item
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent className="divide-y">
@@ -1564,6 +1657,10 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                   onAssign={() => handleAssignClick(item.id)}
                   onEdit={() => handleEditClick(item.id)}
                   displayQuantity={displayQuantity}
+                  bulkMode={bulkAssignMode}
+                  selected={bulkSelectedItems.has(item.id)}
+                  onLongPress={() => enterBulkMode(item.id)}
+                  onBulkSelect={() => toggleBulkItem(item.id)}
                 />
               );
             })}
@@ -1574,6 +1671,29 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
 
       <div className="fixed bottom-0 left-0 right-0 bg-card border-t p-4">
         <div className="space-y-3">
+          {/* Bulk assign action bar */}
+          {bulkAssignMode && (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={exitBulkMode}
+                data-testid="button-cancel-bulk"
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleBulkAssignClick}
+                disabled={bulkSelectedItems.size === 0 || bulkAssignMutation.isPending}
+                data-testid="button-assign-bulk"
+              >
+                {bulkAssignMutation.isPending
+                  ? "Assigning…"
+                  : `Assign ${bulkSelectedItems.size} item${bulkSelectedItems.size !== 1 ? "s" : ""}`}
+              </Button>
+            </div>
+          )}
           {/* Running total comparison - only show on "all" tab */}
           {selectedTab === "all" && (
             <div className={`flex justify-between text-sm p-2 rounded-md ${totalsMatch ? 'bg-green-100 dark:bg-green-900/30' : 'bg-amber-100 dark:bg-amber-900/30'}`}>
@@ -1649,6 +1769,36 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           assignedQuantities={assignedQuantities}
           setAssignedQuantities={setAssignedQuantities}
           setSelectedPeople={setSelectedPeople}
+          receiptId={receiptId}
+          receiptPeopleIds={peopleWithColors.map(p => p.id)}
+          allPeople={allPeople}
+        />
+      </BottomSheet>
+
+      {/* Bulk assign bottom sheet */}
+      <BottomSheet
+        open={bulkAssignSheetOpen}
+        onClose={() => setBulkAssignSheetOpen(false)}
+        title={`Assign ${bulkSelectedItems.size} item${bulkSelectedItems.size !== 1 ? "s" : ""} to…`}
+        footer={
+          <Button
+            className="w-full"
+            onClick={handleSaveBulkAssignment}
+            disabled={bulkAssignMutation.isPending}
+            data-testid="button-save-bulk-assignment"
+          >
+            {bulkAssignMutation.isPending ? "Assigning…" : "Assign All"}
+          </Button>
+        }
+      >
+        <AssignmentSheetBody
+          selectedItemId={null}
+          items={items}
+          peopleWithColors={peopleWithColors}
+          selectedPeople={bulkSelectedPeople}
+          assignedQuantities={bulkAssignedQuantities}
+          setAssignedQuantities={setBulkAssignedQuantities}
+          setSelectedPeople={setBulkSelectedPeople}
           receiptId={receiptId}
           receiptPeopleIds={peopleWithColors.map(p => p.id)}
           allPeople={allPeople}
