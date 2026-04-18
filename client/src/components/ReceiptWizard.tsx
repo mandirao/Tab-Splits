@@ -614,42 +614,15 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
 
         {/* ────────────────────────────── STEP 1: ITEMS + CATEGORIES ────────────────────────────── */}
         {step === 1 && (
-          <>
-            <ReviewItemsStep receiptId={receiptId!} items={items} receipt={receipt} subtotalDiff={subtotalDiff} fromExistingReceipt={!!initialReceiptId} />
-            {/* ── AI-populated category groups ── */}
-            <div className="px-4 pb-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Organized by type</span>
-                {isCategorizing && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-auto" />}
-              </div>
-              {isCategorizing && (
-                <p className="text-sm text-muted-foreground">AI is categorizing your items…</p>
-              )}
-              {hasCategoryData && (
-                <>
-                  <p className="text-xs text-muted-foreground">Tap any item to adjust its category.</p>
-                  <Card>
-                    <CardContent className="p-0 divide-y">
-                      {(["appetizer", "meal", "dessert", "other", "drink", "__none__"] as const).map(cat => {
-                        const catItems = cat === "__none__" ? items.filter(i => !i.category) : items.filter(i => i.category === cat);
-                        if (catItems.length === 0) return null;
-                        const label = cat === "__none__" ? "Uncategorized" : CAT_LABELS[cat];
-                        return (
-                          <div key={cat}>
-                            <div className="px-4 py-1.5 bg-muted/50 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</div>
-                            {catItems.map(item => (
-                              <CategoryItemRow key={item.id} item={item} receiptId={receiptId!} onUpdated={refetchItems} />
-                            ))}
-                          </div>
-                        );
-                      })}
-                    </CardContent>
-                  </Card>
-                </>
-              )}
-            </div>
-          </>
+          <ReviewItemsStep
+            receiptId={receiptId!}
+            items={items}
+            receipt={receipt}
+            subtotalDiff={subtotalDiff}
+            fromExistingReceipt={!!initialReceiptId}
+            onCategoryUpdated={refetchItems}
+            isCategorizing={isCategorizing}
+          />
         )}
 
         {/* ────────────────────────────── STEP 2: DINERS ────────────────────────────── */}
@@ -1142,8 +1115,14 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
-function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExistingReceipt }: {
-  receiptId: string; items: ReceiptItem[]; receipt: Receipt | undefined; subtotalDiff: number; fromExistingReceipt?: boolean;
+function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExistingReceipt, onCategoryUpdated, isCategorizing }: {
+  receiptId: string;
+  items: ReceiptItem[];
+  receipt: Receipt | undefined;
+  subtotalDiff: number;
+  fromExistingReceipt?: boolean;
+  onCategoryUpdated: () => void;
+  isCategorizing: boolean;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -1155,6 +1134,8 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
   const [addName, setAddName] = useState("");
   const [addQty, setAddQty] = useState("1");
   const [addPrice, setAddPrice] = useState("");
+  // Optimistic overrides for category selects so UI doesn't flicker while saving
+  const [catOverrides, setCatOverrides] = useState<Record<string, string>>({});
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
@@ -1183,7 +1164,18 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
     try {
       await apiRequest(`/api/items/${id}`, "DELETE");
       invalidate();
+      setEditingId(null);
     } catch { toast({ title: "Failed to delete item", variant: "destructive" }); }
+  };
+
+  const saveCategory = async (itemId: string, newCat: string) => {
+    setCatOverrides(prev => ({ ...prev, [itemId]: newCat }));
+    try {
+      await apiRequest(`/api/items/${itemId}`, "PATCH", { category: newCat === "__none__" ? null : newCat });
+      onCategoryUpdated();
+    } catch {
+      setCatOverrides(prev => { const n = { ...prev }; delete n[itemId]; return n; });
+    }
   };
 
   const addItem = async () => {
@@ -1200,7 +1192,6 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
   const sub = parseFloat(receipt?.subtotal ?? "0") || 0;
   const itemsTotalUnit = items.reduce((s, i) => s + parseFloat(i.price) * i.quantity, 0);
   const itemsTotalLine = items.reduce((s, i) => s + parseFloat(i.price), 0);
-  // Pick whichever total is closer to the receipt subtotal for display accuracy
   const itemsTotal = sub > 0 && Math.abs(itemsTotalLine - sub) < Math.abs(itemsTotalUnit - sub)
     ? itemsTotalLine
     : itemsTotalUnit;
@@ -1225,11 +1216,15 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
 
       <Card>
         <CardContent className="p-0 divide-y">
-          {items.length === 0 && <p className="p-4 text-muted-foreground text-sm text-center">No items — add them below.</p>}
+          {items.length === 0 && (
+            isCategorizing
+              ? <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />Loading items…</div>
+              : <p className="p-4 text-muted-foreground text-sm text-center">No items — add them below.</p>
+          )}
           {items.map(item => (
-            <div key={item.id} className="px-4 py-3">
+            <div key={item.id}>
               {editingId === item.id ? (
-                <div className="space-y-2">
+                <div className="px-4 py-3 space-y-2">
                   <Input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Item name" className="text-sm" data-testid={`input-edit-name-${item.id}`} />
                   <div className="flex gap-2">
                     <div className="w-20">
@@ -1244,13 +1239,15 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="flex-1" onClick={() => setEditingId(null)}>Cancel</Button>
-                    <Button size="sm" className="flex-1" onClick={saveEdit} data-testid={`button-save-edit-${item.id}`}>Save</Button>
+                  <div className="flex gap-2 pt-1">
+                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteItem(item.id)} data-testid={`button-delete-item-${item.id}`}>Delete</Button>
+                    <div className="flex-1" />
+                    <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
+                    <Button size="sm" onClick={saveEdit} data-testid={`button-save-edit-${item.id}`}>Save</Button>
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 px-4 py-3">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{item.name}</p>
                     <p className="text-xs text-muted-foreground">
@@ -1258,16 +1255,39 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
                       ${parseFloat(item.price).toFixed(2)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <Button size="icon" variant="ghost" onClick={() => startEdit(item)} className="h-8 w-8" data-testid={`button-edit-item-${item.id}`}><Pencil className="h-3.5 w-3.5" /></Button>
-                    <Button size="icon" variant="ghost" onClick={() => deleteItem(item.id)} className="h-8 w-8 text-destructive" data-testid={`button-delete-item-${item.id}`}><Trash2 className="h-3.5 w-3.5" /></Button>
-                  </div>
+                  <Button size="icon" variant="ghost" onClick={() => startEdit(item)} data-testid={`button-edit-item-${item.id}`}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Select
+                    value={catOverrides[item.id] ?? item.category ?? "__none__"}
+                    onValueChange={v => saveCategory(item.id, v)}
+                  >
+                    <SelectTrigger className="w-28 flex-shrink-0 h-9 text-xs" data-testid={`select-category-${item.id}`}>
+                      <SelectValue placeholder="Type?" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Uncategorized</SelectItem>
+                      <SelectItem value="appetizer">Appetizer</SelectItem>
+                      <SelectItem value="meal">Meal</SelectItem>
+                      <SelectItem value="dessert">Dessert</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                      <SelectItem value="drink">Drink</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
             </div>
           ))}
         </CardContent>
       </Card>
+
+      {/* AI categorizing indicator */}
+      {isCategorizing && items.length > 0 && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
+          <Loader2 className="h-3.5 w-3.5 animate-spin flex-shrink-0" />
+          <span>AI is filling in categories…</span>
+        </div>
+      )}
 
       {/* Add item */}
       {showAdd ? (
@@ -1308,42 +1328,6 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
           {sub > 0 && subtotalDiff <= 0.50 && <div className="flex items-center gap-1 text-xs text-green-600"><Check className="h-3 w-3" /> Totals match</div>}
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-function CategoryItemRow({ item, receiptId, onUpdated }: { item: ReceiptItem; receiptId: string; onUpdated: () => void }) {
-  const [cat, setCat] = useState<string>(item.category ?? "__none__");
-
-  const save = async (newCat: string) => {
-    setCat(newCat);
-    try {
-      await apiRequest(`/api/items/${item.id}`, "PATCH", { category: newCat === "__none__" ? null : newCat });
-      onUpdated();
-    } catch { setCat(item.category ?? "__none__"); }
-  };
-
-  return (
-    <div className="px-4 py-3 flex items-center gap-3">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{item.name}</p>
-        <p className="text-xs text-muted-foreground">${parseFloat(item.price).toFixed(2)}</p>
-      </div>
-      <Select value={cat} onValueChange={save}>
-        <SelectTrigger
-          className="w-32 flex-shrink-0 h-8 text-xs"
-          data-testid={`select-category-${item.id}`}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__none__">Uncategorized</SelectItem>
-          <SelectItem value="appetizer">Appetizer</SelectItem>
-          <SelectItem value="meal">Meal</SelectItem>
-          <SelectItem value="drink">Drink</SelectItem>
-          <SelectItem value="dessert">Dessert</SelectItem>
-          <SelectItem value="other">Other</SelectItem>
-        </SelectContent>
-      </Select>
     </div>
   );
 }
