@@ -26,7 +26,7 @@ function firstNameOnly(fullName: string) {
   return fullName.trim().split(/\s+/)[0] ?? fullName;
 }
 
-const CAT_ORDER = ["appetizer", "meal", "drink", "dessert", "other"] as const;
+const CAT_ORDER = ["appetizer", "meal", "dessert", "other", "drink"] as const;
 const CAT_LABELS: Record<string, string> = {
   appetizer: "Appetizers", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other",
 };

@@ -1369,7 +1369,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const subtotalDifference = Math.abs(itemsSubtotal - subtotal);
   const totalsMatch = subtotalDifference < 0.01;
 
-  const CATEGORY_TABS = ["appetizer", "meal", "drink", "dessert", "other"] as const;
+  const CATEGORY_TABS = ["appetizer", "meal", "dessert", "other", "drink"] as const;
   const hasCategoryData = items.some(item => item.category);
   const showCategoryGroups = hasCategoryData && selectedTab !== "unassigned" && !CATEGORY_TABS.includes(selectedTab as any);
 
@@ -1611,7 +1611,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           {/* Category tabs — only show after AI categorization */}
           {hasCategoryData && (
             <>
-              {(["appetizer", "meal", "drink", "dessert", "other"] as const).map(cat => {
+              {(["appetizer", "meal", "dessert", "other", "drink"] as const).map(cat => {
                 const catCount = items.filter(i => i.category === cat).length;
                 if (catCount === 0) return null;
                 const catLabel = { appetizer: "Apps", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" }[cat];
@@ -1775,7 +1775,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           </CardHeader>
           <CardContent className={showCategoryGroups ? "p-0" : "divide-y"}>
             {showCategoryGroups ? (
-              (["appetizer", "meal", "drink", "dessert", "other"] as const).map(cat => {
+              (["appetizer", "meal", "dessert", "other", "drink"] as const).map(cat => {
                 const catItems = filteredItems.filter(i => i.category === cat);
                 if (catItems.length === 0) return null;
                 const catLabel = { appetizer: "Appetizers", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" }[cat];

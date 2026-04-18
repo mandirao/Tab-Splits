@@ -619,7 +619,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
             <Card>
               <CardContent className="p-0 divide-y">
                 {items.length === 0 && <p className="p-4 text-muted-foreground text-sm">No items yet.</p>}
-                {(["appetizer", "meal", "drink", "dessert", "other", "__none__"] as const).map(cat => {
+                {(["appetizer", "meal", "dessert", "other", "drink", "__none__"] as const).map(cat => {
                   const catItems = cat === "__none__" ? items.filter(i => !i.category) : items.filter(i => i.category === cat);
                   if (catItems.length === 0) return null;
                   const label = cat === "__none__" ? "Uncategorized" : CAT_LABELS[cat];
@@ -790,7 +790,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
             {hasCategoryData ? (
               <Card>
                 <CardContent className="p-0">
-                  {(["appetizer", "meal", "drink", "dessert", "other"] as const).map(cat => {
+                  {(["appetizer", "meal", "dessert", "other", "drink"] as const).map(cat => {
                     const catItems = items.filter(i => i.category === cat);
                     if (catItems.length === 0) return null;
                     const catAssigned = catItems.filter(i => (i.assignedTo as string[])?.length > 0).length;
@@ -1238,7 +1238,10 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">${parseFloat(item.price).toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.quantity > 1 && !item.name.startsWith(`${item.quantity} `) && `${item.quantity}× · `}
+                      ${parseFloat(item.price).toFixed(2)}
+                    </p>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <Button size="icon" variant="ghost" onClick={() => startEdit(item)} className="h-8 w-8" data-testid={`button-edit-item-${item.id}`}><Pencil className="h-3.5 w-3.5" /></Button>
@@ -1370,9 +1373,12 @@ function AssignCategorySection({ label, items, assigned, peopleWithColors, getPe
         {items.map(item => {
           const assignedPeople = (item.assignedTo as string[]) || [];
           const isAssigned = assignedPeople.length > 0;
+          const qty = item.quantity ?? 1;
+          const nameHasCount = qty > 1 && item.name.startsWith(`${qty} `);
+          const drawerLabel = qty > 1 && !nameHasCount ? `${qty}× ${item.name}` : item.name;
           return (
             <button key={item.id} type="button"
-              onClick={() => onAssignItem(item.id, item.name)}
+              onClick={() => onAssignItem(item.id, drawerLabel)}
               className="w-full flex items-center gap-3 px-4 py-2.5 hover-elevate active-elevate-2 text-left"
               data-testid={`button-assign-item-${item.id}`}>
               {/* Per-item indicator */}
@@ -1382,7 +1388,12 @@ function AssignCategorySection({ label, items, assigned, peopleWithColors, getPe
                 {isAssigned && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm truncate">{item.name}</p>
+                <p className="text-sm truncate">
+                  {qty > 1 && !nameHasCount && (
+                    <span className="text-muted-foreground font-medium mr-1">{qty}×</span>
+                  )}
+                  {item.name}
+                </p>
                 <p className="text-xs text-muted-foreground">${parseFloat(item.price).toFixed(2)}</p>
               </div>
               <div className="flex -space-x-1 flex-shrink-0">
