@@ -503,27 +503,37 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
   );
   const assignedCount = items.filter(i => (i.assignedTo as string[])?.length > 0).length;
 
-  // Per-person totals for Step 5 preview
-  const perPersonTotals: { person: typeof peopleWithColors[0]; subtotal: number; tax: number; tip: number; total: number }[] = [];
-  if (sub > 0) {
-    peopleWithColors.forEach(person => {
+  // Determine whether OCR stored line totals or unit prices in the price field
+  // (same logic used for the subtotal warning banner)
+  const usePriceAsLineTotal = sub > 0
+    ? Math.abs(itemsSubtotalByLine - sub) < Math.abs(itemsSubtotalByUnit - sub)
+    : false;
+  const effectiveItemCost = (item: ReceiptItem) =>
+    usePriceAsLineTotal ? parseFloat(item.price) : parseFloat(item.price) * item.quantity;
+
+  // Use whichever effective total best matches the receipt as the tax/tip denominator
+  const effectiveSubtotal = sub > 0 ? sub
+    : (usePriceAsLineTotal ? itemsSubtotalByLine : itemsSubtotalByUnit);
+
+  // Per-person totals (used on Share step)
+  const perPersonTotals: { person: typeof peopleWithColors[0]; subtotal: number; tax: number; tip: number; total: number }[] =
+    peopleWithColors.map(person => {
       let psub = 0;
       items.forEach(item => {
         const assigned = (item.assignedTo as string[]) || [];
         if (assigned.includes(person.id)) {
-          psub += parseFloat(item.price) * item.quantity / assigned.length;
+          psub += effectiveItemCost(item) / assigned.length;
         }
       });
-      const share = sub > 0 ? psub / sub : 0;
-      perPersonTotals.push({
+      const share = effectiveSubtotal > 0 ? psub / effectiveSubtotal : 0;
+      return {
         person,
         subtotal: psub,
         tax: tax * share,
         tip: tipAmt * share,
         total: psub + tax * share + tipAmt * share,
-      });
+      };
     });
-  }
 
   const shareUrl = shareToken ? `${window.location.origin}/share/${shareToken}` : "";
 
