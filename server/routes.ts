@@ -2,8 +2,11 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { randomBytes } from "crypto";
 import { storage } from "./storage";
+import { db } from "./db";
 import { getUncachableResendClient } from "./resend";
 import { ipRateLimit, userRateLimit } from "./rateLimit";
+import { sql, gte, isNotNull } from "drizzle-orm";
+import { users as usersTable, receipts as receiptsTable } from "@shared/schema";
 import { 
   insertReceiptSchema, 
   insertReceiptItemSchema, 
@@ -708,6 +711,73 @@ Return ONLY the JSON object, no additional text.`
       if (!owned) return;
       const settlement = await storage.calculateSettlement(req.params.receiptId);
       res.json(settlement);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ─── Admin stats ──────────────────────────────────────────────────────────
+
+  app.get("/api/admin/stats", requireAuth, async (req, res) => {
+    try {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+      const [
+        totalUsersResult,
+        newUsersTodayResult,
+        newUsersWeekResult,
+        totalReceiptsResult,
+        receiptsTodayResult,
+        receiptsWeekResult,
+        receiptsMonthResult,
+        scannedResult,
+        sharedResult,
+        dailyTrend,
+        activeAdmins,
+      ] = await Promise.all([
+        db.select({ count: sql<number>`count(*)::int` }).from(usersTable),
+        db.select({ count: sql<number>`count(*)::int` }).from(usersTable).where(gte(usersTable.createdAt, today)),
+        db.select({ count: sql<number>`count(*)::int` }).from(usersTable).where(gte(usersTable.createdAt, weekAgo)),
+        db.select({ count: sql<number>`count(*)::int` }).from(receiptsTable),
+        db.select({ count: sql<number>`count(*)::int` }).from(receiptsTable).where(gte(receiptsTable.date, today)),
+        db.select({ count: sql<number>`count(*)::int` }).from(receiptsTable).where(gte(receiptsTable.date, weekAgo)),
+        db.select({ count: sql<number>`count(*)::int` }).from(receiptsTable).where(gte(receiptsTable.date, monthAgo)),
+        db.select({ count: sql<number>`count(*)::int` }).from(receiptsTable).where(isNotNull(receiptsTable.imageUrl)),
+        db.select({ count: sql<number>`count(*)::int` }).from(receiptsTable).where(isNotNull(receiptsTable.shareToken)),
+        db.execute(sql`
+          SELECT date_trunc('day', date)::date::text AS day, count(*)::int AS count
+          FROM receipts
+          WHERE date >= ${weekAgo}
+          GROUP BY 1
+          ORDER BY 1
+        `),
+        db.execute(sql`
+          SELECT count(DISTINCT user_id)::int AS count
+          FROM receipts
+          WHERE date >= ${weekAgo}
+        `),
+      ]);
+
+      res.json({
+        users: {
+          total: totalUsersResult[0]?.count ?? 0,
+          newToday: newUsersTodayResult[0]?.count ?? 0,
+          newThisWeek: newUsersWeekResult[0]?.count ?? 0,
+        },
+        receipts: {
+          total: totalReceiptsResult[0]?.count ?? 0,
+          today: receiptsTodayResult[0]?.count ?? 0,
+          thisWeek: receiptsWeekResult[0]?.count ?? 0,
+          thisMonth: receiptsMonthResult[0]?.count ?? 0,
+          withOcr: scannedResult[0]?.count ?? 0,
+          shared: sharedResult[0]?.count ?? 0,
+        },
+        activeAdminsThisWeek: Number((activeAdmins.rows[0] as any)?.count ?? 0),
+        dailyTrend: dailyTrend.rows,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

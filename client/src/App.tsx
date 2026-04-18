@@ -12,8 +12,10 @@ import ScanReceiptPage from "@/pages/ScanReceiptPage";
 import SharedReceiptPage from "@/pages/SharedReceiptPage";
 import LoginPage from "@/pages/LoginPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import AdminPage from "@/pages/AdminPage";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/useAuth";
+import { analytics } from "@/lib/analytics";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType<any> }) {
   const [, navigate] = useLocation();
@@ -40,24 +42,48 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   return <Component />;
 }
 
+function PageViewTracker() {
+  const [location] = useLocation();
+  useEffect(() => {
+    analytics.page(location);
+  }, [location]);
+  return null;
+}
+
+function UserIdentifier() {
+  const { user, isAuthenticated } = useAuth();
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      analytics.identify(user.id, { email: user.email, name: user.name });
+    } else {
+      analytics.reset();
+    }
+  }, [isAuthenticated, user]);
+  return null;
+}
+
 function Router() {
   return (
-    <Switch>
-      {/* Public routes */}
-      <Route path="/login" component={LoginPage} />
-      <Route path="/reset-password" component={ResetPasswordPage} />
-      <Route path="/share/:token" component={SharedReceiptPage} />
+    <>
+      <PageViewTracker />
+      <Switch>
+        {/* Public routes */}
+        <Route path="/login" component={LoginPage} />
+        <Route path="/reset-password" component={ResetPasswordPage} />
+        <Route path="/share/:token" component={SharedReceiptPage} />
 
-      {/* Protected admin routes */}
-      <Route path="/" component={() => <ProtectedRoute component={HomePage} />} />
-      <Route path="/scan" component={() => <ProtectedRoute component={ScanReceiptPage} />} />
-      <Route path="/receipt/:id" component={() => <ProtectedRoute component={ReceiptDetailPage} />} />
-      <Route path="/receipt/:id/summary" component={() => <ProtectedRoute component={OrganizerViewPage} />} />
-      <Route path="/receipt/:id/view" component={() => <ProtectedRoute component={OrganizerViewPage} />} />
-      <Route path="/regulars" component={() => <ProtectedRoute component={RegularsPage} />} />
+        {/* Protected routes */}
+        <Route path="/" component={() => <ProtectedRoute component={HomePage} />} />
+        <Route path="/scan" component={() => <ProtectedRoute component={ScanReceiptPage} />} />
+        <Route path="/receipt/:id" component={() => <ProtectedRoute component={ReceiptDetailPage} />} />
+        <Route path="/receipt/:id/summary" component={() => <ProtectedRoute component={OrganizerViewPage} />} />
+        <Route path="/receipt/:id/view" component={() => <ProtectedRoute component={OrganizerViewPage} />} />
+        <Route path="/regulars" component={() => <ProtectedRoute component={RegularsPage} />} />
+        <Route path="/admin" component={() => <ProtectedRoute component={AdminPage} />} />
 
-      <Route component={NotFound} />
-    </Switch>
+        <Route component={NotFound} />
+      </Switch>
+    </>
   );
 }
 
@@ -65,6 +91,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <UserIdentifier />
         <Toaster />
         <Router />
       </TooltipProvider>
