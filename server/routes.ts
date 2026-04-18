@@ -463,7 +463,7 @@ ${itemList}
 
 Return ONLY a JSON object mapping each ID to its category: {"id1": "meal", "id2": "drink", ...}`,
         }],
-        max_tokens: 600,
+        max_tokens: 2000,
       });
 
       const content = completion.choices[0]?.message?.content || "";
@@ -483,7 +483,7 @@ Return ONLY a JSON object mapping each ID to its category: {"id1": "meal", "id2"
 
       res.json(updatedItems);
     } catch (error: any) {
-      console.error("Categorize error:", error);
+      console.error("Categorize error:", error.message);
       res.status(500).json({ message: error.message || "Failed to categorize items" });
     }
   });
