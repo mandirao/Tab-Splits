@@ -26,11 +26,10 @@ const PERSON_COLORS = [
   "hsl(60, 97%, 37%)",
 ];
 
-const STEP_LABELS = ["Scan", "Items", "Sort", "Diners", "Assign", "Tip", "Paid by", "Share"];
+const STEP_LABELS = ["Scan", "Items", "Diners", "Assign", "Tip", "Paid by", "Share"];
 const STEP_SUBTITLES = [
   "Take or upload a photo of your receipt",
-  "Verify everything looks right",
-  "Organize items by category",
+  "Verify items and review categories",
   "Who's splitting the bill?",
   "Match items to people",
   "Confirm the tip amount",
@@ -163,9 +162,9 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
     }
   }, [receipt?.id]);
 
-  // Generate share token when reaching Step 7
+  // Generate share token when reaching Step 6 (Share)
   useEffect(() => {
-    if (step === 7 && receiptId && !shareToken) {
+    if (step === 6 && receiptId && !shareToken) {
       apiRequest(`/api/receipts/${receiptId}/generate-share-token`, "POST", {})
         .then(async (data: { shareToken: string }) => {
           setShareToken(data.shareToken);
@@ -274,19 +273,28 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
   };
 
   // ─── Step 2: Categorize ───────────────────────────────────────────────────
-  const handleCategorize = async () => {
+  const handleCategorize = async (silent = false) => {
     if (!receiptId) return;
     setIsCategorizing(true);
     try {
       await apiRequest(`/api/receipts/${receiptId}/categorize`, "POST", {});
       await refetchItems();
-      toast({ title: "Items categorized!" });
+      if (!silent) toast({ title: "Items categorized!" });
     } catch (err: any) {
-      toast({ title: "Categorization failed", description: err.message, variant: "destructive" });
+      if (!silent) toast({ title: "Categorization failed", description: err.message, variant: "destructive" });
     } finally {
       setIsCategorizing(false);
     }
   };
+
+  // Auto-categorize silently when the user lands on the Items step (step 1)
+  useEffect(() => {
+    const alreadyCategorized = items.some(i => i.category);
+    if (step === 1 && receiptId && items.length > 0 && !alreadyCategorized && !isCategorizing) {
+      handleCategorize(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, receiptId, items.length]);
 
   // ─── Step 3: Diners ───────────────────────────────────────────────────────
   const [newPersonName, setNewPersonName] = useState("");
@@ -465,15 +473,15 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
 
   // ─── Navigation ───────────────────────────────────────────────────────────
   const handleNext = async () => {
-    if (step === 5) await saveTip();
-    if (step === 6) await savePayer();
-    if (step === 7) { onClose(receiptId ?? undefined); return; }
+    if (step === 4) await saveTip();
+    if (step === 5) await savePayer();
+    if (step === 6) { onClose(receiptId ?? undefined); return; }
     setStep(s => s + 1);
   };
 
   const nextDisabled = (() => {
     if (step === 0) return !previewUrl || isScanning;
-    if (step === 6) return !payerId;
+    if (step === 5) return !payerId;
     return false;
   })();
 
@@ -526,7 +534,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
       <div className="flex-shrink-0 px-4 pt-safe-top pt-4 pb-2 border-b bg-card">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <p className="text-xs text-muted-foreground font-medium">Step {step + 1} of 8</p>
+            <p className="text-xs text-muted-foreground font-medium">Step {step + 1} of 7</p>
             <h1 className="text-lg font-bold leading-tight">{STEP_LABELS[step]}</h1>
             <p className="text-xs text-muted-foreground">{STEP_SUBTITLES[step]}</p>
           </div>
@@ -537,7 +545,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           )}
         </div>
         <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-          <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${((step + 1) / 8) * 100}%` }} />
+          <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${((step + 1) / 7) * 100}%` }} />
         </div>
         <div className="flex gap-1 mt-2 overflow-x-auto scrollbar-hide pb-0.5">
           {STEP_LABELS.map((label, i) => (
@@ -604,41 +612,48 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           </div>
         )}
 
-        {/* ────────────────────────────── STEP 1: REVIEW ────────────────────────────── */}
-        {step === 1 && <ReviewItemsStep receiptId={receiptId!} items={items} receipt={receipt} subtotalDiff={subtotalDiff} fromExistingReceipt={!!initialReceiptId} />}
-
-        {/* ────────────────────────────── STEP 2: CATEGORIZE ────────────────────────────── */}
-        {step === 2 && (
-          <div className="p-4 space-y-4">
-            <Button className="w-full h-12" onClick={handleCategorize} disabled={isCategorizing || items.length === 0} data-testid="button-auto-categorize">
-              {isCategorizing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Categorizing…</> : <><Sparkles className="h-4 w-4 mr-2" />Auto-categorize with AI</>}
-            </Button>
-            {hasCategoryData && (
-              <p className="text-xs text-muted-foreground text-center">AI has grouped your items below. Tap any item to adjust its category.</p>
-            )}
-            <Card>
-              <CardContent className="p-0 divide-y">
-                {items.length === 0 && <p className="p-4 text-muted-foreground text-sm">No items yet.</p>}
-                {(["appetizer", "meal", "dessert", "other", "drink", "__none__"] as const).map(cat => {
-                  const catItems = cat === "__none__" ? items.filter(i => !i.category) : items.filter(i => i.category === cat);
-                  if (catItems.length === 0) return null;
-                  const label = cat === "__none__" ? "Uncategorized" : CAT_LABELS[cat];
-                  return (
-                    <div key={cat}>
-                      <div className="px-4 py-1.5 bg-muted/50 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</div>
-                      {catItems.map(item => (
-                        <CategoryItemRow key={item.id} item={item} receiptId={receiptId!} onUpdated={refetchItems} />
-                      ))}
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          </div>
+        {/* ────────────────────────────── STEP 1: ITEMS + CATEGORIES ────────────────────────────── */}
+        {step === 1 && (
+          <>
+            <ReviewItemsStep receiptId={receiptId!} items={items} receipt={receipt} subtotalDiff={subtotalDiff} fromExistingReceipt={!!initialReceiptId} />
+            {/* ── AI-populated category groups ── */}
+            <div className="px-4 pb-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Organized by type</span>
+                {isCategorizing && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-auto" />}
+              </div>
+              {isCategorizing && (
+                <p className="text-sm text-muted-foreground">AI is categorizing your items…</p>
+              )}
+              {hasCategoryData && (
+                <>
+                  <p className="text-xs text-muted-foreground">Tap any item to adjust its category.</p>
+                  <Card>
+                    <CardContent className="p-0 divide-y">
+                      {(["appetizer", "meal", "dessert", "other", "drink", "__none__"] as const).map(cat => {
+                        const catItems = cat === "__none__" ? items.filter(i => !i.category) : items.filter(i => i.category === cat);
+                        if (catItems.length === 0) return null;
+                        const label = cat === "__none__" ? "Uncategorized" : CAT_LABELS[cat];
+                        return (
+                          <div key={cat}>
+                            <div className="px-4 py-1.5 bg-muted/50 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</div>
+                            {catItems.map(item => (
+                              <CategoryItemRow key={item.id} item={item} receiptId={receiptId!} onUpdated={refetchItems} />
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </div>
+          </>
         )}
 
-        {/* ────────────────────────────── STEP 3: DINERS ────────────────────────────── */}
-        {step === 3 && (
+        {/* ────────────────────────────── STEP 2: DINERS ────────────────────────────── */}
+        {step === 2 && (
           <div className="p-4 space-y-4">
             {/* Current diners on this receipt */}
             {receiptPeople.length > 0 && (
@@ -773,8 +788,8 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           </div>
         )}
 
-        {/* ────────────────────────────── STEP 4: ASSIGN ────────────────────────────── */}
-        {step === 4 && (
+        {/* ────────────────────────────── STEP 3: ASSIGN ────────────────────────────── */}
+        {step === 3 && (
           <div className="p-4 space-y-4">
             {/* Progress summary */}
             <div className={`flex items-center justify-between px-4 py-3 rounded-lg ${assignedCount === items.length ? "bg-green-50 dark:bg-green-900/20" : "bg-amber-50 dark:bg-amber-900/20"}`}>
@@ -842,8 +857,8 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           </div>
         )}
 
-        {/* ────────────────────────────── STEP 5: TIP ────────────────────────────── */}
-        {step === 5 && (
+        {/* ────────────────────────────── STEP 4: TIP ────────────────────────────── */}
+        {step === 4 && (
           <div className="p-4 space-y-4">
             {hasServiceCharge && (
               <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
@@ -900,8 +915,8 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           </div>
         )}
 
-        {/* ────────────────────────────── STEP 6: PAYER ────────────────────────────── */}
-        {step === 6 && (
+        {/* ────────────────────────────── STEP 5: PAYER ────────────────────────────── */}
+        {step === 5 && (
           <div className="p-4 space-y-4">
             <Card>
               <CardContent className="p-4">
@@ -944,8 +959,8 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           </div>
         )}
 
-        {/* ────────────────────────────── STEP 7: SHARE ────────────────────────────── */}
-        {step === 7 && (
+        {/* ────────────────────────────── STEP 6: SHARE ────────────────────────────── */}
+        {step === 6 && (
           <div className="p-4 space-y-4">
             {/* QR Code */}
             <Card>
@@ -1021,12 +1036,12 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
             {isScanning ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Scanning…</> : <>Scan Receipt <ArrowRight className="h-4 w-4 ml-2" /></>}
           </Button>
         )}
-        {step > 0 && step < 7 && (
+        {step > 0 && step < 6 && (
           <Button className="flex-1 h-12" onClick={handleNext} disabled={nextDisabled || tipSaving} data-testid="button-wizard-next">
             {tipSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Continue <ArrowRight className="h-4 w-4 ml-2" /></>}
           </Button>
         )}
-        {step === 7 && (
+        {step === 6 && (
           <Button className="flex-1 h-12" onClick={handleNext} data-testid="button-wizard-done">
             <Check className="h-4 w-4 mr-2" /> Done — View Receipt
           </Button>

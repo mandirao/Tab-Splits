@@ -19,7 +19,7 @@ Tab Splits is a mobile-first bill splitting application that helps groups divide
 - One-tap Venmo payment from shared receipt (opens Venmo app with correct amount)
 - Bulk item assignment: long-press any item (or tap the multi-select icon) to enter bulk mode, check multiple items, then assign them all to the same people at once
 - AI item categorization: tap the Sparkles icon to have GPT-4o automatically sort items into Appetizers, Meals, Drinks, and Desserts; category tabs appear in the tab bar and items are grouped by category in both the admin list view and the shared receipt view for diners
-- Guided 8-step wizard: "Split new tab" launches a full-screen step-by-step flow — Scan → Review Items → Categorize → Add Diners → Assign → Tip → Who Paid → Share — with a progress bar, back/forward navigation, and "Exit to receipt" escape hatch at any step
+- Guided 7-step wizard: "Split new tab" launches a full-screen step-by-step flow — Scan → Review Items+Categories → Add Diners → Assign → Tip → Who Paid → Share — with a progress bar, back/forward navigation, and "Exit to receipt" escape hatch at any step; AI auto-categorizes items silently in the background when the Items step loads
 
 ## User Preferences
 
