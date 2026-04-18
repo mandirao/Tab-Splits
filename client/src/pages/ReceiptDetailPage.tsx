@@ -10,7 +10,7 @@ import ReceiptItemRow from "@/components/ReceiptItemRow";
 import TipCalculator from "@/components/TipCalculator";
 import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
-import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw, ListChecks, Sparkles, UtensilsCrossed, GlassWater, Cake, Tag, Circle, CheckCircle2, MinusCircle } from "lucide-react";
+import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw, ListChecks, Sparkles, UtensilsCrossed, GlassWater, Cake, Tag, Circle, CheckCircle2, MinusCircle, Wand2 } from "lucide-react";
 import logoUrl from "@assets/icon-1024_1775014486817.png";
 import {
   AlertDialog,
@@ -32,6 +32,7 @@ import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Receipt, ReceiptItem, Person, Payment } from "@shared/schema";
+import ReceiptWizard from "@/components/ReceiptWizard";
 
 interface Settlement {
   from: Person;
@@ -626,6 +627,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [bulkSelectedPeople, setBulkSelectedPeople] = useState<string[]>([]);
   const [bulkAssignedQuantities, setBulkAssignedQuantities] = useState<Record<string, number>>({});
   const [bulkCategorizeSheetOpen, setBulkCategorizeSheetOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   useEffect(() => {
     // Check if a scanned image exists for this receipt
@@ -1535,6 +1537,15 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               data-testid="button-open-payments"
             >
               <DollarSign className="h-5 w-5" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setWizardOpen(true)}
+              title="Guide me through this"
+              data-testid="button-open-wizard"
+            >
+              <Wand2 className="h-5 w-5" />
             </Button>
             <Button 
               size="icon" 
@@ -2651,6 +2662,13 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Wizard — launched from "Guide me through this" button */}
+      <ReceiptWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        initialReceiptId={receiptId}
+      />
     </div>
   );
 }

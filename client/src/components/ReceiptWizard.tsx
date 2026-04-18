@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Camera, Upload, Loader2, RotateCw, RotateCcw, Check, ArrowLeft, ArrowRight,
   Sparkles, Users, QrCode, Plus, X, CheckCircle2, Circle, AlertTriangle,
-  Pencil, Trash2, Phone, MinusCircle,
+  Pencil, Trash2, Phone, MinusCircle, UserPlus,
 } from "lucide-react";
 import QRCodeLib from "qrcode";
 import type { Receipt, ReceiptItem, Person } from "@shared/schema";
@@ -52,9 +52,10 @@ function getInitials(name: string) {
 interface ReceiptWizardProps {
   open: boolean;
   onClose: (receiptId?: string) => void;
+  initialReceiptId?: string;
 }
 
-export default function ReceiptWizard({ open, onClose }: ReceiptWizardProps) {
+export default function ReceiptWizard({ open, onClose, initialReceiptId }: ReceiptWizardProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -94,16 +95,22 @@ export default function ReceiptWizard({ open, onClose }: ReceiptWizardProps) {
   // Reset wizard on open
   useEffect(() => {
     if (open) {
-      setStep(0);
-      setReceiptId(null);
-      setPreviewUrl("");
-      setRotation(0);
+      if (initialReceiptId) {
+        // Launched from an existing receipt — skip the scan step
+        setReceiptId(initialReceiptId);
+        setStep(1);
+      } else {
+        setStep(0);
+        setReceiptId(null);
+        setPreviewUrl("");
+        setRotation(0);
+      }
       setShareToken(null);
       setQrDataUrl(null);
       setPayerId(null);
       setVenmoInput("");
     }
-  }, [open]);
+  }, [open, initialReceiptId]);
 
   // ─── Data queries ────────────────────────────────────────────────────────
   const { data: receipt } = useQuery<Receipt>({
@@ -282,6 +289,31 @@ export default function ReceiptWizard({ open, onClose }: ReceiptWizardProps) {
   const [newPersonName, setNewPersonName] = useState("");
   const [newPersonPhone, setNewPersonPhone] = useState("");
   const [isAddingPerson, setIsAddingPerson] = useState(false);
+  const [addMode, setAddMode] = useState<"contacts" | "manual">("manual");
+  const [pendingContact, setPendingContact] = useState<{ name: string; phone: string } | null>(null);
+  const contactsSupported = typeof navigator !== "undefined" && "contacts" in navigator && "ContactsManager" in window;
+
+  const handleOpenContacts = async () => {
+    try {
+      const contacts = await (navigator as any).contacts.select(["name", "tel"], { multiple: false });
+      if (contacts?.length > 0) {
+        const c = contacts[0];
+        setPendingContact({ name: c.name?.[0] ?? "", phone: c.tel?.[0] ?? "" });
+      }
+    } catch (e: any) {
+      if (e?.name !== "AbortError") {
+        toast({ title: "Could not open contacts", description: "Try adding manually instead.", variant: "destructive" });
+      }
+    }
+  };
+
+  const openAddPerson = () => {
+    setAddMode(contactsSupported ? "contacts" : "manual");
+    setPendingContact(null);
+    setNewPersonName("");
+    setNewPersonPhone("");
+    setIsAddingPerson(true);
+  };
 
   const addPersonMutation = useMutation({
     mutationFn: async ({ name, phone }: { name: string; phone?: string }) => {
@@ -293,6 +325,7 @@ export default function ReceiptWizard({ open, onClose }: ReceiptWizardProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "people"] });
       queryClient.invalidateQueries({ queryKey: ["/api/people"] });
       setNewPersonName(""); setNewPersonPhone(""); setIsAddingPerson(false);
+      setPendingContact(null);
     },
     onError: (err: any) => toast({ title: "Failed to add person", description: err.message, variant: "destructive" }),
   });
@@ -601,22 +634,82 @@ export default function ReceiptWizard({ open, onClose }: ReceiptWizardProps) {
             <Card>
               <CardContent className="p-4">
                 {!isAddingPerson ? (
-                  <Button variant="outline" className="w-full" onClick={() => setIsAddingPerson(true)} data-testid="button-add-new-person">
+                  <Button variant="outline" className="w-full" onClick={openAddPerson} data-testid="button-add-new-person">
                     <Plus className="h-4 w-4 mr-2" /> Add new diner
                   </Button>
                 ) : (
                   <div className="space-y-3">
-                    <p className="text-sm font-medium">New diner</p>
-                    <Input placeholder="Name *" value={newPersonName} onChange={e => setNewPersonName(e.target.value)} data-testid="input-new-person-name" />
-                    <Input placeholder="Phone (optional)" type="tel" value={newPersonPhone} onChange={e => setNewPersonPhone(e.target.value)} data-testid="input-new-person-phone" />
-                    <div className="flex gap-2">
-                      <Button variant="outline" className="flex-1" onClick={() => { setIsAddingPerson(false); setNewPersonName(""); setNewPersonPhone(""); }}>Cancel</Button>
-                      <Button className="flex-1" disabled={!newPersonName.trim() || addPersonMutation.isPending}
-                        onClick={() => addPersonMutation.mutate({ name: newPersonName.trim(), phone: newPersonPhone.trim() || undefined })}
-                        data-testid="button-save-new-person">
-                        {addPersonMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add"}
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">New diner</p>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => { setIsAddingPerson(false); setPendingContact(null); }}>
+                        <X className="h-4 w-4" />
                       </Button>
                     </div>
+
+                    {/* From Contacts / Manual tabs */}
+                    <div className="flex gap-1 bg-muted rounded-md p-1">
+                      {([
+                        { id: "contacts" as const, label: "From Contacts", icon: Phone },
+                        { id: "manual" as const, label: "Manual", icon: UserPlus },
+                      ]).map(({ id, label, icon: Icon }) => (
+                        <button key={id} type="button"
+                          onClick={() => { setAddMode(id); setPendingContact(null); setNewPersonName(""); setNewPersonPhone(""); }}
+                          className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-1.5 rounded transition-colors ${addMode === id ? "bg-background shadow-sm text-foreground" : "text-muted-foreground"}`}
+                          data-testid={`button-add-mode-${id}`}>
+                          <Icon className="h-3.5 w-3.5" />{label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Contacts mode */}
+                    {addMode === "contacts" && (
+                      <div className="space-y-3">
+                        {pendingContact ? (
+                          <>
+                            <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                <span className="text-sm font-semibold text-primary">
+                                  {getInitials(pendingContact.name)}
+                                </span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm truncate">{pendingContact.name}</p>
+                                {pendingContact.phone && <p className="text-xs text-muted-foreground">{pendingContact.phone}</p>}
+                              </div>
+                              <Button size="icon" variant="ghost" onClick={() => setPendingContact(null)} className="h-8 w-8" data-testid="button-clear-contact">
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <Button className="w-full" disabled={!pendingContact.name || addPersonMutation.isPending}
+                              onClick={() => addPersonMutation.mutate({ name: pendingContact.name, phone: pendingContact.phone || undefined })}
+                              data-testid="button-confirm-add-contact">
+                              {addPersonMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : `Add ${pendingContact.name.split(" ")[0]}`}
+                            </Button>
+                          </>
+                        ) : contactsSupported ? (
+                          <Button variant="outline" className="w-full" onClick={handleOpenContacts} data-testid="button-open-contacts">
+                            <Phone className="h-4 w-4 mr-2" /> Choose from Contacts
+                          </Button>
+                        ) : (
+                          <p className="text-sm text-muted-foreground text-center py-3">
+                            Contact picking isn't supported in this browser. Switch to Manual.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Manual mode */}
+                    {addMode === "manual" && (
+                      <div className="space-y-2">
+                        <Input placeholder="Name *" value={newPersonName} onChange={e => setNewPersonName(e.target.value)} data-testid="input-new-person-name" />
+                        <Input placeholder="Phone (optional)" type="tel" value={newPersonPhone} onChange={e => setNewPersonPhone(e.target.value)} data-testid="input-new-person-phone" />
+                        <Button className="w-full" disabled={!newPersonName.trim() || addPersonMutation.isPending}
+                          onClick={() => addPersonMutation.mutate({ name: newPersonName.trim(), phone: newPersonPhone.trim() || undefined })}
+                          data-testid="button-save-new-person">
+                          {addPersonMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add diner"}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
