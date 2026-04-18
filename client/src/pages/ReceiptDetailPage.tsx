@@ -37,7 +37,7 @@ import {
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Receipt, ReceiptItem, Person, Payment } from "@shared/schema";
+import type { Receipt, ReceiptItem, Person } from "@shared/schema";
 import ReceiptWizard from "@/components/ReceiptWizard";
 
 interface Settlement {
@@ -636,7 +636,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [personToDelete, setPersonToDelete] = useState<string | null>(null);
   const [paymentsBottomSheetOpen, setPaymentsBottomSheetOpen] = useState(false);
   const [selectedPayerPersonId, setSelectedPayerPersonId] = useState<string>("");
-  const [paymentAmount, setPaymentAmount] = useState<string>("");
   const [payerVenmoInput, setPayerVenmoInput] = useState<string>("");
   const [validationWarning, setValidationWarning] = useState<{
     scannedImage: string;
@@ -793,11 +792,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     queryKey: ["/api/people"],
   });
 
-  // Fetch payments for this receipt
-  const { data: payments = [] } = useQuery<Payment[]>({
-    queryKey: ["/api/receipts", receiptId, "payments"],
-  });
-
   // Fetch settlement calculation
   const { data: settlement = [] } = useQuery<Settlement[]>({
     queryKey: ["/api/receipts", receiptId, "settlement"],
@@ -892,24 +886,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     }
   });
 
-  const updatePersonVenmoMutation = useMutation({
-    mutationFn: async ({ personId, venmoUsername }: { personId: string; venmoUsername: string }) => {
-      return await apiRequest(`/api/people/${personId}`, "PATCH", { venmoUsername });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "people"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/people"] });
-      toast({ title: "Venmo username saved" });
-    },
-    onError: (error: any) => {
-      toast({ 
-        title: "Failed to save Venmo username", 
-        description: error.message,
-        variant: "destructive" 
-      });
-    }
-  });
-
   const updateItemMutation = useMutation({
     mutationFn: async ({ itemId, assignedTo, assignedQuantities }: { itemId: string; assignedTo: string[]; assignedQuantities: Record<string, number> }) => {
       return await apiRequest(`/api/items/${itemId}`, "PATCH", { assignedTo, assignedQuantities });
@@ -997,44 +973,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     }
   });
 
-  const createPaymentMutation = useMutation({
-    mutationFn: async (data: { personId: string; amount: string }) => {
-      return await apiRequest(`/api/receipts/${receiptId}/payments`, "POST", data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "payments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "settlement"] });
-      setShowAddPaymentForm(false);
-      setSelectedPayerPersonId("");
-      setPaymentAmount("");
-      toast({ title: "Payment added" });
-    },
-    onError: (error: any) => {
-      toast({ 
-        title: "Failed to add payment", 
-        description: error.message,
-        variant: "destructive" 
-      });
-    }
-  });
-
-  const deletePaymentMutation = useMutation({
-    mutationFn: async (paymentId: string) => {
-      return await apiRequest(`/api/payments/${paymentId}`, "DELETE");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "payments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "settlement"] });
-      toast({ title: "Payment deleted" });
-    },
-    onError: (error: any) => {
-      toast({ 
-        title: "Failed to delete payment", 
-        description: error.message,
-        variant: "destructive" 
-      });
-    }
-  });
 
   const createItemMutation = useMutation({
     mutationFn: async (data: { name: string; quantity: number; price: string }) => {
@@ -1278,47 +1216,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       setPaymentAmount(total.toFixed(2));
     }
     setPaymentsBottomSheetOpen(true);
-  };
-
-  const handleAddPayment = () => {
-    if (!selectedPayerPersonId || !paymentAmount) {
-      toast({
-        title: "Missing information",
-        description: "Please select a person and enter an amount",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const amount = parseFloat(paymentAmount);
-    if (isNaN(amount) || amount <= 0) {
-      toast({
-        title: "Invalid amount",
-        description: "Please enter a valid positive amount",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Keep paidById in sync with payment payer
-    updatePaidByMutation.mutate({ paidById: selectedPayerPersonId });
-
-    // If Venmo username was provided, update the person's Venmo
-    if (payerVenmoInput.trim()) {
-      updatePersonVenmoMutation.mutate({
-        personId: selectedPayerPersonId,
-        venmoUsername: payerVenmoInput.trim()
-      });
-    }
-
-    createPaymentMutation.mutate({
-      personId: selectedPayerPersonId,
-      amount: amount.toFixed(2)
-    });
-  };
-
-  const handleDeletePayment = (paymentId: string) => {
-    deletePaymentMutation.mutate(paymentId);
   };
 
   const handleAddItem = () => {
@@ -2420,12 +2317,24 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         onClose={() => {
           setPaymentsBottomSheetOpen(false);
           setSelectedPayerPersonId("");
-          setPaymentAmount("");
           setPayerVenmoInput("");
         }}
         title="Who Paid?"
+        footer={
+          <Button
+            className="w-full"
+            onClick={() => {
+              setPaymentsBottomSheetOpen(false);
+              setSelectedPayerPersonId("");
+              setPayerVenmoInput("");
+            }}
+            data-testid="button-save-payer"
+          >
+            Done
+          </Button>
+        }
       >
-        <div className="space-y-3">
+        <div className="space-y-2">
           {peopleWithColors.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">Add people to the bill first</p>
           ) : (
@@ -2442,12 +2351,10 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                       if (isSelected) {
                         setSelectedPayerPersonId("");
                         setPayerVenmoInput("");
-                        setPaymentAmount("");
                         updatePaidByMutation.mutate({ paidById: null });
                       } else {
                         setSelectedPayerPersonId(person.id);
                         setPayerVenmoInput(person.venmoUsername || "");
-                        setPaymentAmount(total.toFixed(2));
                         updatePaidByMutation.mutate({ paidById: person.id });
                       }
                     }}
@@ -2465,9 +2372,9 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                     {isSelected && <Check className="h-4 w-4 text-primary" />}
                   </button>
 
-                  {/* Inline form — only for selected payer */}
+                  {/* Venmo username — only for selected payer */}
                   {isSelected && (
-                    <div className="mt-2 mx-1 space-y-2">
+                    <div className="mt-2 mx-1">
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">@</span>
                         <Input
@@ -2475,75 +2382,23 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                           placeholder="venmo username (optional)"
                           className="pl-7 text-sm"
                           value={payerVenmoInput}
-                          onChange={(e) => setPayerVenmoInput(e.target.value.replace(/^@/, ''))}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/^@/, '');
+                            setPayerVenmoInput(val);
+                            if (val.trim()) {
+                              apiRequest(`/api/people/${person.id}`, "PATCH", { venmoUsername: val.trim() })
+                                .then(() => queryClient.invalidateQueries({ queryKey: ["/api/people"] }))
+                                .catch(() => {});
+                            }
+                          }}
                           data-testid="input-payer-venmo"
                         />
-                      </div>
-                      <div className="flex gap-2">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="0.00"
-                          value={paymentAmount}
-                          onChange={(e) => setPaymentAmount(e.target.value)}
-                          className="text-sm"
-                          data-testid="input-payment-amount"
-                        />
-                        <Button
-                          onClick={handleAddPayment}
-                          disabled={!paymentAmount || createPaymentMutation.isPending}
-                          data-testid="button-add-payment"
-                        >
-                          {createPaymentMutation.isPending ? "…" : "Record"}
-                        </Button>
                       </div>
                     </div>
                   )}
                 </div>
               );
             })
-          )}
-
-          {/* Recorded payments */}
-          {payments.length > 0 && (
-            <>
-              <div className="border-t pt-1" />
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Recorded</p>
-              {payments.map((payment) => {
-                const payer = getPersonById(payment.personId);
-                return (
-                  <div
-                    key={payment.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
-                    data-testid={`payment-${payment.id}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      {payer && (
-                        <div
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0"
-                          style={{ backgroundColor: payer.color }}
-                        >
-                          {getInitialsForPerson(payer.id)}
-                        </div>
-                      )}
-                      <div>
-                        <p className="font-medium text-sm">{payer?.name || "Unknown"}</p>
-                        <p className="text-xs text-muted-foreground">${parseFloat(payment.amount).toFixed(2)}</p>
-                      </div>
-                    </div>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => handleDeletePayment(payment.id)}
-                      data-testid={`button-delete-payment-${payment.id}`}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                );
-              })}
-            </>
           )}
         </div>
       </BottomSheet>
