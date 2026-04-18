@@ -1601,45 +1601,20 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           {hasCategoryData && (
             <>
               {(["meal", "drink", "dessert", "other"] as const).map(cat => {
-                const catItems = items.filter(i => i.category === cat);
-                if (catItems.length === 0) return null;
+                const catCount = items.filter(i => i.category === cat).length;
+                if (catCount === 0) return null;
                 const catLabel = { meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" }[cat];
-                const selectedCount = bulkAssignMode ? catItems.filter(i => bulkSelectedItems.has(i.id)).length : 0;
-                const allCatSelected = bulkAssignMode && selectedCount === catItems.length;
-                const someCatSelected = bulkAssignMode && selectedCount > 0 && !allCatSelected;
                 return (
                   <Button
                     key={cat}
                     variant={selectedTab === cat ? "default" : "outline"}
                     size="sm"
-                    onClick={() => {
-                      setSelectedTab(cat);
-                      if (bulkAssignMode) {
-                        setBulkSelectedItems(prev => {
-                          const next = new Set(prev);
-                          if (allCatSelected) {
-                            catItems.forEach(i => next.delete(i.id));
-                          } else {
-                            catItems.forEach(i => next.add(i.id));
-                          }
-                          return next;
-                        });
-                      }
-                    }}
-                    className="whitespace-nowrap flex items-center gap-1.5"
+                    onClick={() => setSelectedTab(cat)}
+                    className="whitespace-nowrap"
                     data-testid={`tab-category-${cat}`}
                   >
-                    {bulkAssignMode && (
-                      allCatSelected
-                        ? <CheckCircle2 className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                        : someCatSelected
-                          ? <MinusCircle className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                          : <Circle className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                    )}
                     {catLabel}
-                    <span className="opacity-60 text-xs">
-                      {bulkAssignMode && selectedCount > 0 ? `${selectedCount}/${catItems.length}` : `(${catItems.length})`}
-                    </span>
+                    <span className="ml-1 opacity-60 text-xs">({catCount})</span>
                   </Button>
                 );
               })}
@@ -1838,7 +1813,47 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                 );
               })
             ) : (
-              filteredItems.map(renderItemRow)
+              <>
+                {/* Select-all banner — only in bulk mode on a category tab */}
+                {bulkAssignMode && CATEGORY_TABS.includes(selectedTab as any) && (() => {
+                  const catLabel = { meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" }[selectedTab as "meal" | "drink" | "dessert" | "other"];
+                  const selectedCount = filteredItems.filter(i => bulkSelectedItems.has(i.id)).length;
+                  const allSelected = filteredItems.length > 0 && selectedCount === filteredItems.length;
+                  const someSelected = selectedCount > 0 && !allSelected;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBulkSelectedItems(prev => {
+                          const next = new Set(prev);
+                          if (allSelected) {
+                            filteredItems.forEach(i => next.delete(i.id));
+                          } else {
+                            filteredItems.forEach(i => next.add(i.id));
+                          }
+                          return next;
+                        });
+                      }}
+                      className="w-full flex items-center gap-2 px-6 py-2 bg-muted/50 border-b hover-elevate active-elevate-2"
+                      data-testid={`button-select-category-${selectedTab}`}
+                    >
+                      {allSelected
+                        ? <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                        : someSelected
+                          ? <MinusCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          : <Circle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      }
+                      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest flex-1 text-left">
+                        {catLabel}
+                      </span>
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {selectedCount > 0 ? `${selectedCount}/${filteredItems.length}` : filteredItems.length}
+                      </span>
+                    </button>
+                  );
+                })()}
+                {filteredItems.map(renderItemRow)}
+              </>
             )}
           </CardContent>
         </Card>
