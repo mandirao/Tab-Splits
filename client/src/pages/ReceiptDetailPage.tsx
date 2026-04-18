@@ -425,6 +425,23 @@ function AssignmentSheetBody({
     }
   };
 
+  const allPeopleIds = peopleWithColors.map((p: any) => p.id);
+  const everyoneSelected = allPeopleIds.length > 0 && allPeopleIds.every(id => selectedPeople.includes(id));
+
+  const handleSelectEveryone = () => {
+    if (everyoneSelected) {
+      setSelectedPeople([]);
+      setAssignedQuantities({});
+    } else {
+      setSelectedPeople(allPeopleIds);
+      if (splitMode === "share") {
+        const newQtys: Record<string, number> = {};
+        allPeopleIds.forEach(id => { newQtys[id] = assignedQuantities[id] || 1; });
+        setAssignedQuantities(newQtys);
+      }
+    }
+  };
+
   const handleSplitModeChange = (mode: "equal" | "share") => {
     setSplitMode(mode);
     if (mode === "equal") {
@@ -451,6 +468,21 @@ function AssignmentSheetBody({
 
       {/* People chip selector */}
       <div className="flex flex-wrap gap-2 items-center">
+        {allPeopleIds.length > 1 && (
+          <button
+            type="button"
+            onClick={handleSelectEveryone}
+            data-testid="button-select-everyone"
+            className={`flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium border transition-colors ${
+              everyoneSelected
+                ? "bg-foreground text-background border-foreground"
+                : "bg-background text-foreground border-border hover-elevate"
+            }`}
+          >
+            <Users className="h-3.5 w-3.5" />
+            Everyone
+          </button>
+        )}
         {peopleWithColors.map((person: any) => (
           <PersonChip
             key={person.id}
@@ -1569,20 +1601,35 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           {hasCategoryData && (
             <>
               {(["meal", "drink", "dessert", "other"] as const).map(cat => {
-                const catCount = items.filter(i => i.category === cat).length;
-                if (catCount === 0) return null;
+                const catItems = items.filter(i => i.category === cat);
+                if (catItems.length === 0) return null;
                 const catLabel = { meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" }[cat];
+                const allCatSelected = bulkAssignMode && catItems.length > 0 && catItems.every(i => bulkSelectedItems.has(i.id));
                 return (
                   <Button
                     key={cat}
                     variant={selectedTab === cat ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setSelectedTab(cat)}
-                    className="whitespace-nowrap"
+                    onClick={() => {
+                      setSelectedTab(cat);
+                      if (bulkAssignMode) {
+                        setBulkSelectedItems(prev => {
+                          const next = new Set(prev);
+                          if (allCatSelected) {
+                            catItems.forEach(i => next.delete(i.id));
+                          } else {
+                            catItems.forEach(i => next.add(i.id));
+                          }
+                          return next;
+                        });
+                      }
+                    }}
+                    className={`whitespace-nowrap ${bulkAssignMode && allCatSelected ? "ring-2 ring-primary ring-offset-1" : ""}`}
                     data-testid={`tab-category-${cat}`}
                   >
                     {catLabel}
-                    <span className="ml-1 opacity-60 text-xs">({catCount})</span>
+                    <span className="ml-1 opacity-60 text-xs">({catItems.length})</span>
+                    {bulkAssignMode && allCatSelected && <Check className="ml-1 h-3 w-3" />}
                   </Button>
                 );
               })}
