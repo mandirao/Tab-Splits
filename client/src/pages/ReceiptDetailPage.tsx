@@ -467,8 +467,32 @@ function AssignmentSheetBody({
 
   const totalShares = selectedPeople.reduce((s, pid) => s + (assignedQuantities[pid] ?? 1), 0);
 
+  const selectedItem = selectedItemId ? items.find((i: any) => i.id === selectedItemId) : null;
+  const itemQty = selectedItem ? (Number(selectedItem.quantity) || 1) : 1;
+  const itemPrice = selectedItem ? Number(selectedItem.price) : 0;
+  const unitPrice = itemQty > 1 ? itemPrice / itemQty : itemPrice;
+  const nameHasCount = itemQty > 1 && selectedItem?.name?.startsWith(`${itemQty} `);
+  const displayItemName = nameHasCount
+    ? selectedItem!.name.slice(String(itemQty).length + 1)
+    : (selectedItem?.name ?? "");
+
   return (
     <div className="space-y-4">
+      {/* Item header — what is being assigned */}
+      {selectedItem && (
+        <div className="flex items-start justify-between gap-3 rounded-md bg-muted/60 px-3 py-2.5">
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-sm leading-snug truncate">{displayItemName}</p>
+            {itemQty > 1 && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {itemQty} × ${unitPrice.toFixed(2)}
+              </p>
+            )}
+          </div>
+          <span className="font-semibold text-sm tabular-nums flex-shrink-0">${itemPrice.toFixed(2)}</span>
+        </div>
+      )}
+
       <p className="text-sm text-muted-foreground">
         Select who is splitting this item
       </p>
@@ -2011,7 +2035,13 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           setSelectedPeople([]);
           setAssignedQuantities({});
         }}
-        title="Assign to People"
+        title={(() => {
+          const it = items.find(i => i.id === selectedItemId);
+          if (!it) return "Assign to People";
+          const qty = Number(it.quantity) || 1;
+          const name = qty > 1 && it.name.startsWith(`${qty} `) ? it.name.slice(String(qty).length + 1) : it.name;
+          return `Assign "${name}"`;
+        })()}
         footer={
           <Button 
             className="w-full" 
