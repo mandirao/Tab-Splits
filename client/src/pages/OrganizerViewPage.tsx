@@ -26,6 +26,82 @@ function firstNameOnly(fullName: string) {
   return fullName.trim().split(/\s+/)[0] ?? fullName;
 }
 
+const CAT_ORDER = ["appetizer", "meal", "drink", "dessert", "other"] as const;
+const CAT_LABELS: Record<string, string> = {
+  appetizer: "Appetizers", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other",
+};
+
+function OrganizerItemRow({
+  item,
+  isAllTab,
+  selectedTab,
+  getColorForPerson,
+  getInitialsForPerson,
+}: {
+  item: ReceiptItem;
+  isAllTab: boolean;
+  selectedTab: string;
+  getColorForPerson: (pid: string) => string;
+  getInitialsForPerson: (pid: string) => string;
+}) {
+  const assignedPeople = (item.assignedTo as string[]) || [];
+  const isAssigned = assignedPeople.length > 0;
+  const qtys = (item.assignedQuantities as Record<string, number>) || {};
+  const totalQty = assignedPeople.reduce((s, pid) => s + (qtys[pid] ?? 1), 0);
+
+  const myQty = !isAllTab ? (qtys[selectedTab] ?? 1) : 1;
+  let displayPrice = parseFloat(item.price) || 0;
+  if (!isAllTab && isAssigned) {
+    displayPrice = totalQty > 0
+      ? (myQty / totalQty) * displayPrice
+      : displayPrice / assignedPeople.length;
+  }
+
+  const itemQty = item.quantity || 1;
+  const effNum = itemQty * myQty;
+  const effDen = isAllTab ? 1 : totalQty;
+  const g = gcd(effNum, effDen);
+  const sNum = effNum / g;
+  const sDen = effDen / g;
+  const effBadge = isAllTab
+    ? (itemQty > 1 ? `${itemQty}x` : null)
+    : isAssigned && !(sNum === 1 && sDen === 1)
+      ? (sDen === 1 ? `${sNum}x` : `${sNum}/${sDen}`)
+      : null;
+
+  return (
+    <div
+      className={`flex items-center gap-3 py-3 ${!isAssigned ? 'opacity-60' : ''}`}
+      data-testid={`item-row-${item.id}`}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline gap-2">
+          {effBadge && (
+            <Badge variant="outline" className="text-xs px-1.5 shrink-0">
+              {effBadge}
+            </Badge>
+          )}
+          <span className="font-medium text-sm truncate">{item.name}</span>
+        </div>
+        <span className="text-base font-semibold">${displayPrice.toFixed(2)}</span>
+      </div>
+      {isAllTab && isAssigned && (
+        <div className="flex -space-x-1 shrink-0">
+          {assignedPeople.map((pid, idx) => (
+            <div
+              key={idx}
+              className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center ring-2 ring-background"
+              style={{ backgroundColor: getColorForPerson(pid) }}
+            >
+              {getInitialsForPerson(pid)}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function OrganizerViewPage({ params }: { params: { id: string } }) {
   const receiptId = params?.id || window.location.pathname.split('/')[2];
   const [, setLocation] = useLocation();
@@ -126,6 +202,8 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
   const peopleInTabs = peopleWithColors.filter(p => personTotals.has(p.id));
   const displayNames = getDisplayNames(peopleInTabs);
 
+  const hasCategoryData = filteredItems.some(item => item.category);
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -224,67 +302,40 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
             <div className="divide-y px-4">
               {filteredItems.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-3">No items assigned.</p>
+              ) : hasCategoryData ? (
+                CAT_ORDER.filter(cat =>
+                  filteredItems.some(item => (item.category || "other") === cat)
+                ).map(cat => (
+                  <div key={cat}>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-3 pb-1">
+                      {CAT_LABELS[cat]}
+                    </p>
+                    {filteredItems
+                      .filter(item => (item.category || "other") === cat)
+                      .map(item => (
+                        <OrganizerItemRow
+                          key={item.id}
+                          item={item}
+                          isAllTab={isAllTab}
+                          selectedTab={selectedTab}
+                          getColorForPerson={getColorForPerson}
+                          getInitialsForPerson={getInitialsForPerson}
+                        />
+                      ))
+                    }
+                  </div>
+                ))
               ) : (
-                filteredItems.map(item => {
-                  const assignedPeople = (item.assignedTo as string[]) || [];
-                  const isAssigned = assignedPeople.length > 0;
-                  const qtys = (item.assignedQuantities as Record<string, number>) || {};
-                  const totalQty = assignedPeople.reduce((s, pid) => s + (qtys[pid] ?? 1), 0);
-
-                  const myQty = !isAllTab ? (qtys[selectedTab] ?? 1) : 1;
-                  let displayPrice = parseFloat(item.price) || 0;
-                  if (!isAllTab && isAssigned) {
-                    displayPrice = totalQty > 0
-                      ? (myQty / totalQty) * displayPrice
-                      : displayPrice / assignedPeople.length;
-                  }
-
-                  const itemQty = item.quantity || 1;
-                  const effNum = itemQty * myQty;
-                  const effDen = isAllTab ? 1 : totalQty;
-                  const g = gcd(effNum, effDen);
-                  const sNum = effNum / g;
-                  const sDen = effDen / g;
-                  const effBadge = isAllTab
-                    ? (itemQty > 1 ? `${itemQty}x` : null)
-                    : isAssigned && !(sNum === 1 && sDen === 1)
-                      ? (sDen === 1 ? `${sNum}x` : `${sNum}/${sDen}`)
-                      : null;
-
-                  return (
-                    <div
-                      key={item.id}
-                      className={`flex items-center gap-3 py-3 ${!isAssigned ? 'opacity-60' : ''}`}
-                      data-testid={`item-row-${item.id}`}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2">
-                          {effBadge && (
-                            <Badge variant="outline" className="text-xs px-1.5 shrink-0">
-                              {effBadge}
-                            </Badge>
-                          )}
-                          <span className="font-medium text-sm truncate">{item.name}</span>
-                        </div>
-                        <span className="text-base font-semibold">${displayPrice.toFixed(2)}</span>
-                      </div>
-
-                      {isAllTab && isAssigned && (
-                        <div className="flex -space-x-1 shrink-0">
-                          {assignedPeople.map((personId, idx) => (
-                            <div
-                              key={idx}
-                              className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center ring-2 ring-background"
-                              style={{ backgroundColor: getColorForPerson(personId) }}
-                            >
-                              {getInitialsForPerson(personId)}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
+                filteredItems.map(item => (
+                  <OrganizerItemRow
+                    key={item.id}
+                    item={item}
+                    isAllTab={isAllTab}
+                    selectedTab={selectedTab}
+                    getColorForPerson={getColorForPerson}
+                    getInitialsForPerson={getInitialsForPerson}
+                  />
+                ))
               )}
             </div>
 
