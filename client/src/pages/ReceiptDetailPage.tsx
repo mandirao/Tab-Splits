@@ -10,7 +10,7 @@ import ReceiptItemRow from "@/components/ReceiptItemRow";
 import TipCalculator from "@/components/TipCalculator";
 import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
-import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw, ListChecks, Sparkles, UtensilsCrossed, GlassWater, Cake, Tag } from "lucide-react";
+import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw, ListChecks, Sparkles, UtensilsCrossed, GlassWater, Cake, Tag, Circle, CheckCircle2, MinusCircle } from "lucide-react";
 import logoUrl from "@assets/icon-1024_1775014486817.png";
 import {
   AlertDialog,
@@ -1604,7 +1604,9 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                 const catItems = items.filter(i => i.category === cat);
                 if (catItems.length === 0) return null;
                 const catLabel = { meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" }[cat];
-                const allCatSelected = bulkAssignMode && catItems.length > 0 && catItems.every(i => bulkSelectedItems.has(i.id));
+                const selectedCount = bulkAssignMode ? catItems.filter(i => bulkSelectedItems.has(i.id)).length : 0;
+                const allCatSelected = bulkAssignMode && selectedCount === catItems.length;
+                const someCatSelected = bulkAssignMode && selectedCount > 0 && !allCatSelected;
                 return (
                   <Button
                     key={cat}
@@ -1624,12 +1626,20 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                         });
                       }
                     }}
-                    className={`whitespace-nowrap ${bulkAssignMode && allCatSelected ? "ring-2 ring-primary ring-offset-1" : ""}`}
+                    className="whitespace-nowrap flex items-center gap-1.5"
                     data-testid={`tab-category-${cat}`}
                   >
+                    {bulkAssignMode && (
+                      allCatSelected
+                        ? <CheckCircle2 className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                        : someCatSelected
+                          ? <MinusCircle className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                          : <Circle className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                    )}
                     {catLabel}
-                    <span className="ml-1 opacity-60 text-xs">({catItems.length})</span>
-                    {bulkAssignMode && allCatSelected && <Check className="ml-1 h-3 w-3" />}
+                    <span className="opacity-60 text-xs">
+                      {bulkAssignMode && selectedCount > 0 ? `${selectedCount}/${catItems.length}` : `(${catItems.length})`}
+                    </span>
                   </Button>
                 );
               })}
