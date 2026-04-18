@@ -1597,7 +1597,18 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       {/* Horizontal Tabs */}
       <div className="flex-shrink-0 border-b bg-card overflow-x-auto scrollbar-hide">
         <div className="flex gap-2 p-2 min-w-max">
-          {/* Person tabs — first priority for per-person verification */}
+          {/* All Items — always first */}
+          <Button
+            variant={selectedTab === "all" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedTab("all")}
+            className="whitespace-nowrap"
+            data-testid="tab-all-items"
+          >
+            All Items
+          </Button>
+
+          {/* Person tabs */}
           {peopleWithColors.map((person) => {
             const personTotal = personTotals.get(person.id);
             if (!personTotal) return null;
@@ -1627,31 +1638,19 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             );
           })}
 
-          {/* All Items */}
+          {/* Manage People */}
           <Button
-            variant={selectedTab === "all" ? "default" : "outline"}
+            variant="outline"
             size="sm"
-            onClick={() => setSelectedTab("all")}
-            className="whitespace-nowrap"
-            data-testid="tab-all-items"
+            onClick={handleManagePeopleClick}
+            className="whitespace-nowrap flex items-center gap-1.5 text-muted-foreground"
+            data-testid="button-add-person-tab"
           >
-            All Items
+            <Users className="h-3.5 w-3.5" />
+            Manage
           </Button>
 
-          {/* Unassigned — only when needed */}
-          {hasUnassignedItems && (
-            <Button
-              variant={selectedTab === "unassigned" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setSelectedTab("unassigned")}
-              className="whitespace-nowrap"
-              data-testid="tab-unassigned"
-            >
-              Unassigned
-            </Button>
-          )}
-
-          {/* Category tabs — collapsed into a dropdown at the end */}
+          {/* Categories dropdown */}
           {hasCategoryData && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1683,17 +1682,18 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             </DropdownMenu>
           )}
 
-          {/* Manage People — always at far right */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleManagePeopleClick}
-            className="whitespace-nowrap flex items-center gap-1.5 text-muted-foreground"
-            data-testid="button-add-person-tab"
-          >
-            <Users className="h-3.5 w-3.5" />
-            Manage
-          </Button>
+          {/* Unassigned — only when needed, after categories */}
+          {hasUnassignedItems && (
+            <Button
+              variant={selectedTab === "unassigned" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedTab("unassigned")}
+              className="whitespace-nowrap"
+              data-testid="tab-unassigned"
+            >
+              Unassigned
+            </Button>
+          )}
         </div>
       </div>
 
