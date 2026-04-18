@@ -1360,6 +1360,16 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   // Check if there are unassigned items
   const hasUnassignedItems = items.some(item => (item.assignedTo as string[] || []).length === 0);
 
+  // CTA state — drives the bottom action bar
+  const unassignedCount = items.filter(i => (i.assignedTo as string[] || []).length === 0).length;
+  const hasPeople = peopleWithColors.length > 0;
+  const isReadyToShare = items.length > 0 && hasPeople && !hasUnassignedItems;
+  const ctaHint = !hasPeople
+    ? "Add diners to get started"
+    : unassignedCount > 0
+    ? `${unassignedCount} item${unassignedCount !== 1 ? "s" : ""} still need assignment`
+    : `All ${items.length} item${items.length !== 1 ? "s" : ""} assigned across ${peopleWithColors.length} ${peopleWithColors.length === 1 ? "person" : "people"}`;
+
   // Calculate running total of all items
   const itemsSubtotal = items.reduce((sum, item) => {
     return sum + (parseFloat(item.price) || 0);
@@ -1688,7 +1698,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         </div>
       </div>
 
-      <main className="flex-1 overflow-y-auto p-4 pb-64">
+      <main className="flex-1 overflow-y-auto p-4 pb-80">
         <Card className="mb-4">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between gap-2">
@@ -1953,6 +1963,56 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             <span>Total</span>
             <span data-testid="text-receipt-total">${displayTotals.total.toFixed(2)}</span>
           </div>
+
+          {/* ── Dynamic CTA bar ── */}
+          {!bulkAssignMode && (
+            <div className="pt-3 mt-1 border-t">
+              <div className="flex items-center gap-2">
+                {isReadyToShare ? (
+                  <>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setWizardOpen(true)}
+                      title="Guide me through this"
+                      data-testid="button-cta-wizard"
+                    >
+                      <Wand2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      onClick={handleShareClick}
+                      data-testid="button-cta-share"
+                    >
+                      <Share2 className="h-4 w-4 mr-2" />
+                      Share with diners
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      className="flex-1"
+                      onClick={() => setWizardOpen(true)}
+                      data-testid="button-cta-wizard"
+                    >
+                      <Wand2 className="h-4 w-4 mr-2" />
+                      Guide me through this
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={handleShareClick}
+                      title="Share"
+                      data-testid="button-cta-share"
+                    >
+                      <Share2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1.5 text-center" data-testid="text-cta-hint">{ctaHint}</p>
+            </div>
+          )}
         </div>
       </div>
 
