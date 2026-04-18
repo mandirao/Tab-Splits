@@ -553,7 +553,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
         )}
 
         {/* ────────────────────────────── STEP 1: REVIEW ────────────────────────────── */}
-        {step === 1 && <ReviewItemsStep receiptId={receiptId!} items={items} receipt={receipt} subtotalDiff={subtotalDiff} />}
+        {step === 1 && <ReviewItemsStep receiptId={receiptId!} items={items} receipt={receipt} subtotalDiff={subtotalDiff} fromExistingReceipt={!!initialReceiptId} />}
 
         {/* ────────────────────────────── STEP 2: CATEGORIZE ────────────────────────────── */}
         {step === 2 && (
@@ -987,8 +987,8 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
-function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff }: {
-  receiptId: string; items: ReceiptItem[]; receipt: Receipt | undefined; subtotalDiff: number;
+function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExistingReceipt }: {
+  receiptId: string; items: ReceiptItem[]; receipt: Receipt | undefined; subtotalDiff: number; fromExistingReceipt?: boolean;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -1047,7 +1047,7 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff }: {
 
   return (
     <div className="p-4 space-y-4">
-      {subtotalDiff > 0.50 && sub > 0 && (
+      {subtotalDiff > 0.50 && sub > 0 && !fromExistingReceipt && (
         <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
           <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
           <div className="text-xs text-amber-700 dark:text-amber-300">
@@ -1093,7 +1093,7 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff }: {
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">{item.quantity > 1 ? `${item.quantity}×` : ""} ${parseFloat(item.price).toFixed(2)}{item.quantity > 1 ? ` = $${(parseFloat(item.price) * item.quantity).toFixed(2)}` : ""}</p>
+                    <p className="text-xs text-muted-foreground">{item.quantity > 1 ? `${item.quantity}× · ` : ""}${parseFloat(item.price).toFixed(2)}</p>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <Button size="icon" variant="ghost" onClick={() => startEdit(item)} className="h-8 w-8" data-testid={`button-edit-item-${item.id}`}><Pencil className="h-3.5 w-3.5" /></Button>
