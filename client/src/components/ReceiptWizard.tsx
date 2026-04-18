@@ -1214,80 +1214,112 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
         </div>
       )}
 
-      <Card>
-        <CardContent className="p-0 divide-y">
-          {items.length === 0 && (
-            isCategorizing
-              ? <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />Loading items…</div>
-              : <p className="p-4 text-muted-foreground text-sm text-center">No items — add them below.</p>
-          )}
-          {items.map(item => (
-            <div key={item.id}>
-              {editingId === item.id ? (
-                <div className="px-4 py-3 space-y-2">
-                  <Input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Item name" className="text-sm" data-testid={`input-edit-name-${item.id}`} />
-                  <div className="flex gap-2">
-                    <div className="w-20">
-                      <label className="text-[10px] text-muted-foreground">Qty</label>
-                      <Input type="number" min="1" value={editQty} onChange={e => setEditQty(e.target.value)} className="text-sm" data-testid={`input-edit-qty-${item.id}`} />
-                    </div>
-                    <div className="flex-1">
-                      <label className="text-[10px] text-muted-foreground">Price</label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
-                        <Input type="number" step="0.01" value={editPrice} onChange={e => setEditPrice(e.target.value)} className="pl-6 text-sm" data-testid={`input-edit-price-${item.id}`} />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 pt-1">
-                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteItem(item.id)} data-testid={`button-delete-item-${item.id}`}>Delete</Button>
-                    <div className="flex-1" />
-                    <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
-                    <Button size="sm" onClick={saveEdit} data-testid={`button-save-edit-${item.id}`}>Save</Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 px-4 py-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.quantity > 1 && !item.name.startsWith(`${item.quantity} `) && `${item.quantity}× · `}
-                      ${parseFloat(item.price).toFixed(2)}
-                    </p>
-                  </div>
-                  <Button size="icon" variant="ghost" onClick={() => startEdit(item)} data-testid={`button-edit-item-${item.id}`}>
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Select
-                    value={catOverrides[item.id] ?? item.category ?? "__none__"}
-                    onValueChange={v => saveCategory(item.id, v)}
-                  >
-                    <SelectTrigger className="w-28 flex-shrink-0 h-9 text-xs" data-testid={`select-category-${item.id}`}>
-                      <SelectValue placeholder="Type?" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">Uncategorized</SelectItem>
-                      <SelectItem value="appetizer">Appetizer</SelectItem>
-                      <SelectItem value="meal">Meal</SelectItem>
-                      <SelectItem value="dessert">Dessert</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                      <SelectItem value="drink">Drink</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* AI categorizing indicator */}
-      {isCategorizing && items.length > 0 && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
-          <Loader2 className="h-3.5 w-3.5 animate-spin flex-shrink-0" />
-          <span>AI is filling in categories…</span>
+      {/* Categorizing banner */}
+      {isCategorizing && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-muted/60 border border-border">
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium">Categorizing items…</p>
+            <p className="text-xs text-muted-foreground">AI is sorting your items by type</p>
+          </div>
         </div>
       )}
+
+      {(() => {
+        const effectiveCat = (item: ReceiptItem) => catOverrides[item.id] ?? item.category ?? "__none__";
+        const showGrouped = !isCategorizing && items.some(i => i.category);
+        const CAT_ORDER_LOCAL = ["appetizer", "meal", "dessert", "other", "drink", "__none__"] as const;
+
+        const renderItemRow = (item: ReceiptItem) => (
+          <div key={item.id}>
+            {editingId === item.id ? (
+              <div className="px-4 py-3 space-y-2">
+                <Input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Item name" className="text-sm" data-testid={`input-edit-name-${item.id}`} />
+                <div className="flex gap-2">
+                  <div className="w-20">
+                    <label className="text-[10px] text-muted-foreground">Qty</label>
+                    <Input type="number" min="1" value={editQty} onChange={e => setEditQty(e.target.value)} className="text-sm" data-testid={`input-edit-qty-${item.id}`} />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-[10px] text-muted-foreground">Price</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                      <Input type="number" step="0.01" value={editPrice} onChange={e => setEditPrice(e.target.value)} className="pl-6 text-sm" data-testid={`input-edit-price-${item.id}`} />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteItem(item.id)} data-testid={`button-delete-item-${item.id}`}>Delete</Button>
+                  <div className="flex-1" />
+                  <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
+                  <Button size="sm" onClick={saveEdit} data-testid={`button-save-edit-${item.id}`}>Save</Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 px-4 py-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{item.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {item.quantity > 1 && !item.name.startsWith(`${item.quantity} `) && `${item.quantity}× · `}
+                    ${parseFloat(item.price).toFixed(2)}
+                  </p>
+                </div>
+                <Button size="icon" variant="ghost" onClick={() => startEdit(item)} data-testid={`button-edit-item-${item.id}`}>
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Select value={effectiveCat(item)} onValueChange={v => saveCategory(item.id, v)}>
+                  <SelectTrigger className="w-28 flex-shrink-0 h-9 text-xs" data-testid={`select-category-${item.id}`}>
+                    <SelectValue placeholder="Type?" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Uncategorized</SelectItem>
+                    <SelectItem value="appetizer">Appetizer</SelectItem>
+                    <SelectItem value="meal">Meal</SelectItem>
+                    <SelectItem value="dessert">Dessert</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                    <SelectItem value="drink">Drink</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+        );
+
+        if (showGrouped) {
+          const groups = CAT_ORDER_LOCAL
+            .map(cat => ({
+              cat,
+              label: cat === "__none__" ? "Uncategorized" : CAT_LABELS[cat],
+              groupItems: items.filter(i => effectiveCat(i) === cat),
+            }))
+            .filter(g => g.groupItems.length > 0);
+          return (
+            <Card>
+              <CardContent className="p-0">
+                {groups.map((g, gi) => (
+                  <div key={g.cat} className={gi > 0 ? "border-t" : ""}>
+                    <div className="px-4 py-1.5 bg-muted/40 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                      {g.label}
+                    </div>
+                    <div className="divide-y">
+                      {g.groupItems.map(item => renderItemRow(item))}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          );
+        }
+
+        return (
+          <Card>
+            <CardContent className="p-0 divide-y">
+              {items.length === 0 && <p className="p-4 text-muted-foreground text-sm text-center">No items — add them below.</p>}
+              {items.map(item => renderItemRow(item))}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Add item */}
       {showAdd ? (
