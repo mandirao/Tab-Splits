@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
 import TipCalculator from "@/components/TipCalculator";
@@ -1162,21 +1163,14 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
 }
 
 function CategoryItemRow({ item, receiptId, onUpdated }: { item: ReceiptItem; receiptId: string; onUpdated: () => void }) {
-  const [cat, setCat] = useState<string | null>(item.category ?? null);
-  const categories: { value: string; label: string }[] = [
-    { value: "appetizer", label: "App" },
-    { value: "meal", label: "Meal" },
-    { value: "drink", label: "Drink" },
-    { value: "dessert", label: "Dessert" },
-    { value: "other", label: "Other" },
-  ];
+  const [cat, setCat] = useState<string>(item.category ?? "__none__");
 
-  const save = async (newCat: string | null) => {
+  const save = async (newCat: string) => {
     setCat(newCat);
     try {
-      await apiRequest(`/api/items/${item.id}`, "PATCH", { category: newCat });
+      await apiRequest(`/api/items/${item.id}`, "PATCH", { category: newCat === "__none__" ? null : newCat });
       onUpdated();
-    } catch { /* revert */ setCat(item.category ?? null); }
+    } catch { setCat(item.category ?? "__none__"); }
   };
 
   return (
@@ -1185,16 +1179,21 @@ function CategoryItemRow({ item, receiptId, onUpdated }: { item: ReceiptItem; re
         <p className="text-sm font-medium truncate">{item.name}</p>
         <p className="text-xs text-muted-foreground">${parseFloat(item.price).toFixed(2)}</p>
       </div>
-      <div className="flex gap-1 flex-shrink-0">
-        {categories.map(c => (
-          <button key={c.value} type="button"
-            onClick={() => save(cat === c.value ? null : c.value)}
-            data-testid={`button-category-${c.value}-${item.id}`}
-            className={`px-2 py-0.5 rounded-full text-[11px] font-medium border transition-colors ${cat === c.value ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-border hover-elevate"}`}>
-            {c.label}
-          </button>
-        ))}
-      </div>
+      <Select value={cat} onValueChange={save}>
+        <SelectTrigger
+          className="w-32 flex-shrink-0 h-8 text-xs"
+          data-testid={`select-category-${item.id}`}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">Uncategorized</SelectItem>
+          <SelectItem value="appetizer">Appetizer</SelectItem>
+          <SelectItem value="meal">Meal</SelectItem>
+          <SelectItem value="drink">Drink</SelectItem>
+          <SelectItem value="dessert">Dessert</SelectItem>
+          <SelectItem value="other">Other</SelectItem>
+        </SelectContent>
+      </Select>
     </div>
   );
 }
