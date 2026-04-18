@@ -345,8 +345,8 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
   };
 
   // ─── Step 4: Assign ───────────────────────────────────────────────────────
-  const openAssignSheet = (label: string, itemIds: string[]) => {
-    setAssignPeople([]);
+  const openAssignSheet = (label: string, itemIds: string[], currentAssignment?: string[]) => {
+    setAssignPeople(currentAssignment ?? []);
     setAssignSheet({ label, itemIds });
   };
 
@@ -745,7 +745,11 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                     return (
                       <AssignCategorySection key={cat} label={CAT_LABELS[cat]} items={catItems} assigned={catAssigned}
                         peopleWithColors={peopleWithColors} getPersonColor={getPersonColor}
-                        onAssignAll={() => openAssignSheet(CAT_LABELS[cat], catItems.map(i => i.id))} />
+                        onAssignAll={() => openAssignSheet(CAT_LABELS[cat], catItems.map(i => i.id))}
+                        onAssignItem={(itemId, itemName) => {
+                          const item = items.find(i => i.id === itemId);
+                          openAssignSheet(itemName, [itemId], (item?.assignedTo as string[]) || []);
+                        }} />
                     );
                   })}
                   {/* Unassigned/uncategorized */}
@@ -753,7 +757,11 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                     <AssignCategorySection label="Other Items" items={items.filter(i => !i.category)}
                       assigned={items.filter(i => !i.category && (i.assignedTo as string[])?.length > 0).length}
                       peopleWithColors={peopleWithColors} getPersonColor={getPersonColor}
-                      onAssignAll={() => openAssignSheet("Other Items", items.filter(i => !i.category).map(i => i.id))} />
+                      onAssignAll={() => openAssignSheet("Other Items", items.filter(i => !i.category).map(i => i.id))}
+                      onAssignItem={(itemId, itemName) => {
+                        const item = items.find(i => i.id === itemId);
+                        openAssignSheet(itemName, [itemId], (item?.assignedTo as string[]) || []);
+                      }} />
                   )}
                 </CardContent>
               </Card>
@@ -762,7 +770,11 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                 <CardContent className="p-0">
                   <AssignCategorySection label="All Items" items={items} assigned={assignedCount}
                     peopleWithColors={peopleWithColors} getPersonColor={getPersonColor}
-                    onAssignAll={() => openAssignSheet("All Items", items.map(i => i.id))} />
+                    onAssignAll={() => openAssignSheet("All Items", items.map(i => i.id))}
+                    onAssignItem={(itemId, itemName) => {
+                      const item = items.find(i => i.id === itemId);
+                      openAssignSheet(itemName, [itemId], (item?.assignedTo as string[]) || []);
+                    }} />
                 </CardContent>
               </Card>
             )}
@@ -1187,45 +1199,64 @@ function CategoryItemRow({ item, receiptId, onUpdated }: { item: ReceiptItem; re
   );
 }
 
-function AssignCategorySection({ label, items, assigned, peopleWithColors, getPersonColor, onAssignAll }: {
+function AssignCategorySection({ label, items, assigned, peopleWithColors, getPersonColor, onAssignAll, onAssignItem }: {
   label: string;
   items: ReceiptItem[];
   assigned: number;
   peopleWithColors: { id: string; name: string; color: string }[];
   getPersonColor: (pid: string) => string;
   onAssignAll: () => void;
+  onAssignItem: (itemId: string, itemName: string) => void;
 }) {
   const allAssigned = assigned === items.length;
   const someAssigned = assigned > 0 && !allAssigned;
 
   return (
     <div>
+      {/* ── Category header — "Select all" row ── */}
       <button type="button" onClick={onAssignAll}
-        className="w-full flex items-center gap-2 px-4 py-2 bg-muted/50 border-b hover-elevate active-elevate-2"
-        data-testid={`button-assign-section-${label.toLowerCase().replace(" ", "-")}`}>
-        {allAssigned
-          ? <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
-          : someAssigned
-            ? <MinusCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            : <Circle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-        }
+        className="w-full flex items-center gap-3 px-4 py-2.5 bg-muted/40 border-b hover-elevate active-elevate-2"
+        data-testid={`button-assign-section-${label.toLowerCase().replace(/\s+/g, "-")}`}>
+        {/* Radio-style indicator */}
+        <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+          allAssigned
+            ? "border-primary bg-primary"
+            : someAssigned
+              ? "border-primary/50 bg-primary/10"
+              : "border-muted-foreground/40"
+        }`}>
+          {allAssigned && <Check className="h-3 w-3 text-primary-foreground" />}
+          {someAssigned && <div className="h-2 w-2 rounded-full bg-primary/70" />}
+        </div>
         <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground flex-1 text-left">{label}</span>
         <span className="text-xs text-muted-foreground tabular-nums">
-          {assigned > 0 ? `${assigned}/${items.length}` : items.length}
+          {assigned > 0 ? `${assigned}/${items.length}` : `${items.length} items`}
         </span>
       </button>
+
+      {/* ── Individual item rows ── */}
       <div className="divide-y">
         {items.map(item => {
-          const assigned2 = (item.assignedTo as string[]) || [];
+          const assignedPeople = (item.assignedTo as string[]) || [];
+          const isAssigned = assignedPeople.length > 0;
           return (
-            <div key={item.id} className="flex items-center justify-between px-4 py-2.5 gap-2">
+            <button key={item.id} type="button"
+              onClick={() => onAssignItem(item.id, item.name)}
+              className="w-full flex items-center gap-3 px-4 py-2.5 hover-elevate active-elevate-2 text-left"
+              data-testid={`button-assign-item-${item.id}`}>
+              {/* Per-item indicator */}
+              <div className={`h-4 w-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                isAssigned ? "border-primary bg-primary" : "border-muted-foreground/30"
+              }`}>
+                {isAssigned && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+              </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm truncate">{item.name}</p>
                 <p className="text-xs text-muted-foreground">${parseFloat(item.price).toFixed(2)}</p>
               </div>
               <div className="flex -space-x-1 flex-shrink-0">
-                {assigned2.length === 0 && <span className="text-xs text-muted-foreground">unassigned</span>}
-                {assigned2.slice(0, 4).map(pid => {
+                {!isAssigned && <span className="text-xs text-muted-foreground italic pr-1">tap to assign</span>}
+                {assignedPeople.slice(0, 4).map(pid => {
                   const person = peopleWithColors.find(p => p.id === pid);
                   if (!person) return null;
                   return (
@@ -1236,9 +1267,13 @@ function AssignCategorySection({ label, items, assigned, peopleWithColors, getPe
                     </div>
                   );
                 })}
-                {assigned2.length > 4 && <div className="h-6 w-6 rounded-full border-2 border-background bg-muted flex items-center justify-center text-[9px] font-bold">+{assigned2.length - 4}</div>}
+                {assignedPeople.length > 4 && (
+                  <div className="h-6 w-6 rounded-full border-2 border-background bg-muted flex items-center justify-center text-[9px] font-bold">
+                    +{assignedPeople.length - 4}
+                  </div>
+                )}
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
