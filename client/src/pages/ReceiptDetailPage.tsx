@@ -1695,6 +1695,8 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                         ? "All Items"
                         : selectedTab === "unassigned"
                         ? "Unassigned Items"
+                        : CATEGORY_TABS.includes(selectedTab as any)
+                        ? ({ meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" } as Record<string, string>)[selectedTab]
                         : `${getPersonById(selectedTab)?.name}'s Items`}
                     </h2>
                     <span className="text-xs text-muted-foreground flex-shrink-0">
