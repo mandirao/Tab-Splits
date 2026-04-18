@@ -10,7 +10,7 @@ import ReceiptItemRow from "@/components/ReceiptItemRow";
 import TipCalculator from "@/components/TipCalculator";
 import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
-import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw, ListChecks, Sparkles } from "lucide-react";
+import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw, ListChecks, Sparkles, UtensilsCrossed, GlassWater, Cake, Tag } from "lucide-react";
 import logoUrl from "@assets/icon-1024_1775014486817.png";
 import {
   AlertDialog,
@@ -561,7 +561,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const [assignedQuantities, setAssignedQuantities] = useState<Record<string, number>>({});
-  const [editItemData, setEditItemData] = useState({ name: "", quantity: 1, price: "" });
+  const [editItemData, setEditItemData] = useState<{ name: string; quantity: number; price: string; category?: string | null }>({ name: "", quantity: 1, price: "", category: null });
   const [shareBottomSheetOpen, setShareBottomSheetOpen] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
   const [urlCopied, setUrlCopied] = useState(false);
@@ -593,6 +593,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [bulkAssignSheetOpen, setBulkAssignSheetOpen] = useState(false);
   const [bulkSelectedPeople, setBulkSelectedPeople] = useState<string[]>([]);
   const [bulkAssignedQuantities, setBulkAssignedQuantities] = useState<Record<string, number>>({});
+  const [bulkCategorizeSheetOpen, setBulkCategorizeSheetOpen] = useState(false);
 
   useEffect(() => {
     // Check if a scanned image exists for this receipt
@@ -851,7 +852,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   });
 
   const updateItemDetailsMutation = useMutation({
-    mutationFn: async ({ itemId, data }: { itemId: string; data: { name: string; quantity: number; price: string } }) => {
+    mutationFn: async ({ itemId, data }: { itemId: string; data: { name: string; quantity: number; price: string; category?: string | null } }) => {
       return await apiRequest(`/api/items/${itemId}`, "PATCH", data);
     },
     onSuccess: () => {
@@ -1010,6 +1011,15 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     },
   });
 
+  const bulkCategorizeMutation = useMutation({
+    mutationFn: async ({ itemIds, category }: { itemIds: string[]; category: string }) => {
+      await Promise.all(itemIds.map(id => apiRequest(`/api/items/${id}`, "PATCH", { category })));
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to categorize items", description: error.message, variant: "destructive" });
+    },
+  });
+
   const enterBulkMode = (initialItemId?: string) => {
     setBulkAssignMode(true);
     setBulkSelectedItems(initialItemId ? new Set([initialItemId]) : new Set());
@@ -1021,6 +1031,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     setBulkAssignMode(false);
     setBulkSelectedItems(new Set());
     setBulkAssignSheetOpen(false);
+    setBulkCategorizeSheetOpen(false);
     setBulkSelectedPeople([]);
     setBulkAssignedQuantities({});
   };
@@ -1095,7 +1106,8 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       setEditItemData({
         name: item.name,
         quantity: item.quantity || 1,
-        price: item.price
+        price: item.price,
+        category: item.category ?? null,
       });
       setEditBottomSheetOpen(true);
     }
@@ -1109,7 +1121,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       });
       setEditBottomSheetOpen(false);
       setSelectedItemId(null);
-      setEditItemData({ name: "", quantity: 1, price: "" });
+      setEditItemData({ name: "", quantity: 1, price: "", category: null });
     }
   };
 
@@ -1748,11 +1760,20 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             <div className="flex gap-2">
               <Button
                 variant="outline"
-                className="flex-1"
+                size="sm"
                 onClick={exitBulkMode}
                 data-testid="button-cancel-bulk"
               >
                 Cancel
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setBulkCategorizeSheetOpen(true)}
+                disabled={bulkSelectedItems.size === 0 || bulkCategorizeMutation.isPending}
+                data-testid="button-categorize-bulk"
+              >
+                Set category
               </Button>
               <Button
                 className="flex-1"
@@ -1762,7 +1783,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               >
                 {bulkAssignMutation.isPending
                   ? "Assigning…"
-                  : `Assign ${bulkSelectedItems.size} item${bulkSelectedItems.size !== 1 ? "s" : ""}`}
+                  : `Assign ${bulkSelectedItems.size}`}
               </Button>
             </div>
           )}
@@ -1881,7 +1902,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         open={editBottomSheetOpen}
         onClose={() => {
           setEditBottomSheetOpen(false);
-          setEditItemData({ name: "", quantity: 1, price: "" });
+          setEditItemData({ name: "", quantity: 1, price: "", category: null });
         }}
         title="Edit Item"
         footer={
@@ -1947,6 +1968,87 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               data-testid="input-edit-item-price"
             />
           </div>
+          <div className="space-y-2">
+            <Label>Category</Label>
+            <div className="flex gap-2 flex-wrap">
+              {([
+                { value: null, label: "None", Icon: Tag },
+                { value: "meal", label: "Meal", Icon: UtensilsCrossed },
+                { value: "drink", label: "Drink", Icon: GlassWater },
+                { value: "dessert", label: "Dessert", Icon: Cake },
+                { value: "other", label: "Other", Icon: Tag },
+              ] as const).map(({ value, label, Icon }) => {
+                const selected = (editItemData.category ?? null) === value;
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setEditItemData(prev => ({ ...prev, category: value }))}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm border transition-colors
+                      ${selected
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-muted-foreground border-border hover-elevate"
+                      }`}
+                    data-testid={`button-category-${value ?? "none"}`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </BottomSheet>
+
+      {/* Bulk categorize sheet */}
+      <BottomSheet
+        open={bulkCategorizeSheetOpen}
+        onClose={() => setBulkCategorizeSheetOpen(false)}
+        title={`Categorize ${bulkSelectedItems.size} item${bulkSelectedItems.size !== 1 ? "s" : ""}`}
+      >
+        <div className="space-y-2 pb-2">
+          {([
+            { value: "meal", label: "Meal", Icon: UtensilsCrossed, description: "Entrees, appetizers, sides, salads" },
+            { value: "drink", label: "Drink", Icon: GlassWater, description: "Beverages, cocktails, coffee, tea" },
+            { value: "dessert", label: "Dessert", Icon: Cake, description: "Ice cream, cake, pastries, sweets" },
+            { value: "other", label: "Other", Icon: Tag, description: "Service charges, fees, non-food" },
+          ] as const).map(({ value, label, Icon, description }) => {
+            const isPendingThis = bulkCategorizeMutation.isPending && bulkCategorizeMutation.variables?.category === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={async () => {
+                  if (bulkCategorizeMutation.isPending) return;
+                  const n = bulkSelectedItems.size;
+                  const ids = Array.from(bulkSelectedItems);
+                  try {
+                    await bulkCategorizeMutation.mutateAsync({ itemIds: ids, category: value });
+                    await queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
+                    toast({ title: `Categorized ${n} item${n !== 1 ? "s" : ""}` });
+                    setBulkCategorizeSheetOpen(false);
+                    exitBulkMode();
+                  } catch {
+                    // error toast handled by onError
+                  }
+                }}
+                className={`flex items-center gap-4 w-full p-4 rounded-lg border bg-background text-left transition-opacity ${bulkCategorizeMutation.isPending ? "opacity-60" : "hover-elevate active-elevate-2"}`}
+                data-testid={`button-bulk-category-${value}`}
+              >
+                <div className="flex-shrink-0 h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                  {isPendingThis
+                    ? <RefreshCw className="h-5 w-5 text-foreground animate-spin" />
+                    : <Icon className="h-5 w-5 text-foreground" />
+                  }
+                </div>
+                <div>
+                  <div className="font-medium">{label}</div>
+                  <div className="text-sm text-muted-foreground">{description}</div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </BottomSheet>
 
