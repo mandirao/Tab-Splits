@@ -40,3 +40,8 @@ waitForPort = 5000
 
 [agent]
 integrations = ["javascript_mem_db:1.0.0", "javascript_openai_ai_integrations:1.0.0", "javascript_object_storage:2.0.0", "resend:1.0.0"]
+
+[userenv]
+
+[userenv.shared]
+VITE_POSTHOG_KEY = "phc_nWfgFC6cY35QV6V4n98PEe9bTpZLBYCK5CPmZss2RtGU"
