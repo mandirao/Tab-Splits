@@ -101,8 +101,6 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
         setPreviewUrl("");
         setRotation(0);
       }
-      setShareToken(null);
-      setQrDataUrl(null);
       setPayerId(null);
       setVenmoInput("");
     }
