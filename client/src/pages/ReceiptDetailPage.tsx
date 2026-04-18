@@ -1213,7 +1213,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       const currentPayer = peopleWithColors.find(p => p.id === receipt.paidById);
       setSelectedPayerPersonId(receipt.paidById);
       setPayerVenmoInput(currentPayer?.venmoUsername || "");
-      setPaymentAmount(total.toFixed(2));
     }
     setPaymentsBottomSheetOpen(true);
   };
