@@ -51,6 +51,80 @@ function firstNameOnly(fullName: string) {
   return fullName.trim().split(/\s+/)[0] ?? fullName;
 }
 
+function SharedItemRow({
+  item,
+  isAllTab,
+  selectedTab,
+  getColorForPerson,
+  getPersonById,
+}: {
+  item: ReceiptItem;
+  isAllTab: boolean;
+  selectedTab: string;
+  getColorForPerson: (pid: string) => string;
+  getPersonById: (id: string) => { id: string; name: string; color: string } | undefined;
+}) {
+  const assignedPeople = (item.assignedTo as string[]) || [];
+  const isAssigned = assignedPeople.length > 0;
+  const qtys = (item.assignedQuantities as Record<string, number>) || {};
+  const totalQty = assignedPeople.reduce((s, pid) => s + (qtys[pid] ?? 1), 0);
+
+  const myQty = !isAllTab ? (qtys[selectedTab] ?? 1) : 1;
+  let displayPrice = parseFloat(item.price) || 0;
+  if (!isAllTab && isAssigned) {
+    displayPrice = totalQty > 0
+      ? (myQty / totalQty) * displayPrice
+      : displayPrice / assignedPeople.length;
+  }
+
+  const itemQty = item.quantity || 1;
+  const effNum = itemQty * myQty;
+  const effDen = isAllTab ? 1 : totalQty;
+  const g = gcd(effNum, effDen);
+  const sNum = effNum / g;
+  const sDen = effDen / g;
+  const effBadge = isAllTab
+    ? (itemQty > 1 ? `${itemQty}x` : null)
+    : isAssigned && !(sNum === 1 && sDen === 1)
+      ? (sDen === 1 ? `${sNum}x` : `${sNum}/${sDen}`)
+      : null;
+
+  const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+
+  return (
+    <div
+      className={`flex items-center gap-3 py-3 ${!isAssigned ? 'opacity-60' : ''}`}
+      data-testid={`item-row-${item.id}`}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline gap-2">
+          {effBadge && (
+            <Badge variant="outline" className="text-xs px-1.5 shrink-0">
+              {effBadge}
+            </Badge>
+          )}
+          <span className="font-medium text-sm truncate">{item.name}</span>
+        </div>
+        <span className="text-base font-semibold">${displayPrice.toFixed(2)}</span>
+      </div>
+
+      {isAllTab && isAssigned && (
+        <div className="flex -space-x-1 shrink-0">
+          {assignedPeople.map((pid, idx) => (
+            <div
+              key={idx}
+              className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center ring-2 ring-background"
+              style={{ backgroundColor: getColorForPerson(pid) }}
+            >
+              {getInitials(getPersonById(pid)?.name || "")}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SharedReceiptPage({ params }: { params: { token: string } }) {
   const shareToken = params?.token || window.location.pathname.split('/').pop();
 
@@ -218,6 +292,12 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
 
   const myTotals = !isAllTab ? personTotals.get(selectedTab) : null;
 
+  const hasCategoryData = items.some(item => item.category);
+  const CAT_ORDER = ["appetizer", "meal", "drink", "dessert", "other"] as const;
+  const CAT_LABELS: Record<string, string> = {
+    appetizer: "Appetizers", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other",
+  };
+
   // Only show tabs for people who have at least one item assigned
   const peopleInTabs = peopleWithColors.filter(p => personTotals.has(p.id));
 
@@ -325,72 +405,49 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
             </h2>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="divide-y px-4">
-              {filteredItems.length === 0 ? (
+            {filteredItems.length === 0 ? (
+              <div className="px-4">
                 <p className="text-sm text-muted-foreground py-3">No items assigned.</p>
-              ) : (
-                filteredItems.map(item => {
-                  const assignedPeople = (item.assignedTo as string[]) || [];
-                  const isAssigned = assignedPeople.length > 0;
-                  const qtys = (item.assignedQuantities as Record<string, number>) || {};
-                  const totalQty = assignedPeople.reduce((s, pid) => s + (qtys[pid] ?? 1), 0);
-
-                  const myQty = !isAllTab ? (qtys[selectedTab] ?? 1) : 1;
-                  let displayPrice = parseFloat(item.price) || 0;
-                  if (!isAllTab && isAssigned) {
-                    displayPrice = totalQty > 0
-                      ? (myQty / totalQty) * displayPrice
-                      : displayPrice / assignedPeople.length;
-                  }
-
-                  const itemQty = item.quantity || 1;
-                  const effNum = itemQty * myQty;
-                  const effDen = isAllTab ? 1 : totalQty;
-                  const g = gcd(effNum, effDen);
-                  const sNum = effNum / g;
-                  const sDen = effDen / g;
-                  const effBadge = isAllTab
-                    ? (itemQty > 1 ? `${itemQty}x` : null)
-                    : isAssigned && !(sNum === 1 && sDen === 1)
-                      ? (sDen === 1 ? `${sNum}x` : `${sNum}/${sDen}`)
-                      : null;
-
+              </div>
+            ) : hasCategoryData ? (
+              // ── Category-grouped view ──────────────────────────────────────────
+              <>
+                {CAT_ORDER.map(cat => {
+                  const catItems = filteredItems.filter(i => i.category === cat);
+                  if (catItems.length === 0) return null;
                   return (
-                    <div
-                      key={item.id}
-                      className={`flex items-center gap-3 py-3 ${!isAssigned ? 'opacity-60' : ''}`}
-                      data-testid={`item-row-${item.id}`}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2">
-                          {effBadge && (
-                            <Badge variant="outline" className="text-xs px-1.5 shrink-0">
-                              {effBadge}
-                            </Badge>
-                          )}
-                          <span className="font-medium text-sm truncate">{item.name}</span>
-                        </div>
-                        <span className="text-base font-semibold">${displayPrice.toFixed(2)}</span>
+                    <div key={cat}>
+                      <div className="px-4 py-1.5 bg-muted/50 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground border-b">
+                        {CAT_LABELS[cat]}
                       </div>
-
-                      {isAllTab && isAssigned && (
-                        <div className="flex -space-x-1 shrink-0">
-                          {assignedPeople.map((pid, idx) => (
-                            <div
-                              key={idx}
-                              className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center ring-2 ring-background"
-                              style={{ backgroundColor: getColorForPerson(pid) }}
-                            >
-                              {getInitials(getPersonById(pid)?.name || "")}
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <div className="divide-y px-4">
+                        {catItems.map(item => <SharedItemRow key={item.id} item={item} isAllTab={isAllTab} selectedTab={selectedTab} getColorForPerson={getColorForPerson} getPersonById={getPersonById} />)}
+                      </div>
                     </div>
                   );
-                })
-              )}
-            </div>
+                })}
+                {/* Uncategorized items */}
+                {(() => {
+                  const uncatItems = filteredItems.filter(i => !i.category);
+                  if (uncatItems.length === 0) return null;
+                  return (
+                    <div>
+                      <div className="px-4 py-1.5 bg-muted/50 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground border-b">
+                        Other
+                      </div>
+                      <div className="divide-y px-4">
+                        {uncatItems.map(item => <SharedItemRow key={item.id} item={item} isAllTab={isAllTab} selectedTab={selectedTab} getColorForPerson={getColorForPerson} getPersonById={getPersonById} />)}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>
+            ) : (
+              // ── Flat view (no categories) ──────────────────────────────────────
+              <div className="divide-y px-4">
+                {filteredItems.map(item => <SharedItemRow key={item.id} item={item} isAllTab={isAllTab} selectedTab={selectedTab} getColorForPerson={getColorForPerson} getPersonById={getPersonById} />)}
+              </div>
+            )}
 
             {/* Person-tab totals — connected at the bottom of the items card */}
             {!isAllTab && myTotals && (

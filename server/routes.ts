@@ -450,10 +450,11 @@ Return ONLY the JSON object, no additional text.`
         model: "gpt-4o",
         messages: [{
           role: "user",
-          content: `Categorize each restaurant menu item as exactly one of: "meal", "drink", "dessert", or "other".
+          content: `Categorize each restaurant menu item as exactly one of: "appetizer", "meal", "drink", "dessert", or "other".
 
 Rules:
-- "meal": food items — entrees, appetizers, salads, soups, sandwiches, sides, any savory dish
+- "appetizer": starters — shared plates, small bites, dips, spreads, anything served before the main course
+- "meal": main courses — entrees, salads, soups, sandwiches, sides, any savory dish that is a full portion
 - "drink": any beverage — water, soda, juice, coffee, tea, beer, wine, cocktails, smoothies
 - "dessert": sweets — ice cream, cake, pie, cookies, pastries, any post-meal sweet
 - "other": service charges, fees, non-food items
@@ -471,7 +472,7 @@ Return ONLY a JSON object mapping each ID to its category: {"id1": "meal", "id2"
       if (!jsonMatch) return res.status(500).json({ message: "Failed to parse AI response" });
 
       const categories: Record<string, string> = JSON.parse(jsonMatch[0]);
-      const validCategories = ["meal", "drink", "dessert", "other"];
+      const validCategories = ["appetizer", "meal", "drink", "dessert", "other"];
 
       const updatedItems = await Promise.all(
         items.map(item => {

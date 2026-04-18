@@ -10,7 +10,7 @@ import ReceiptItemRow from "@/components/ReceiptItemRow";
 import TipCalculator from "@/components/TipCalculator";
 import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
-import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw, ListChecks, Sparkles, UtensilsCrossed, GlassWater, Cake, Tag, Circle, CheckCircle2, MinusCircle, Wand2 } from "lucide-react";
+import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw, ListChecks, Sparkles, UtensilsCrossed, GlassWater, Cake, Tag, Circle, CheckCircle2, MinusCircle, Wand2, Salad } from "lucide-react";
 import logoUrl from "@assets/icon-1024_1775014486817.png";
 import {
   AlertDialog,
@@ -1098,7 +1098,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     mutationFn: () => apiRequest(`/api/receipts/${receiptId}/categorize`, "POST", {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
-      toast({ title: "Items categorized", description: "Items sorted into Meals, Drinks, and Desserts" });
+      toast({ title: "Items categorized", description: "Items sorted into Appetizers, Meals, Drinks, and Desserts" });
     },
     onError: (error: any) => {
       toast({ title: "Categorization failed", description: error.message, variant: "destructive" });
@@ -1369,7 +1369,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const subtotalDifference = Math.abs(itemsSubtotal - subtotal);
   const totalsMatch = subtotalDifference < 0.01;
 
-  const CATEGORY_TABS = ["meal", "drink", "dessert", "other"] as const;
+  const CATEGORY_TABS = ["appetizer", "meal", "drink", "dessert", "other"] as const;
   const hasCategoryData = items.some(item => item.category);
   const showCategoryGroups = hasCategoryData && selectedTab !== "unassigned" && !CATEGORY_TABS.includes(selectedTab as any);
 
@@ -1611,10 +1611,10 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           {/* Category tabs — only show after AI categorization */}
           {hasCategoryData && (
             <>
-              {(["meal", "drink", "dessert", "other"] as const).map(cat => {
+              {(["appetizer", "meal", "drink", "dessert", "other"] as const).map(cat => {
                 const catCount = items.filter(i => i.category === cat).length;
                 if (catCount === 0) return null;
-                const catLabel = { meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" }[cat];
+                const catLabel = { appetizer: "Apps", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" }[cat];
                 return (
                   <Button
                     key={cat}
@@ -1707,7 +1707,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                         : selectedTab === "unassigned"
                         ? "Unassigned Items"
                         : CATEGORY_TABS.includes(selectedTab as any)
-                        ? ({ meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" } as Record<string, string>)[selectedTab]
+                        ? ({ appetizer: "Appetizers", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" } as Record<string, string>)[selectedTab]
                         : `${getPersonById(selectedTab)?.name}'s Items`}
                     </h2>
                     <span className="text-xs text-muted-foreground flex-shrink-0">
@@ -1775,10 +1775,10 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           </CardHeader>
           <CardContent className={showCategoryGroups ? "p-0" : "divide-y"}>
             {showCategoryGroups ? (
-              (["meal", "drink", "dessert", "other"] as const).map(cat => {
+              (["appetizer", "meal", "drink", "dessert", "other"] as const).map(cat => {
                 const catItems = filteredItems.filter(i => i.category === cat);
                 if (catItems.length === 0) return null;
-                const catLabel = { meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" }[cat];
+                const catLabel = { appetizer: "Appetizers", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" }[cat];
                 const selectedCount = bulkAssignMode ? catItems.filter(i => bulkSelectedItems.has(i.id)).length : 0;
                 const allCatSelected = bulkAssignMode && selectedCount === catItems.length;
                 const someCatSelected = bulkAssignMode && selectedCount > 0 && !allCatSelected;
@@ -1829,7 +1829,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               <>
                 {/* Select-all banner — only in bulk mode on a category tab */}
                 {bulkAssignMode && CATEGORY_TABS.includes(selectedTab as any) && (() => {
-                  const catLabel = { meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" }[selectedTab as "meal" | "drink" | "dessert" | "other"];
+                  const catLabel = { appetizer: "Appetizers", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" }[selectedTab as "appetizer" | "meal" | "drink" | "dessert" | "other"];
                   const selectedCount = filteredItems.filter(i => bulkSelectedItems.has(i.id)).length;
                   const allSelected = filteredItems.length > 0 && selectedCount === filteredItems.length;
                   const someSelected = selectedCount > 0 && !allSelected;
@@ -2093,6 +2093,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             <div className="flex gap-2 flex-wrap">
               {([
                 { value: null, label: "None", Icon: Tag },
+                { value: "appetizer", label: "Appetizer", Icon: Salad },
                 { value: "meal", label: "Meal", Icon: UtensilsCrossed },
                 { value: "drink", label: "Drink", Icon: GlassWater },
                 { value: "dessert", label: "Dessert", Icon: Cake },
@@ -2129,7 +2130,8 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       >
         <div className="space-y-2 pb-2">
           {([
-            { value: "meal", label: "Meal", Icon: UtensilsCrossed, description: "Entrees, appetizers, sides, salads" },
+            { value: "appetizer", label: "Appetizer", Icon: Salad, description: "Starters, shared plates, small bites, dips" },
+            { value: "meal", label: "Meal", Icon: UtensilsCrossed, description: "Entrees, mains, sides, salads" },
             { value: "drink", label: "Drink", Icon: GlassWater, description: "Beverages, cocktails, coffee, tea" },
             { value: "dessert", label: "Dessert", Icon: Cake, description: "Ice cream, cake, pastries, sweets" },
             { value: "other", label: "Other", Icon: Tag, description: "Service charges, fees, non-food" },

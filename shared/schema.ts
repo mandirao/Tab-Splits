@@ -98,7 +98,7 @@ export const updateReceiptItemSchema = z.object({
   price: numericStringSchema.optional(),
   assignedTo: z.array(z.string()).optional(),
   assignedQuantities: z.record(z.string(), z.number()).optional(),
-  category: z.enum(["meal", "drink", "dessert", "other"]).nullable().optional(),
+  category: z.enum(["appetizer", "meal", "drink", "dessert", "other"]).nullable().optional(),
 }).strict();
 
 export const updatePersonSchema = z.object({

@@ -38,7 +38,7 @@ const STEP_SUBTITLES = [
 ];
 
 const CAT_LABELS: Record<string, string> = {
-  meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other",
+  appetizer: "Appetizers", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other",
 };
 
 const SERVICE_CHARGE_TERMS = ["gratuity", "service charge", "service fee", "auto-grat", "auto grat", "autogratuity"];
@@ -567,7 +567,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
             <Card>
               <CardContent className="p-0 divide-y">
                 {items.length === 0 && <p className="p-4 text-muted-foreground text-sm">No items yet.</p>}
-                {(["meal", "drink", "dessert", "other", "__none__"] as const).map(cat => {
+                {(["appetizer", "meal", "drink", "dessert", "other", "__none__"] as const).map(cat => {
                   const catItems = cat === "__none__" ? items.filter(i => !i.category) : items.filter(i => i.category === cat);
                   if (catItems.length === 0) return null;
                   const label = cat === "__none__" ? "Uncategorized" : CAT_LABELS[cat];
@@ -738,7 +738,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
             {hasCategoryData ? (
               <Card>
                 <CardContent className="p-0">
-                  {(["meal", "drink", "dessert", "other"] as const).map(cat => {
+                  {(["appetizer", "meal", "drink", "dessert", "other"] as const).map(cat => {
                     const catItems = items.filter(i => i.category === cat);
                     if (catItems.length === 0) return null;
                     const catAssigned = catItems.filter(i => (i.assignedTo as string[])?.length > 0).length;
@@ -1152,6 +1152,7 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff }: {
 function CategoryItemRow({ item, receiptId, onUpdated }: { item: ReceiptItem; receiptId: string; onUpdated: () => void }) {
   const [cat, setCat] = useState<string | null>(item.category ?? null);
   const categories: { value: string; label: string }[] = [
+    { value: "appetizer", label: "App" },
     { value: "meal", label: "Meal" },
     { value: "drink", label: "Drink" },
     { value: "dessert", label: "Dessert" },
