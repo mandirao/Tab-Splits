@@ -10,7 +10,7 @@ import ReceiptItemRow from "@/components/ReceiptItemRow";
 import TipCalculator from "@/components/TipCalculator";
 import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
-import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw, ListChecks } from "lucide-react";
+import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw, ListChecks, Sparkles } from "lucide-react";
 import logoUrl from "@assets/icon-1024_1775014486817.png";
 import {
   AlertDialog,
@@ -1049,6 +1049,17 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     setBulkAssignSheetOpen(false);
   };
 
+  const categorizeMutation = useMutation({
+    mutationFn: () => apiRequest(`/api/receipts/${receiptId}/categorize`, "POST", {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
+      toast({ title: "Items categorized", description: "Items sorted into Meals, Drinks, and Desserts" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Categorization failed", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleTipChange = (amount: number) => {
     updateReceiptMutation.mutate({ tip: amount });
   };
@@ -1312,11 +1323,17 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const subtotalDifference = Math.abs(itemsSubtotal - subtotal);
   const totalsMatch = subtotalDifference < 0.01;
 
+  const CATEGORY_TABS = ["meal", "drink", "dessert", "other"] as const;
+  const hasCategoryData = items.some(item => item.category);
+  const showCategoryGroups = hasCategoryData && selectedTab !== "unassigned" && !CATEGORY_TABS.includes(selectedTab as any);
+
   // Filter items based on selected tab
-  const filteredItems = selectedTab === "all" 
-    ? items 
+  const filteredItems = selectedTab === "all"
+    ? items
     : selectedTab === "unassigned"
     ? items.filter(item => (item.assignedTo as string[] || []).length === 0)
+    : CATEGORY_TABS.includes(selectedTab as any)
+    ? items.filter(item => item.category === selectedTab)
     : items.filter(item => {
         const assignedPeople = (item.assignedTo as string[]) || [];
         return assignedPeople.includes(selectedTab);
@@ -1371,10 +1388,45 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   };
 
   // Determine which totals to display in sticky summary
-  const isPersonTab = selectedTab !== "all" && selectedTab !== "unassigned";
+  const isPersonTab = selectedTab !== "all" && selectedTab !== "unassigned" && !CATEGORY_TABS.includes(selectedTab as any);
   const displayTotals = isPersonTab
     ? (personTotals.get(selectedTab) || { subtotal: 0, tax: 0, tip: 0, total: 0 })
     : { subtotal, tax, tip: tipAmount, total };
+
+  const renderItemRow = (item: ReceiptItem) => {
+    const assignedPeople = (item.assignedTo as string[]) || [];
+    const isPersonTabCtx = !["all", "unassigned", ...CATEGORY_TABS].includes(selectedTab as any);
+    let displayQuantity: string | undefined;
+    let displayPrice = parseFloat(item.price) || 0;
+    if (isPersonTabCtx && assignedPeople.length > 0) {
+      const adjustedQty = getAdjustedQuantity(item, selectedTab);
+      displayQuantity = formatQuantity(adjustedQty);
+      const qtys = (item.assignedQuantities as Record<string, number>) || {};
+      const totalAssignedQty = assignedPeople.reduce((sum, pid) => sum + (qtys[pid] ?? 1), 0);
+      const personQty = qtys[selectedTab] ?? 1;
+      displayPrice = totalAssignedQty > 0
+        ? (personQty / totalAssignedQty) * displayPrice
+        : displayPrice / assignedPeople.length;
+    }
+    return (
+      <ReceiptItemRow
+        key={item.id}
+        id={item.id}
+        name={item.name}
+        quantity={item.quantity || 1}
+        price={displayPrice}
+        assignedInitials={assignedPeople.map(getInitialsForPerson)}
+        assignedColors={assignedPeople.map(getColorForPerson)}
+        onAssign={() => handleAssignClick(item.id)}
+        onEdit={() => handleEditClick(item.id)}
+        displayQuantity={displayQuantity}
+        bulkMode={bulkAssignMode}
+        selected={bulkSelectedItems.has(item.id)}
+        onLongPress={() => enterBulkMode(item.id)}
+        onBulkSelect={() => toggleBulkItem(item.id)}
+      />
+    );
+  };
 
   if (!receipt) {
     return (
@@ -1501,6 +1553,30 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             All Items
           </Button>
           
+          {/* Category tabs — only show after AI categorization */}
+          {hasCategoryData && (
+            <>
+              {(["meal", "drink", "dessert", "other"] as const).map(cat => {
+                const catCount = items.filter(i => i.category === cat).length;
+                if (catCount === 0) return null;
+                const catLabel = { meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" }[cat];
+                return (
+                  <Button
+                    key={cat}
+                    variant={selectedTab === cat ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedTab(cat)}
+                    className="whitespace-nowrap"
+                    data-testid={`tab-category-${cat}`}
+                  >
+                    {catLabel}
+                    <span className="ml-1 opacity-60 text-xs">({catCount})</span>
+                  </Button>
+                );
+              })}
+            </>
+          )}
+
           {hasUnassignedItems && (
             <Button
               variant={selectedTab === "unassigned" ? "default" : "outline"}
@@ -1600,6 +1676,20 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                   </Button>
                 ) : (
                   <>
+                    {items.length > 0 && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => categorizeMutation.mutate()}
+                        disabled={categorizeMutation.isPending}
+                        title={hasCategoryData ? "Re-categorize items with AI" : "Categorize items with AI"}
+                        data-testid="button-categorize"
+                      >
+                        {categorizeMutation.isPending
+                          ? <RefreshCw className="h-4 w-4 animate-spin" />
+                          : <Sparkles className="h-4 w-4" />}
+                      </Button>
+                    )}
                     <Button
                       size="icon"
                       variant="ghost"
@@ -1626,44 +1716,26 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               </div>
             </div>
           </CardHeader>
-          <CardContent className="divide-y">
-            {filteredItems.map((item) => {
-              const assignedPeople = (item.assignedTo as string[]) || [];
-              const isPersonTab = selectedTab !== "all" && selectedTab !== "unassigned";
-              
-              let displayQuantity: string | undefined;
-              let displayPrice = parseFloat(item.price) || 0;
-              
-              if (isPersonTab && assignedPeople.length > 0) {
-                const adjustedQty = getAdjustedQuantity(item, selectedTab);
-                displayQuantity = formatQuantity(adjustedQty);
-                const qtys = (item.assignedQuantities as Record<string, number>) || {};
-                const totalAssignedQty = assignedPeople.reduce((sum, pid) => sum + (qtys[pid] ?? 1), 0);
-                const personQty = qtys[selectedTab] ?? 1;
-                displayPrice = totalAssignedQty > 0
-                  ? (personQty / totalAssignedQty) * displayPrice
-                  : displayPrice / assignedPeople.length;
-              }
-              
-              return (
-                <ReceiptItemRow
-                  key={item.id}
-                  id={item.id}
-                  name={item.name}
-                  quantity={item.quantity || 1}
-                  price={displayPrice}
-                  assignedInitials={assignedPeople.map(getInitialsForPerson)}
-                  assignedColors={assignedPeople.map(getColorForPerson)}
-                  onAssign={() => handleAssignClick(item.id)}
-                  onEdit={() => handleEditClick(item.id)}
-                  displayQuantity={displayQuantity}
-                  bulkMode={bulkAssignMode}
-                  selected={bulkSelectedItems.has(item.id)}
-                  onLongPress={() => enterBulkMode(item.id)}
-                  onBulkSelect={() => toggleBulkItem(item.id)}
-                />
-              );
-            })}
+          <CardContent className={showCategoryGroups ? "p-0" : "divide-y"}>
+            {showCategoryGroups ? (
+              (["meal", "drink", "dessert", "other"] as const).map(cat => {
+                const catItems = filteredItems.filter(i => i.category === cat);
+                if (catItems.length === 0) return null;
+                const catLabel = { meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" }[cat];
+                return (
+                  <div key={cat}>
+                    <div className="px-6 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest bg-muted/50 border-y first:border-t-0">
+                      {catLabel}
+                    </div>
+                    <div className="divide-y px-6">
+                      {catItems.map(renderItemRow)}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              filteredItems.map(renderItemRow)
+            )}
           </CardContent>
         </Card>
 

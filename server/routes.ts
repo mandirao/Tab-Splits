@@ -434,6 +434,60 @@ Return ONLY the JSON object, no additional text.`
     }
   });
 
+  // ─── AI categorize items ───────────────────────────────────────────────────
+
+  app.post("/api/receipts/:id/categorize", requireAuth, async (req, res) => {
+    try {
+      const owned = await getOwnedReceipt(req.params.id, req.session.userId!, res);
+      if (!owned) return;
+
+      const items = await storage.getReceiptItems(req.params.id);
+      if (items.length === 0) return res.json([]);
+
+      const itemList = items.map(i => `${i.id}|${i.name}`).join("\n");
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{
+          role: "user",
+          content: `Categorize each restaurant menu item as exactly one of: "meal", "drink", "dessert", or "other".
+
+Rules:
+- "meal": food items — entrees, appetizers, salads, soups, sandwiches, sides, any savory dish
+- "drink": any beverage — water, soda, juice, coffee, tea, beer, wine, cocktails, smoothies
+- "dessert": sweets — ice cream, cake, pie, cookies, pastries, any post-meal sweet
+- "other": service charges, fees, non-food items
+
+Items (format: id|name):
+${itemList}
+
+Return ONLY a JSON object mapping each ID to its category: {"id1": "meal", "id2": "drink", ...}`,
+        }],
+        max_tokens: 600,
+      });
+
+      const content = completion.choices[0]?.message?.content || "";
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return res.status(500).json({ message: "Failed to parse AI response" });
+
+      const categories: Record<string, string> = JSON.parse(jsonMatch[0]);
+      const validCategories = ["meal", "drink", "dessert", "other"];
+
+      const updatedItems = await Promise.all(
+        items.map(item => {
+          const cat = categories[item.id];
+          const category = validCategories.includes(cat) ? cat : "other";
+          return storage.updateReceiptItem(item.id, { category } as any);
+        })
+      );
+
+      res.json(updatedItems);
+    } catch (error: any) {
+      console.error("Categorize error:", error);
+      res.status(500).json({ message: error.message || "Failed to categorize items" });
+    }
+  });
+
   // ─── Receipt routes ───────────────────────────────────────────────────────
 
   app.post("/api/receipts", requireAuth, async (req, res) => {
