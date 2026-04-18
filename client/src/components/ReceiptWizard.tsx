@@ -861,30 +861,6 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
               </CardContent>
             </Card>
 
-            {/* Per-person preview */}
-            {perPersonTotals.length > 0 && (
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Each person owes</p>
-                  <div className="space-y-2">
-                    {perPersonTotals.map(({ person, total, subtotal: psub }) => (
-                      <div key={person.id} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="h-7 w-7 rounded-full flex items-center justify-center text-white text-xs font-semibold" style={{ backgroundColor: person.color }}>
-                            {getInitials(person.name)}
-                          </div>
-                          <span className="text-sm">{person.name}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="font-semibold text-sm">${total.toFixed(2)}</span>
-                          {psub > 0 && <span className="text-xs text-muted-foreground ml-1">(items ${psub.toFixed(2)})</span>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </div>
         )}
 
