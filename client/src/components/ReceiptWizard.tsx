@@ -13,6 +13,7 @@ import {
   Camera, Upload, Loader2, RotateCw, RotateCcw, Check, ArrowLeft, ArrowRight,
   Sparkles, Users, Plus, X, CheckCircle2, Circle, AlertTriangle,
   Pencil, Trash2, Phone, MinusCircle, UserPlus, Utensils, Layers, Shuffle, ImageIcon,
+  Tag, Salad, UtensilsCrossed, GlassWater, Cake,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -85,6 +86,9 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
   const [autoAdvanceMode, setAutoAdvanceMode] = useState(true);
   const [autoAssignDone, setAutoAssignDone] = useState(false);
   const [seqProcessed, setSeqProcessed] = useState<Set<string>>(new Set());
+
+  // Assign step — full item edit sheet
+  const [assignEditSheet, setAssignEditSheet] = useState<{ id: string; name: string; quantity: number; price: string; category: string | null } | null>(null);
 
   // Step 6 review
   const [reviewPersonIdx, setReviewPersonIdx] = useState(0);
@@ -389,6 +393,18 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
       setDrawerCatOverrides(prev => { const n = { ...prev }; delete n[itemId]; return n; });
     }
   };
+
+  const saveAssignEdit = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { name: string; quantity: number; price: string; category: string | null } }) =>
+      apiRequest(`/api/items/${id}`, "PATCH", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
+      setAssignEditSheet(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to save changes", description: error.message, variant: "destructive" });
+    },
+  });
 
   const confirmAssign = async () => {
     if (!assignSheet || assignPeople.length === 0) return;
@@ -881,7 +897,8 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                             (item?.assignedTo as string[]) || [],
                             (item?.assignedQuantities as Record<string, number>) || {},
                           );
-                        }} />
+                        }}
+                        onEditItem={(item) => setAssignEditSheet({ id: item.id, name: item.name, quantity: item.quantity ?? 1, price: item.price, category: item.category ?? null })} />
                     );
                   })}
                   {/* Unassigned/uncategorized */}
@@ -898,7 +915,8 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                           (item?.assignedTo as string[]) || [],
                           (item?.assignedQuantities as Record<string, number>) || {},
                         );
-                      }} />
+                      }}
+                      onEditItem={(item) => setAssignEditSheet({ id: item.id, name: item.name, quantity: item.quantity ?? 1, price: item.price, category: item.category ?? null })} />
                   )}
                 </CardContent>
               </Card>
@@ -916,7 +934,8 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                         (item?.assignedTo as string[]) || [],
                         (item?.assignedQuantities as Record<string, number>) || {},
                       );
-                    }} />
+                    }}
+                    onEditItem={(item) => setAssignEditSheet({ id: item.id, name: item.name, quantity: item.quantity ?? 1, price: item.price, category: item.category ?? null })} />
                 </CardContent>
               </Card>
             )}
@@ -1388,6 +1407,95 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
         </div>
       </BottomSheet>
 
+      {/* ── Assign Step: Full Item Edit Sheet ── */}
+      <BottomSheet
+        open={!!assignEditSheet}
+        onClose={() => setAssignEditSheet(null)}
+        title="Edit Item"
+        footer={
+          <Button
+            className="w-full h-12"
+            onClick={() => {
+              if (!assignEditSheet) return;
+              saveAssignEdit.mutate({ id: assignEditSheet.id, data: { name: assignEditSheet.name, quantity: assignEditSheet.quantity, price: assignEditSheet.price, category: assignEditSheet.category } });
+            }}
+            disabled={!assignEditSheet?.name || !assignEditSheet?.price || saveAssignEdit.isPending}
+            data-testid="button-save-assign-item-edit"
+          >
+            {saveAssignEdit.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Changes"}
+          </Button>
+        }
+      >
+        {assignEditSheet && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="assign-edit-name">Item Name</Label>
+              <Input
+                id="assign-edit-name"
+                value={assignEditSheet.name}
+                onChange={e => setAssignEditSheet(prev => prev ? { ...prev, name: e.target.value } : null)}
+                placeholder="e.g. Caesar Salad"
+                data-testid="input-assign-edit-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="assign-edit-quantity">Quantity</Label>
+              <Input
+                id="assign-edit-quantity"
+                type="number"
+                min="1"
+                value={assignEditSheet.quantity}
+                onChange={e => setAssignEditSheet(prev => prev ? { ...prev, quantity: parseInt(e.target.value) || 1 } : null)}
+                data-testid="input-assign-edit-quantity"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="assign-edit-price">Price</Label>
+              <Input
+                id="assign-edit-price"
+                type="text"
+                inputMode="decimal"
+                value={assignEditSheet.price}
+                onChange={e => setAssignEditSheet(prev => prev ? { ...prev, price: e.target.value } : null)}
+                placeholder="0.00"
+                data-testid="input-assign-edit-price"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <div className="flex gap-2 flex-wrap">
+                {([
+                  { value: null, label: "None", Icon: Tag },
+                  { value: "appetizer", label: "Appetizer", Icon: Salad },
+                  { value: "meal", label: "Meal", Icon: UtensilsCrossed },
+                  { value: "drink", label: "Drink", Icon: GlassWater },
+                  { value: "dessert", label: "Dessert", Icon: Cake },
+                  { value: "other", label: "Other", Icon: Tag },
+                ] as const).map(({ value, label, Icon }) => {
+                  const selected = (assignEditSheet.category ?? null) === value;
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => setAssignEditSheet(prev => prev ? { ...prev, category: value } : null)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm border transition-colors
+                        ${selected
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background text-muted-foreground border-border hover-elevate"
+                        }`}
+                      data-testid={`button-assign-edit-category-${value ?? "none"}`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+      </BottomSheet>
+
       {/* ── Review Step: Item Edit Dialog ── */}
       <Dialog open={!!reviewEditItem} onOpenChange={open => { if (!open) setReviewEditItem(null); }}>
         <DialogContent className="max-w-sm mx-auto">
@@ -1767,7 +1875,7 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
   );
 }
 
-function AssignCategorySection({ label, items, assigned, peopleWithColors, getPersonColor, onAssignAll, onAssignItem }: {
+function AssignCategorySection({ label, items, assigned, peopleWithColors, getPersonColor, onAssignAll, onAssignItem, onEditItem }: {
   label: string;
   items: ReceiptItem[];
   assigned: number;
@@ -1775,6 +1883,7 @@ function AssignCategorySection({ label, items, assigned, peopleWithColors, getPe
   getPersonColor: (pid: string) => string;
   onAssignAll: () => void;
   onAssignItem: (itemId: string, itemName: string) => void;
+  onEditItem: (item: ReceiptItem) => void;
 }) {
   const allAssigned = assigned === items.length;
   const someAssigned = assigned > 0 && !allAssigned;
@@ -1811,10 +1920,11 @@ function AssignCategorySection({ label, items, assigned, peopleWithColors, getPe
           const nameHasCount = qty > 1 && item.name.startsWith(`${qty} `);
           const drawerLabel = qty > 1 && !nameHasCount ? `${qty}× ${item.name}` : item.name;
           return (
-            <button key={item.id} type="button"
-              onClick={() => onAssignItem(item.id, drawerLabel)}
-              className="w-full flex items-center gap-3 px-4 py-2.5 hover-elevate active-elevate-2 text-left"
-              data-testid={`button-assign-item-${item.id}`}>
+            <div key={item.id} className="flex items-center divide-x">
+              <button type="button"
+                onClick={() => onAssignItem(item.id, drawerLabel)}
+                className="flex-1 flex items-center gap-3 px-4 py-2.5 hover-elevate active-elevate-2 text-left min-w-0"
+                data-testid={`button-assign-item-${item.id}`}>
               {/* Per-item indicator */}
               <div className={`h-4 w-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
                 isAssigned ? "border-primary bg-primary" : "border-muted-foreground/30"
@@ -1849,7 +1959,14 @@ function AssignCategorySection({ label, items, assigned, peopleWithColors, getPe
                   </div>
                 )}
               </div>
-            </button>
+              </button>
+              <button type="button"
+                onClick={() => onEditItem(item)}
+                className="px-3 py-2.5 flex items-center justify-center text-muted-foreground hover-elevate active-elevate-2 flex-shrink-0"
+                data-testid={`button-edit-assign-item-${item.id}`}>
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            </div>
           );
         })}
       </div>
