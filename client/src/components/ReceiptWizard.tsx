@@ -1113,7 +1113,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
       {/* ── Assign People Sheet ── */}
       <BottomSheet open={!!assignSheet} onClose={() => setAssignSheet(null)}
         title={assignSheet?.itemIds.length === 1
-          ? <span>Who had the <strong>{assignSheet?.label}</strong>?</span>
+          ? <span>Who had a <strong>{assignSheet?.label}</strong>?</span>
           : `Assign ${assignSheet?.itemIds.length ?? ""} items`}
         subtitle={(() => {
           if (!assignSheet || assignSheet.itemIds.length !== 1) return undefined;
