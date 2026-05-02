@@ -42,6 +42,10 @@ const CAT_LABELS: Record<string, string> = {
   appetizer: "Appetizers", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other",
 };
 
+const CAT_LABELS_SINGULAR: Record<string, string> = {
+  appetizer: "Appetizer", meal: "Meal", drink: "Drink", dessert: "Dessert", other: "Other",
+};
+
 const SERVICE_CHARGE_TERMS = ["gratuity", "service charge", "service fee", "auto-grat", "auto grat", "autogratuity"];
 
 function getInitials(name: string) {
@@ -1119,7 +1123,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           const qty = item.quantity ?? 1;
           const totalPrice = unitPrice * qty;
           const effectiveCat = drawerCatOverrides[item.id] ?? item.category ?? "__none__";
-          const catOptions = [...Object.entries(CAT_LABELS), ["__none__", "Uncategorized"]] as [string, string][];
+          const catOptions = [...Object.entries(CAT_LABELS_SINGULAR), ["__none__", "Uncategorized"]] as [string, string][];
           return (
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground tabular-nums" data-testid={`text-item-price-${item.id}`}>
