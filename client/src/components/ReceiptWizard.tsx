@@ -720,25 +720,24 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
               id: "family" as DiningFormat,
               icon: Utensils,
               label: "Family Style",
-              detail: "All food split equally between everyone. Drinks assigned per person.",
+              lines: ["All food split equally.", "People pay for their own drinks."],
             },
             {
               id: "courses" as DiningFormat,
               icon: Layers,
               label: "Courses",
-              detail: "Apps & desserts split equally. Each person pays for their own entree and drinks.",
+              lines: ["Apps & desserts split equally.", "People pay for their own entree and drinks."],
             },
             {
               id: "mixed" as DiningFormat,
               icon: Shuffle,
               label: "Mixed Bag",
-              detail: "Full manual control — you assign every item yourself.",
+              lines: ["Full manual control."],
             },
           ];
-          const selectedFmt = formats.find(f => f.id === diningFormat);
           return (
-            <div className="p-4 space-y-4">
-              <div className="grid grid-cols-3 gap-3">
+            <div className="p-4">
+              <div className="grid grid-cols-3 gap-3 items-stretch">
                 {formats.map(fmt => {
                   const Icon = fmt.icon;
                   const selected = diningFormat === fmt.id;
@@ -747,7 +746,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                       key={fmt.id}
                       type="button"
                       onClick={() => setDiningFormat(fmt.id)}
-                      className={`relative aspect-square rounded-lg border-2 flex flex-col items-center justify-center gap-2 p-3 text-center transition-colors ${selected ? "border-primary bg-primary/5" : "border-border hover-elevate"}`}
+                      className={`relative rounded-lg border-2 flex flex-col items-center p-3 text-center transition-colors ${selected ? "border-primary bg-primary/5" : "border-border hover-elevate"}`}
                       data-testid={`button-format-${fmt.id}`}
                     >
                       {selected && (
@@ -755,17 +754,17 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                           <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
                         </span>
                       )}
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center mb-2 ${selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
                         <Icon className="h-5 w-5" />
                       </div>
-                      <p className={`text-xs font-semibold leading-tight ${selected ? "text-primary" : ""}`}>{fmt.label}</p>
+                      <p className={`text-xs font-semibold leading-tight mb-1.5 ${selected ? "text-primary" : ""}`}>{fmt.label}</p>
+                      {fmt.lines.map((line, i) => (
+                        <p key={i} className="text-[10px] leading-snug text-muted-foreground">{line}</p>
+                      ))}
                     </button>
                   );
                 })}
               </div>
-              {selectedFmt && (
-                <p className="text-sm text-muted-foreground text-center px-2">{selectedFmt.detail}</p>
-              )}
             </div>
           );
         })()}
