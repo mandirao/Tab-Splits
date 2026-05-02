@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 interface BottomSheetProps {
   open: boolean;
   onClose: () => void;
-  title: string;
+  title: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
 }

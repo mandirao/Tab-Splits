@@ -1095,13 +1095,16 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
       </div>
 
       {/* ── Assign People Sheet ── */}
-      <BottomSheet open={!!assignSheet} onClose={() => setAssignSheet(null)} title={`Assign ${assignSheet?.label ?? ""}`}>
+      <BottomSheet open={!!assignSheet} onClose={() => setAssignSheet(null)}
+        title={assignSheet?.itemIds.length === 1
+          ? <span>Who had the <strong>{assignSheet?.label}</strong>?</span>
+          : `Assign ${assignSheet?.itemIds.length ?? ""} items`}>
         <div className="space-y-4 pb-2">
-          <p className="text-sm text-muted-foreground">
-            {assignSheet?.itemIds.length === 1
-              ? "Select who is splitting this item"
-              : `${assignSheet?.itemIds.length} items will be assigned to the selected people.`}
-          </p>
+          {(assignSheet?.itemIds.length ?? 0) > 1 && (
+            <p className="text-sm text-muted-foreground">
+              {assignSheet?.itemIds.length} items will be assigned to the selected people.
+            </p>
+          )}
 
           {/* Person chips */}
           <div className="flex flex-wrap gap-2">
