@@ -565,10 +565,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
     const seq = getSeqItems(items, seqProcessed);
     if (seq.length === 0) return;
     const next = seq[0];
-    const qty = next.quantity ?? 1;
-    const nameHasCount = qty > 1 && next.name.startsWith(`${qty} `);
-    const drawerLabel = qty > 1 && !nameHasCount ? `${qty}× ${next.name}` : next.name;
-    openAssignSheet(drawerLabel, [next.id],
+    openAssignSheet(next.name, [next.id],
       (next.assignedTo as string[]) || [],
       (next.assignedQuantities as Record<string, number>) || {},
     );
@@ -1266,48 +1263,53 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           })()}
 
           {/* Split mode — only when 2+ people selected */}
-          {assignPeople.length >= 2 && (
-            <div className="space-y-3">
-              <div className="flex gap-1 bg-muted rounded-md p-1">
-                <button
-                  className={`flex-1 py-1.5 px-3 rounded text-sm font-medium transition-colors ${assignSplitMode === "equal" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground"}`}
-                  onClick={() => handleAssignSplitModeChange("equal")}
-                  data-testid="button-split-equal">
-                  Split equally
-                </button>
-                <button
-                  className={`flex-1 py-1.5 px-3 rounded text-sm font-medium transition-colors ${assignSplitMode === "share" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground"}`}
-                  onClick={() => handleAssignSplitModeChange("share")}
-                  data-testid="button-split-share">
-                  Split by share
-                </button>
-              </div>
+          {assignPeople.length >= 2 && (() => {
+            const totalShares = assignPeople.reduce((s, pid) => s + (assignedQuantities[pid] ?? 1), 0);
+            return (
+              <div className="space-y-2">
+                {/* Subtle disclosure toggle */}
+                <div className="flex justify-center">
+                  {assignSplitMode === "equal" ? (
+                    <button type="button"
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+                      onClick={() => handleAssignSplitModeChange("share")}
+                      data-testid="button-split-share">
+                      Not splitting equally? Adjust amounts
+                    </button>
+                  ) : (
+                    <button type="button"
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+                      onClick={() => handleAssignSplitModeChange("equal")}
+                      data-testid="button-split-equal">
+                      Back to equal split
+                    </button>
+                  )}
+                </div>
 
-              {assignSplitMode === "share" && (() => {
-                const totalShares = assignPeople.reduce((s, pid) => s + (assignedQuantities[pid] ?? 1), 0);
-                return (
-                  <div className="space-y-1">
+                {/* Per-person qty rows — compact, inline */}
+                {assignSplitMode === "share" && (
+                  <div className="rounded-lg border border-border divide-y divide-border overflow-hidden">
                     {assignPeople.map(pid => {
                       const person = peopleWithColors.find(p => p.id === pid);
                       if (!person) return null;
                       const weight = assignedQuantities[pid] ?? 1;
                       const pct = totalShares > 0 ? Math.round((weight / totalShares) * 100) : 0;
                       return (
-                        <div key={pid} className="flex items-center gap-3 py-2">
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0"
+                        <div key={pid} className="flex items-center gap-2 px-3 py-2">
+                          <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0"
                             style={{ backgroundColor: person.color }}>
                             {getInitials(person.name)}
                           </div>
-                          <span className="flex-1 text-sm font-medium truncate">{person.name}</span>
-                          <span className="text-xs text-muted-foreground w-9 text-right tabular-nums">{pct}%</span>
-                          <div className="flex items-center gap-2">
+                          <span className="flex-1 text-sm truncate">{person.name}</span>
+                          <span className="text-xs text-muted-foreground w-8 text-right tabular-nums">{pct}%</span>
+                          <div className="flex items-center gap-1.5 ml-1">
                             <Button size="icon" variant="outline"
                               onClick={() => updateAssignShare(pid, weight - 1)}
                               disabled={weight <= 1}
                               data-testid={`button-share-minus-${pid}`}>
                               <span className="text-base leading-none select-none">−</span>
                             </Button>
-                            <span className="w-8 text-center text-sm font-semibold tabular-nums" data-testid={`text-share-${pid}`}>
+                            <span className="w-6 text-center text-sm font-semibold tabular-nums" data-testid={`text-share-${pid}`}>
                               {weight}
                             </span>
                             <Button size="icon" variant="outline"
@@ -1320,10 +1322,10 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                       );
                     })}
                   </div>
-                );
-              })()}
-            </div>
-          )}
+                )}
+              </div>
+            );
+          })()}
 
         </div>
       </BottomSheet>
