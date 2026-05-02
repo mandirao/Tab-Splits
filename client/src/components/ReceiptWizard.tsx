@@ -1115,6 +1115,50 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
         title={assignSheet?.itemIds.length === 1
           ? <span>Who had a <strong>{assignSheet?.label}</strong>?</span>
           : `Assign ${assignSheet?.itemIds.length ?? ""} items`}
+        footer={(() => {
+          const isSingle = assignSheet?.itemIds.length === 1;
+          const seqRemaining = getSeqItems(items, new Set([
+            ...seqProcessed,
+            ...(assignSheet?.itemIds ?? []),
+          ]));
+          const isLast = seqRemaining.length === 0;
+
+          if (autoAdvanceMode && isSingle) {
+            return (
+              <div className="space-y-3">
+                <Button className="w-full h-12" disabled={assignPeople.length === 0 || isAssigning}
+                  onClick={confirmAssignAndNext} data-testid="button-assign-and-next">
+                  {isAssigning
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : isLast
+                      ? <><Check className="h-4 w-4 mr-2" />Assign &amp; Done</>
+                      : <>Assign &amp; Next <ArrowRight className="h-4 w-4 ml-2" /></>}
+                </Button>
+                <div className="flex justify-center gap-8">
+                  <button type="button" onClick={skipAndNext} disabled={isAssigning}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors py-1 disabled:opacity-40"
+                    data-testid="button-skip-item">
+                    Skip
+                  </button>
+                  <button type="button" onClick={confirmAssign} disabled={assignPeople.length === 0 || isAssigning}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors py-1 disabled:opacity-40"
+                    data-testid="button-confirm-assign">
+                    Assign only
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <Button className="w-full h-12" disabled={assignPeople.length === 0 || isAssigning}
+              onClick={confirmAssign} data-testid="button-confirm-assign">
+              {isAssigning
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : `Assign to ${assignPeople.length === peopleWithColors.length && assignPeople.length > 0 ? "everyone" : `${assignPeople.length} person${assignPeople.length !== 1 ? "s" : ""}`}`}
+            </Button>
+          );
+        })()}
         subtitle={(() => {
           if (!assignSheet || assignSheet.itemIds.length !== 1) return undefined;
           const item = items.find(i => i.id === assignSheet.itemIds[0]);
@@ -1255,46 +1299,6 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
             </div>
           )}
 
-          {/* Sequential buttons when in auto-advance mode (single-item sheet only) */}
-          {(() => {
-            const isSingle = assignSheet?.itemIds.length === 1;
-            const seqRemaining = getSeqItems(items, new Set([
-              ...seqProcessed,
-              ...(assignSheet?.itemIds ?? []),
-            ]));
-            const isLast = seqRemaining.length === 0;
-
-            if (autoAdvanceMode && isSingle) {
-              return (
-                <div className="space-y-2">
-                  <Button className="w-full h-12" disabled={assignPeople.length === 0 || isAssigning}
-                    onClick={confirmAssignAndNext} data-testid="button-assign-and-next">
-                    {isAssigning
-                      ? <Loader2 className="h-4 w-4 animate-spin" />
-                      : isLast
-                        ? <><Check className="h-4 w-4 mr-2" /> Assign &amp; Done</>
-                        : <>Assign &amp; Next <ArrowRight className="h-4 w-4 ml-2" /></>}
-                  </Button>
-                  <div className="flex gap-2">
-                    <Button variant="outline" className="flex-1" disabled={isAssigning}
-                      onClick={skipAndNext} data-testid="button-skip-item">
-                      Skip
-                    </Button>
-                    <Button variant="ghost" className="flex-1" disabled={assignPeople.length === 0 || isAssigning}
-                      onClick={confirmAssign} data-testid="button-confirm-assign">
-                      Assign only
-                    </Button>
-                  </div>
-                </div>
-              );
-            }
-
-            return (
-              <Button className="w-full h-12" disabled={assignPeople.length === 0 || isAssigning} onClick={confirmAssign} data-testid="button-confirm-assign">
-                {isAssigning ? <Loader2 className="h-4 w-4 animate-spin" /> : `Assign to ${assignPeople.length === peopleWithColors.length && assignPeople.length > 0 ? "everyone" : `${assignPeople.length} person${assignPeople.length !== 1 ? "s" : ""}`}`}
-              </Button>
-            );
-          })()}
         </div>
       </BottomSheet>
     </div>
