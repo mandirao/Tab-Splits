@@ -1144,8 +1144,8 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                   {isAssigning
                     ? <Loader2 className="h-4 w-4 animate-spin" />
                     : isLast
-                      ? <><Check className="h-4 w-4 mr-2" />Assign &amp; Done</>
-                      : <>Assign &amp; Next <ArrowRight className="h-4 w-4 ml-2" /></>}
+                      ? "Assign and done"
+                      : "Assign and continue"}
                 </Button>
                 <div className="flex justify-center gap-8">
                   <button type="button" onClick={skipAndNext} disabled={isAssigning}
