@@ -88,6 +88,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
   const [assignSplitMode, setAssignSplitMode] = useState<"equal" | "share">("equal");
   const [isAssigning, setIsAssigning] = useState(false);
   const [drawerCatOverrides, setDrawerCatOverrides] = useState<Record<string, string>>({});
+  const [drawerQtyOverrides, setDrawerQtyOverrides] = useState<Record<string, number>>({});
   // Sequential auto-advance
   const [autoAdvanceMode, setAutoAdvanceMode] = useState(true);
   const [autoAssignDone, setAutoAssignDone] = useState(false);
@@ -367,7 +368,19 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
     setAssignedQuantities(qtys);
     setAssignSplitMode(hasSaved ? "share" : "equal");
     setDrawerCatOverrides({});
+    setDrawerQtyOverrides({});
     setAssignSheet({ label, itemIds });
+  };
+
+  const changeItemQuantity = async (itemId: string, qty: number) => {
+    if (qty < 1) return;
+    setDrawerQtyOverrides(prev => ({ ...prev, [itemId]: qty }));
+    try {
+      await apiRequest(`/api/items/${itemId}`, "PATCH", { quantity: qty });
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
+    } catch {
+      setDrawerQtyOverrides(prev => { const n = { ...prev }; delete n[itemId]; return n; });
+    }
   };
 
   const changeItemCategory = async (itemId: string, cat: string) => {
@@ -1163,16 +1176,30 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           if (!assignSheet || assignSheet.itemIds.length !== 1) return undefined;
           const item = items.find(i => i.id === assignSheet.itemIds[0]);
           if (!item) return undefined;
-          const unitPrice = parseFloat(item.price);
-          const qty = item.quantity ?? 1;
-          const totalPrice = unitPrice * qty;
+          const linePrice = parseFloat(item.price);
+          const qty = drawerQtyOverrides[item.id] ?? item.quantity ?? 1;
           const effectiveCat = drawerCatOverrides[item.id] ?? item.category ?? "__none__";
           const catOptions = [...Object.entries(CAT_LABELS_SINGULAR), ["__none__", "Uncategorized"]] as [string, string][];
           return (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground tabular-nums" data-testid={`text-item-price-${item.id}`}>
-                {qty > 1 ? `${qty}× $${unitPrice.toFixed(2)} = ` : ""}
-                <span className="font-medium text-foreground">${totalPrice.toFixed(2)}</span>
+              {/* Qty stepper */}
+              <div className="flex items-center gap-1.5">
+                <Button size="icon" variant="outline"
+                  onClick={() => changeItemQuantity(item.id, qty - 1)}
+                  disabled={qty <= 1}
+                  data-testid={`button-qty-minus-${item.id}`}>
+                  <span className="text-base leading-none select-none">−</span>
+                </Button>
+                <span className="w-5 text-center text-sm font-semibold tabular-nums" data-testid={`text-qty-${item.id}`}>{qty}</span>
+                <Button size="icon" variant="outline"
+                  onClick={() => changeItemQuantity(item.id, qty + 1)}
+                  data-testid={`button-qty-plus-${item.id}`}>
+                  <span className="text-base leading-none select-none">+</span>
+                </Button>
+              </div>
+              {/* Receipt total — fixed, never recalculated */}
+              <span className="text-sm font-medium tabular-nums" data-testid={`text-item-price-${item.id}`}>
+                ${linePrice.toFixed(2)}
               </span>
               <Select value={effectiveCat} onValueChange={v => changeItemCategory(item.id, v)}>
                 <SelectTrigger className="w-auto h-7 text-xs gap-1 px-2 border-dashed" data-testid={`select-cat-${item.id}`}>
