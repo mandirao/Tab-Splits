@@ -851,17 +851,10 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
         {/* ────────────────────────────── STEP 4: ASSIGN ────────────────────────────── */}
         {step === 4 && (
           <div className="p-4 space-y-4">
-            {/* Progress summary + mode toggle */}
-            <div className="flex items-center gap-2">
-              <div className={`flex-1 flex items-center justify-between px-4 py-3 rounded-lg ${assignedCount === items.length ? "bg-green-50 dark:bg-green-900/20" : "bg-amber-50 dark:bg-amber-900/20"}`}>
-                <span className="text-sm font-medium">{assignedCount === items.length ? "All items assigned!" : `${assignedCount} of ${items.length} items assigned`}</span>
-                {assignedCount === items.length ? <Check className="h-4 w-4 text-green-600" /> : <span className="text-xs text-amber-600 font-medium">{items.length - assignedCount} remaining</span>}
-              </div>
-              <Button size="sm" variant="outline" className="flex-shrink-0 text-xs"
-                onClick={() => setAutoAdvanceMode(m => !m)}
-                data-testid="button-toggle-advance-mode">
-                {autoAdvanceMode ? "List view" : "Step through"}
-              </Button>
+            {/* Progress summary */}
+            <div className={`flex items-center justify-between px-4 py-3 rounded-lg ${assignedCount === items.length ? "bg-green-50 dark:bg-green-900/20" : "bg-amber-50 dark:bg-amber-900/20"}`}>
+              <span className="text-sm font-medium">{assignedCount === items.length ? "All items assigned!" : `${assignedCount} of ${items.length} items assigned`}</span>
+              {assignedCount === items.length ? <Check className="h-4 w-4 text-green-600" /> : <span className="text-xs text-amber-600 font-medium">{items.length - assignedCount} remaining</span>}
             </div>
 
             {peopleWithColors.length === 0 && (
@@ -1203,7 +1196,16 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
       {/* ── Assign People Sheet ── */}
       <BottomSheet open={!!assignSheet} onClose={() => { setAssignSheet(null); setAutoAdvanceMode(false); }}
         title={assignSheet?.itemIds.length === 1
-          ? <span>Who had a <strong>{assignSheet?.label}</strong>?</span>
+          ? <div className="flex items-center justify-between w-full">
+              <span>Who had a <strong>{assignSheet?.label}</strong>?</span>
+              {autoAdvanceMode && (
+                <button type="button" onClick={skipAndNext} disabled={isAssigning}
+                  className="text-sm font-normal text-muted-foreground hover:text-foreground transition-colors ml-2 flex-shrink-0 disabled:opacity-40"
+                  data-testid="button-skip-item">
+                  Skip
+                </button>
+              )}
+            </div>
           : `Assign ${assignSheet?.itemIds.length ?? ""} items`}
         footer={(() => {
           const isSingle = assignSheet?.itemIds.length === 1;
@@ -1215,28 +1217,14 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
 
           if (autoAdvanceMode && isSingle) {
             return (
-              <div className="space-y-3">
-                <Button className="w-full h-12" disabled={assignPeople.length === 0 || isAssigning}
-                  onClick={confirmAssignAndNext} data-testid="button-assign-and-next">
-                  {isAssigning
-                    ? <Loader2 className="h-4 w-4 animate-spin" />
-                    : isLast
-                      ? "Assign and done"
-                      : "Assign and continue"}
-                </Button>
-                <div className="flex justify-center gap-8">
-                  <button type="button" onClick={skipAndNext} disabled={isAssigning}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors py-1 disabled:opacity-40"
-                    data-testid="button-skip-item">
-                    Skip
-                  </button>
-                  <button type="button" onClick={confirmAssign} disabled={assignPeople.length === 0 || isAssigning}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors py-1 disabled:opacity-40"
-                    data-testid="button-confirm-assign">
-                    Assign only
-                  </button>
-                </div>
-              </div>
+              <Button className="w-full h-12" disabled={assignPeople.length === 0 || isAssigning}
+                onClick={confirmAssignAndNext} data-testid="button-assign-and-next">
+                {isAssigning
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : isLast
+                    ? "Assign and done"
+                    : "Assign and continue"}
+              </Button>
             );
           }
 
@@ -1330,14 +1318,60 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           })()}
 
           {(() => {
-            const isSingleMeal =
-              assignSheet?.itemIds.length === 1 &&
-              diningFormat === "courses" &&
-              ((drawerCatOverrides[assignSheet.itemIds[0]] ??
-                items.find(i => i.id === assignSheet.itemIds[0])?.category) === "meal");
+            const currentCat = assignSheet?.itemIds.length === 1
+              ? (drawerCatOverrides[assignSheet.itemIds[0]] ?? items.find(i => i.id === assignSheet.itemIds[0])?.category)
+              : null;
+
+            const isSingleMeal = currentCat === "meal" && diningFormat === "courses";
             const mealItems = isSingleMeal
               ? items.filter(i => i.category === "meal" && i.id !== assignSheet!.itemIds[0])
               : [];
+
+            const isSingleDrink = currentCat === "drink";
+            const drinkItems = isSingleDrink
+              ? items.filter(i => i.category === "drink" && i.id !== assignSheet!.itemIds[0])
+              : [];
+
+            const getAnnotation = (isSingleMeal || isSingleDrink)
+              ? (personId: string) => {
+                  if (isSingleMeal) {
+                    const theirMeals = mealItems.filter(i => (i.assignedTo as string[])?.includes(personId));
+                    if (theirMeals.length === 1)
+                      return (
+                        <span className="text-[10px] font-medium text-muted-foreground max-w-[72px] truncate leading-none"
+                          title={theirMeals[0].name}>
+                          {theirMeals[0].name}
+                        </span>
+                      );
+                    if (theirMeals.length > 1)
+                      return (
+                        <span className="text-[10px] font-medium text-red-500 leading-none">
+                          ×{theirMeals.length} entrees
+                        </span>
+                      );
+                    return null;
+                  }
+                  if (isSingleDrink) {
+                    const theirDrinks = drinkItems.filter(i => (i.assignedTo as string[])?.includes(personId));
+                    if (theirDrinks.length === 1)
+                      return (
+                        <span className="text-[10px] text-muted-foreground max-w-[72px] truncate leading-none"
+                          title={theirDrinks[0].name}>
+                          {theirDrinks[0].name}
+                        </span>
+                      );
+                    if (theirDrinks.length > 1)
+                      return (
+                        <span className="text-[10px] text-muted-foreground leading-none">
+                          ×{theirDrinks.length} drinks
+                        </span>
+                      );
+                    return null;
+                  }
+                  return null;
+                }
+              : undefined;
+
             return (
               <AssignPersonSheetBody
                 people={peopleWithColors}
@@ -1346,23 +1380,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                 onSelectedPeopleChange={setAssignPeople}
                 onAssignedQuantitiesChange={setAssignedQuantities}
                 resetKey={assignSheet?.itemIds.join(",") ?? null}
-                getChipAnnotation={isSingleMeal ? (personId) => {
-                  const theirMeals = mealItems.filter(i => (i.assignedTo as string[])?.includes(personId));
-                  if (theirMeals.length === 1)
-                    return (
-                      <span className="text-[10px] font-medium text-green-600 max-w-[72px] truncate leading-none"
-                        title={theirMeals[0].name}>
-                        {theirMeals[0].name}
-                      </span>
-                    );
-                  if (theirMeals.length > 1)
-                    return (
-                      <span className="text-[10px] font-medium text-red-500 leading-none">
-                        ×{theirMeals.length} entrees
-                      </span>
-                    );
-                  return null;
-                } : undefined}
+                getChipAnnotation={getAnnotation}
               />
             );
           })()}
