@@ -419,7 +419,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [bulkAssignSheetOpen, setBulkAssignSheetOpen] = useState(false);
   const [bulkSelectedPeople, setBulkSelectedPeople] = useState<string[]>([]);
   const [bulkAssignedQuantities, setBulkAssignedQuantities] = useState<Record<string, number>>({});
-  const [bulkCategorizeSheetOpen, setBulkCategorizeSheetOpen] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
 
   useEffect(() => {
@@ -789,14 +788,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     },
   });
 
-  const bulkCategorizeMutation = useMutation({
-    mutationFn: async ({ itemIds, category }: { itemIds: string[]; category: string }) => {
-      await Promise.all(itemIds.map(id => apiRequest(`/api/items/${id}`, "PATCH", { category })));
-    },
-    onError: (error: any) => {
-      toast({ title: "Failed to categorize items", description: error.message, variant: "destructive" });
-    },
-  });
 
   const enterBulkMode = (initialItemId?: string) => {
     setBulkAssignMode(true);
@@ -809,7 +800,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     setBulkAssignMode(false);
     setBulkSelectedItems(new Set());
     setBulkAssignSheetOpen(false);
-    setBulkCategorizeSheetOpen(false);
     setBulkSelectedPeople([]);
     setBulkAssignedQuantities({});
   };
@@ -838,16 +828,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     setBulkAssignSheetOpen(false);
   };
 
-  const categorizeMutation = useMutation({
-    mutationFn: () => apiRequest(`/api/receipts/${receiptId}/categorize`, "POST", {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
-      toast({ title: "Items categorized", description: "Items sorted into Appetizers, Meals, Drinks, and Desserts" });
-    },
-    onError: (error: any) => {
-      toast({ title: "Categorization failed", description: error.message, variant: "destructive" });
-    },
-  });
 
   const handleTipChange = (amount: number) => {
     updateReceiptMutation.mutate({ tip: amount });
@@ -1437,20 +1417,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                   </Button>
                 ) : (
                   <>
-                    {items.length > 0 && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => categorizeMutation.mutate()}
-                        disabled={categorizeMutation.isPending}
-                        className="flex items-center gap-1 px-2"
-                        data-testid="button-categorize"
-                      >
-                        {categorizeMutation.isPending
-                          ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" />Sorting…</>
-                          : <><Sparkles className="h-3.5 w-3.5" />Categorize</>}
-                      </Button>
-                    )}
                     <Button
                       size="sm"
                       variant="ghost"
@@ -1588,15 +1554,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                 data-testid="button-cancel-bulk"
               >
                 Cancel
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setBulkCategorizeSheetOpen(true)}
-                disabled={bulkSelectedItems.size === 0 || bulkCategorizeMutation.isPending}
-                data-testid="button-categorize-bulk"
-              >
-                Set category
               </Button>
               <Button
                 className="flex-1"
@@ -1891,57 +1848,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         </div>
       </BottomSheet>
 
-      {/* Bulk categorize sheet */}
-      <BottomSheet
-        open={bulkCategorizeSheetOpen}
-        onClose={() => setBulkCategorizeSheetOpen(false)}
-        title={`Categorize ${bulkSelectedItems.size} item${bulkSelectedItems.size !== 1 ? "s" : ""}`}
-      >
-        <div className="space-y-2 pb-2">
-          {([
-            { value: "appetizer", label: "Appetizer", Icon: Salad, description: "Starters, shared plates, small bites, dips" },
-            { value: "meal", label: "Meal", Icon: UtensilsCrossed, description: "Entrees, mains, sides, salads" },
-            { value: "drink", label: "Drink", Icon: GlassWater, description: "Beverages, cocktails, coffee, tea" },
-            { value: "dessert", label: "Dessert", Icon: Cake, description: "Ice cream, cake, pastries, sweets" },
-            { value: "other", label: "Other", Icon: Tag, description: "Service charges, fees, non-food" },
-          ] as const).map(({ value, label, Icon, description }) => {
-            const isPendingThis = bulkCategorizeMutation.isPending && bulkCategorizeMutation.variables?.category === value;
-            return (
-              <button
-                key={value}
-                type="button"
-                onClick={async () => {
-                  if (bulkCategorizeMutation.isPending) return;
-                  const n = bulkSelectedItems.size;
-                  const ids = Array.from(bulkSelectedItems);
-                  try {
-                    await bulkCategorizeMutation.mutateAsync({ itemIds: ids, category: value });
-                    await queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
-                    toast({ title: `Categorized ${n} item${n !== 1 ? "s" : ""}` });
-                    setBulkCategorizeSheetOpen(false);
-                    exitBulkMode();
-                  } catch {
-                    // error toast handled by onError
-                  }
-                }}
-                className={`flex items-center gap-4 w-full p-4 rounded-lg border bg-background text-left transition-opacity ${bulkCategorizeMutation.isPending ? "opacity-60" : "hover-elevate active-elevate-2"}`}
-                data-testid={`button-bulk-category-${value}`}
-              >
-                <div className="flex-shrink-0 h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                  {isPendingThis
-                    ? <RefreshCw className="h-5 w-5 text-foreground animate-spin" />
-                    : <Icon className="h-5 w-5 text-foreground" />
-                  }
-                </div>
-                <div>
-                  <div className="font-medium">{label}</div>
-                  <div className="text-sm text-muted-foreground">{description}</div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </BottomSheet>
 
       <BottomSheet
         open={shareBottomSheetOpen}
