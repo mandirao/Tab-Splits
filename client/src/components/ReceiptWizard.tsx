@@ -14,7 +14,8 @@ import {
   Sparkles, Users, Plus, X, CheckCircle2, Circle, AlertTriangle,
   Pencil, Trash2, Phone, MinusCircle, UserPlus, Utensils, Layers, Shuffle, ImageIcon,
 } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import type { Receipt, ReceiptItem, Person } from "@shared/schema";
 import { CAT_LABELS, CAT_LABELS_SINGULAR, getInitials } from "@/lib/categories";
 import AssignPersonSheetBody from "@/components/AssignPersonSheetBody";
@@ -1538,36 +1539,16 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
         </div>
       )}
 
-      {/* Restaurant name — always editable, image icon when scan available */}
+      {/* Restaurant name — click to edit, same pattern as admin receipt view */}
       <div className="relative flex items-center justify-center min-h-[2.25rem]">
-        {editingRestaurantName ? (
-          <div className="flex items-center gap-1.5 w-full">
-            <Input
-              value={editRestaurantValue}
-              onChange={e => setEditRestaurantValue(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") saveRestaurantName(); if (e.key === "Escape") setEditingRestaurantName(false); }}
-              className="text-center font-semibold flex-1"
-              autoFocus
-              data-testid="input-restaurant-name"
-            />
-            <Button size="icon" variant="ghost" onClick={saveRestaurantName} data-testid="button-save-restaurant-name">
-              <Check className="h-4 w-4" />
-            </Button>
-            <Button size="icon" variant="ghost" onClick={() => setEditingRestaurantName(false)} data-testid="button-cancel-restaurant-name">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        ) : (
-          <>
-            <p className="font-semibold text-lg">{receipt?.restaurantName || "Unknown Restaurant"}</p>
-            <Button size="icon" variant="ghost" className="ml-1"
-              onClick={() => { setEditRestaurantValue(receipt?.restaurantName ?? ""); setEditingRestaurantName(true); }}
-              data-testid="button-edit-restaurant-name">
-              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-            </Button>
-          </>
-        )}
-        {scannedImageUrl && !editingRestaurantName && (
+        <button
+          className="text-xl font-bold px-2 py-0.5 rounded-md border border-border/50 bg-transparent cursor-text mx-auto block text-center transition-colors hover:border-border focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={() => { setEditRestaurantValue(receipt?.restaurantName ?? ""); setEditingRestaurantName(true); }}
+          data-testid="button-edit-restaurant-name"
+        >
+          {receipt?.restaurantName || "Unknown Restaurant"}
+        </button>
+        {scannedImageUrl && (
           <Button size="icon" variant="ghost" className="absolute right-0"
             onClick={() => setShowImageDialog(true)} data-testid="button-view-scanned-image">
             <ImageIcon className="h-4 w-4 text-muted-foreground" />
@@ -1726,6 +1707,36 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
       </Card>
 
       {/* Scanned image dialog */}
+      <Dialog open={editingRestaurantName} onOpenChange={(open) => !open && setEditingRestaurantName(false)}>
+        <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>Edit Tab Name</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="wizard-tab-name">Restaurant / Tab Name</Label>
+              <Input
+                id="wizard-tab-name"
+                value={editRestaurantValue}
+                onChange={e => setEditRestaurantValue(e.target.value)}
+                placeholder="e.g., Joe's Pizza"
+                onKeyDown={e => { if (e.key === "Enter" && editRestaurantValue.trim()) saveRestaurantName(); }}
+                data-testid="input-restaurant-name"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setEditingRestaurantName(false)} data-testid="button-cancel-restaurant-name">
+                Cancel
+              </Button>
+              <Button className="flex-1" onClick={saveRestaurantName} disabled={!editRestaurantValue.trim()} data-testid="button-save-restaurant-name">
+                Save
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showImageDialog} onOpenChange={setShowImageDialog}>
         <DialogContent className="max-w-sm p-2">
           <DialogTitle className="sr-only">Receipt scan</DialogTitle>
