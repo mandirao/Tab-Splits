@@ -78,6 +78,9 @@ Preferred communication style: Simple, everyday language.
 - All numeric currency values stored as DECIMAL(10,2) for precision
 - UUID primary keys generated via PostgreSQL's gen_random_uuid()
 
+**Shared Utilities (`client/src/lib/`):**
+- `categories.ts` — single source of truth for category constants (`CAT_LABELS`, `CAT_LABELS_SINGULAR`, `CAT_LABELS_SHORT`, `CATEGORY_ORDER`) and `getInitials(name)` helper; imported by all pages and components
+
 **Server Architecture:**
 - Separation of concerns: routes.ts handles HTTP layer, storage.ts handles data layer
 - Interface-based storage layer (IStorage) for potential future abstraction

@@ -8,6 +8,7 @@ import type { Receipt, ReceiptItem, Person, Payment } from "@shared/schema";
 import { ArrowLeft, Image } from "lucide-react";
 import { useLocation } from "wouter";
 import { getDisplayNames } from "@/lib/personDisplay";
+import { CAT_LABELS, CATEGORY_ORDER, getInitials } from "@/lib/categories";
 
 function gcd(a: number, b: number): number { return b === 0 ? a : gcd(b, a % b); }
 
@@ -26,10 +27,7 @@ function firstNameOnly(fullName: string) {
   return fullName.trim().split(/\s+/)[0] ?? fullName;
 }
 
-const CAT_ORDER = ["appetizer", "meal", "dessert", "other", "drink"] as const;
-const CAT_LABELS: Record<string, string> = {
-  appetizer: "Appetizers", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other",
-};
+const CAT_ORDER = CATEGORY_ORDER;
 
 function OrganizerItemRow({
   item,
@@ -139,7 +137,7 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
   const getInitialsForPerson = (personId: string) => {
     const person = getPersonById(personId);
     if (!person) return "";
-    return person.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    return getInitials(person.name);
   };
   const getColorForPerson = (personId: string) => getPersonById(personId)?.color || PERSON_COLORS[0];
 

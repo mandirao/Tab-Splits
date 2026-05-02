@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import type { Receipt, ReceiptItem, Person } from "@shared/schema";
+import { CAT_LABELS, CAT_LABELS_SINGULAR, getInitials } from "@/lib/categories";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -40,19 +41,7 @@ const STEP_SUBTITLES = [
 
 type DiningFormat = "family" | "courses" | "mixed";
 
-const CAT_LABELS: Record<string, string> = {
-  appetizer: "Appetizers", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other",
-};
-
-const CAT_LABELS_SINGULAR: Record<string, string> = {
-  appetizer: "Appetizer", meal: "Meal", drink: "Drink", dessert: "Dessert", other: "Other",
-};
-
 const SERVICE_CHARGE_TERMS = ["gratuity", "service charge", "service fee", "auto-grat", "auto grat", "autogratuity"];
-
-function getInitials(name: string) {
-  return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
-}
 
 // ─── Main Wizard Component ────────────────────────────────────────────────────
 

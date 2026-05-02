@@ -24,6 +24,7 @@ import logoUrl from "@assets/icon-1024_1775014486817.png";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { getInitials } from "@/lib/categories";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import type { Receipt, ReceiptItem, Person } from "@shared/schema";
@@ -216,7 +217,7 @@ function ManageDinersSheet({ open, onOpenChange }: { open: boolean; onOpenChange
                         <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
                           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                             <span className="text-sm font-semibold text-primary">
-                              {pendingContact.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
+                              {getInitials(pendingContact.name)}
                             </span>
                           </div>
                           <div className="flex-1 min-w-0">

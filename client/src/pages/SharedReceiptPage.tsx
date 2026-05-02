@@ -8,6 +8,7 @@ import type { ReceiptItem } from "@shared/schema";
 import { Image, ChevronRight, ArrowRight } from "lucide-react";
 import logoUrl from "@assets/icon-1024_1775014486817.png";
 import { getDisplayNames } from "@/lib/personDisplay";
+import { CAT_LABELS, CATEGORY_ORDER, getInitials } from "@/lib/categories";
 
 interface RedactedPerson {
   id: string;
@@ -89,8 +90,6 @@ function SharedItemRow({
       ? (sDen === 1 ? `${sNum}x` : `${sNum}/${sDen}`)
       : null;
 
-  const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-
   return (
     <div
       className={`flex items-center gap-3 py-3 ${!isAssigned ? 'opacity-60' : ''}`}
@@ -150,7 +149,6 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
 
   const displayNames = getDisplayNames(peopleWithColors);
   const getPersonById = (id: string) => peopleWithColors.find(p => p.id === id);
-  const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   const getColorForPerson = (id: string) => getPersonById(id)?.color || PERSON_COLORS[0];
 
   // Scroll the active tab into view whenever selectedTab changes
@@ -293,10 +291,7 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
   const myTotals = !isAllTab ? personTotals.get(selectedTab) : null;
 
   const hasCategoryData = items.some(item => item.category);
-  const CAT_ORDER = ["appetizer", "meal", "dessert", "other", "drink"] as const;
-  const CAT_LABELS: Record<string, string> = {
-    appetizer: "Appetizers", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other",
-  };
+  const CAT_ORDER = CATEGORY_ORDER;
 
   // Only show tabs for people who have at least one item assigned
   const peopleInTabs = peopleWithColors.filter(p => personTotals.has(p.id));

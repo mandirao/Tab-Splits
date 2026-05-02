@@ -39,6 +39,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Receipt, ReceiptItem, Person } from "@shared/schema";
 import ReceiptWizard from "@/components/ReceiptWizard";
+import { CAT_LABELS, CAT_LABELS_SHORT, CATEGORY_ORDER, getInitials } from "@/lib/categories";
 
 interface Settlement {
   from: Person;
@@ -264,7 +265,7 @@ function AddPersonPanel({ receiptId, receiptPeopleIds, allPeople, onAdded, compa
               <div className="flex items-center gap-3 p-3 rounded-md border bg-background">
                 <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <span className="text-sm font-semibold text-primary">
-                    {pendingContact.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
+                    {getInitials(pendingContact.name)}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
@@ -499,7 +500,7 @@ function AssignmentSheetBody({
           <PersonChip
             key={person.id}
             name={person.name}
-            initials={person.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+            initials={getInitials(person.name)}
             color={person.color}
             selected={selectedPeople.includes(person.id)}
             onSelect={() => handleTogglePerson(person.id)}
@@ -557,7 +558,7 @@ function AssignmentSheetBody({
                       className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0"
                       style={{ backgroundColor: person.color }}
                     >
-                      {person.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                      {getInitials(person.name)}
                     </div>
                     <span className="flex-1 text-sm font-medium">{person.name}</span>
                     <span className="text-xs text-muted-foreground w-9 text-right tabular-nums">
@@ -1241,7 +1242,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const getInitialsForPerson = (personId: string) => {
     const person = getPersonById(personId);
     if (!person) return "";
-    return person.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    return getInitials(person.name);
   };
   const getColorForPerson = (personId: string) => getPersonById(personId)?.color || PERSON_COLORS[0];
 
@@ -1298,7 +1299,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const subtotalDifference = Math.abs(itemsSubtotal - subtotal);
   const totalsMatch = subtotalDifference < 0.01;
 
-  const CATEGORY_TABS = ["appetizer", "meal", "dessert", "other", "drink"] as const;
+  const CATEGORY_TABS = CATEGORY_ORDER;
   const hasCategoryData = items.some(item => item.category);
   const showCategoryGroups = hasCategoryData && selectedTab !== "unassigned" && !CATEGORY_TABS.includes(selectedTab as any);
 
@@ -1573,7 +1574,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                   data-testid="tab-categories-menu"
                 >
                   {CATEGORY_TABS.includes(selectedTab as any)
-                    ? ({ appetizer: "Apps", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" } as Record<string, string>)[selectedTab]
+                    ? CAT_LABELS_SHORT[selectedTab]
                     : "Categories"}
                   <ChevronDown className="h-3 w-3 opacity-60" />
                 </Button>
@@ -1582,7 +1583,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                 {(["appetizer", "meal", "dessert", "other", "drink"] as const).map(cat => {
                   const catCount = items.filter(i => i.category === cat).length;
                   if (catCount === 0) return null;
-                  const catLabel = { appetizer: "Appetizers", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" }[cat];
+                  const catLabel = CAT_LABELS[cat];
                   return (
                     <DropdownMenuItem key={cat} onClick={() => setSelectedTab(cat)} data-testid={`tab-category-${cat}`}>
                       {catLabel}
@@ -1628,7 +1629,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                         : selectedTab === "unassigned"
                         ? "Unassigned Items"
                         : CATEGORY_TABS.includes(selectedTab as any)
-                        ? ({ appetizer: "Appetizers", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" } as Record<string, string>)[selectedTab]
+                        ? CAT_LABELS[selectedTab]
                         : `${getPersonById(selectedTab)?.name}'s Items`}
                     </h2>
                     <span className="text-xs text-muted-foreground flex-shrink-0">
@@ -1698,7 +1699,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               (["appetizer", "meal", "dessert", "other", "drink"] as const).map(cat => {
                 const catItems = filteredItems.filter(i => i.category === cat);
                 if (catItems.length === 0) return null;
-                const catLabel = { appetizer: "Appetizers", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" }[cat];
+                const catLabel = CAT_LABELS[cat];
                 const selectedCount = bulkAssignMode ? catItems.filter(i => bulkSelectedItems.has(i.id)).length : 0;
                 const allCatSelected = bulkAssignMode && selectedCount === catItems.length;
                 const someCatSelected = bulkAssignMode && selectedCount > 0 && !allCatSelected;
@@ -1749,7 +1750,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               <>
                 {/* Select-all banner — only in bulk mode on a category tab */}
                 {bulkAssignMode && CATEGORY_TABS.includes(selectedTab as any) && (() => {
-                  const catLabel = { appetizer: "Appetizers", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other" }[selectedTab as "appetizer" | "meal" | "drink" | "dessert" | "other"];
+                  const catLabel = CAT_LABELS[selectedTab];
                   const selectedCount = filteredItems.filter(i => bulkSelectedItems.has(i.id)).length;
                   const allSelected = filteredItems.length > 0 && selectedCount === filteredItems.length;
                   const someSelected = selectedCount > 0 && !allSelected;
@@ -2215,7 +2216,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                               className="w-6 h-6 rounded-full text-white text-xs font-semibold flex items-center justify-center"
                               style={{ backgroundColor: person.color }}
                             >
-                              {person.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                              {getInitials(person.name)}
                             </div>
                             <span>{person.name}</span>
                           </div>
@@ -2259,7 +2260,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             const hasAssignedItems = items.some(item =>
               (item.assignedTo as string[] || []).includes(person.id)
             );
-            const initials = person.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+            const initials = getInitials(person.name);
             return (
               <div
                 key={person.id}
@@ -2329,7 +2330,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           ) : (
             peopleWithColors.map((person) => {
               const isSelected = selectedPayerPersonId === person.id;
-              const initials = person.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+              const initials = getInitials(person.name);
               return (
                 <div key={person.id}>
                   <button
