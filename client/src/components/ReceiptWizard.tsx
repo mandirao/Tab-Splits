@@ -83,6 +83,10 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
   const [assignedQuantities, setAssignedQuantities] = useState<Record<string, number>>({});
   const [assignSplitMode, setAssignSplitMode] = useState<"equal" | "share">("equal");
   const [isAssigning, setIsAssigning] = useState(false);
+  // Sequential auto-advance
+  const [autoAdvanceMode, setAutoAdvanceMode] = useState(true);
+  const [autoAssignDone, setAutoAssignDone] = useState(false);
+  const [seqProcessed, setSeqProcessed] = useState<Set<string>>(new Set());
 
   // Step 5 tip
   const [tipPct, setTipPct] = useState(20);
@@ -110,6 +114,9 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
       setVenmoInput("");
       setDiningFormat(null);
       autoAssignApplied.current = false;
+      setAutoAssignDone(false);
+      setAutoAdvanceMode(true);
+      setSeqProcessed(new Set());
     }
   }, [open, initialReceiptId]);
 
@@ -377,6 +384,20 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
     }
   };
 
+  const confirmAssignAndNext = async () => {
+    if (!assignSheet || assignPeople.length === 0) return;
+    // Mark as processed immediately so auto-advance skips it before query refetches
+    setSeqProcessed(prev => new Set([...prev, ...assignSheet.itemIds]));
+    await confirmAssign();
+    // auto-advance effect opens the next item once assignSheet becomes null
+  };
+
+  const skipAndNext = () => {
+    if (!assignSheet) return;
+    setSeqProcessed(prev => new Set([...prev, ...assignSheet.itemIds]));
+    setAssignSheet(null);
+  };
+
   const everyoneSelected = peopleWithColors.length > 0 && peopleWithColors.every(p => assignPeople.includes(p.id));
 
   const toggleAssignPerson = (pid: string) => {
@@ -475,7 +496,10 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
       toAssign.push(...items.filter(i => i.category === "appetizer" || i.category === "dessert" || i.category === "other"));
     }
 
-    if (toAssign.length === 0) return;
+    if (toAssign.length === 0) {
+      setAutoAssignDone(true);
+      return;
+    }
 
     const run = async () => {
       try {
@@ -488,10 +512,38 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
         const label = diningFormat === "family" ? "food items assigned to everyone" : "shared items assigned to everyone";
         toast({ title: `Auto-assigned: ${toAssign.length} ${label}` });
       } catch { /* silent — user can still assign manually */ }
+      finally { setAutoAssignDone(true); }
     };
     run();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, receiptId, diningFormat, items.length, peopleWithColors.length]);
+
+  // ─── Sequential item order (same category order as the Assign display) ──
+  const CAT_SEQ_ORDER = ["appetizer", "meal", "dessert", "other", "drink"] as const;
+  const getSeqItems = (itemList: ReceiptItem[], processed: Set<string>) => [
+    ...CAT_SEQ_ORDER.flatMap(cat => itemList.filter(i => i.category === cat)),
+    ...itemList.filter(i => !i.category),
+  ].filter(i => !(i.assignedTo as string[])?.length && !processed.has(i.id));
+
+  // ─── Auto-advance: open the next unassigned item when no sheet is open ───
+  useEffect(() => {
+    if (step !== 4 || !autoAdvanceMode || assignSheet) return;
+    // Wait until auto-assign has finished (or not needed for mixed)
+    if (!autoAssignDone && diningFormat !== "mixed") return;
+    if (items.length === 0 || peopleWithColors.length === 0) return;
+
+    const seq = getSeqItems(items, seqProcessed);
+    if (seq.length === 0) return;
+    const next = seq[0];
+    const qty = next.quantity ?? 1;
+    const nameHasCount = qty > 1 && next.name.startsWith(`${qty} `);
+    const drawerLabel = qty > 1 && !nameHasCount ? `${qty}× ${next.name}` : next.name;
+    openAssignSheet(drawerLabel, [next.id],
+      (next.assignedTo as string[]) || [],
+      (next.assignedQuantities as Record<string, number>) || {},
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, autoAdvanceMode, autoAssignDone, diningFormat, items, assignSheet, seqProcessed, peopleWithColors.length]);
 
   // ─── Navigation ───────────────────────────────────────────────────────────
   const handleNext = async () => {
@@ -827,10 +879,17 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
         {/* ────────────────────────────── STEP 4: ASSIGN ────────────────────────────── */}
         {step === 4 && (
           <div className="p-4 space-y-4">
-            {/* Progress summary */}
-            <div className={`flex items-center justify-between px-4 py-3 rounded-lg ${assignedCount === items.length ? "bg-green-50 dark:bg-green-900/20" : "bg-amber-50 dark:bg-amber-900/20"}`}>
-              <span className="text-sm font-medium">{assignedCount === items.length ? "All items assigned!" : `${assignedCount} of ${items.length} items assigned`}</span>
-              {assignedCount === items.length ? <Check className="h-4 w-4 text-green-600" /> : <span className="text-xs text-amber-600 font-medium">{items.length - assignedCount} remaining</span>}
+            {/* Progress summary + mode toggle */}
+            <div className="flex items-center gap-2">
+              <div className={`flex-1 flex items-center justify-between px-4 py-3 rounded-lg ${assignedCount === items.length ? "bg-green-50 dark:bg-green-900/20" : "bg-amber-50 dark:bg-amber-900/20"}`}>
+                <span className="text-sm font-medium">{assignedCount === items.length ? "All items assigned!" : `${assignedCount} of ${items.length} items assigned`}</span>
+                {assignedCount === items.length ? <Check className="h-4 w-4 text-green-600" /> : <span className="text-xs text-amber-600 font-medium">{items.length - assignedCount} remaining</span>}
+              </div>
+              <Button size="sm" variant="outline" className="flex-shrink-0 text-xs"
+                onClick={() => setAutoAdvanceMode(m => !m)}
+                data-testid="button-toggle-advance-mode">
+                {autoAdvanceMode ? "List view" : "Step through"}
+              </Button>
             </div>
 
             {peopleWithColors.length === 0 && (
@@ -1118,9 +1177,46 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
             </div>
           )}
 
-          <Button className="w-full h-12" disabled={assignPeople.length === 0 || isAssigning} onClick={confirmAssign} data-testid="button-confirm-assign">
-            {isAssigning ? <Loader2 className="h-4 w-4 animate-spin" /> : `Assign to ${assignPeople.length === peopleWithColors.length && assignPeople.length > 0 ? "everyone" : `${assignPeople.length} person${assignPeople.length !== 1 ? "s" : ""}`}`}
-          </Button>
+          {/* Sequential buttons when in auto-advance mode (single-item sheet only) */}
+          {(() => {
+            const isSingle = assignSheet?.itemIds.length === 1;
+            const seqRemaining = getSeqItems(items, new Set([
+              ...seqProcessed,
+              ...(assignSheet?.itemIds ?? []),
+            ]));
+            const isLast = seqRemaining.length === 0;
+
+            if (autoAdvanceMode && isSingle) {
+              return (
+                <div className="space-y-2">
+                  <Button className="w-full h-12" disabled={assignPeople.length === 0 || isAssigning}
+                    onClick={confirmAssignAndNext} data-testid="button-assign-and-next">
+                    {isAssigning
+                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                      : isLast
+                        ? <><Check className="h-4 w-4 mr-2" /> Assign &amp; Done</>
+                        : <>Assign &amp; Next <ArrowRight className="h-4 w-4 ml-2" /></>}
+                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="flex-1" disabled={isAssigning}
+                      onClick={skipAndNext} data-testid="button-skip-item">
+                      Skip
+                    </Button>
+                    <Button variant="ghost" className="flex-1" disabled={assignPeople.length === 0 || isAssigning}
+                      onClick={confirmAssign} data-testid="button-confirm-assign">
+                      Assign only
+                    </Button>
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <Button className="w-full h-12" disabled={assignPeople.length === 0 || isAssigning} onClick={confirmAssign} data-testid="button-confirm-assign">
+                {isAssigning ? <Loader2 className="h-4 w-4 animate-spin" /> : `Assign to ${assignPeople.length === peopleWithColors.length && assignPeople.length > 0 ? "everyone" : `${assignPeople.length} person${assignPeople.length !== 1 ? "s" : ""}`}`}
+              </Button>
+            );
+          })()}
         </div>
       </BottomSheet>
     </div>
