@@ -1,7 +1,6 @@
 import { useRef } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { UserPlus, Check, Pencil } from "lucide-react";
+import { Check, Pencil } from "lucide-react";
 
 interface ReceiptItemRowProps {
   id: string;
@@ -138,15 +137,13 @@ export default function ReceiptItemRow({
               ))}
             </button>
           ) : (
-            <Button
-              size="sm"
-              variant="outline"
+            <button
               onClick={onAssign}
-              className="flex-shrink-0"
+              className="text-xs text-muted-foreground italic flex-shrink-0 hover:text-foreground transition-colors"
               data-testid="button-assign"
             >
-              <UserPlus className="h-4 w-4" />
-            </Button>
+              Tap to assign
+            </button>
           )}
         </>
       )}
