@@ -977,6 +977,8 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                         onAssignAll={() => openAssignSheet(CAT_LABELS[cat], catItems.map(i => i.id))}
                         onAssignItem={(itemId, itemName) => {
                           const item = items.find(i => i.id === itemId);
+                          setAutoAdvanceMode(true);
+                          setSeqProcessed(new Set());
                           openAssignSheet(itemName, [itemId],
                             (item?.assignedTo as string[]) || [],
                             (item?.assignedQuantities as Record<string, number>) || {},
@@ -992,6 +994,8 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                       onAssignAll={() => openAssignSheet("Other Items", items.filter(i => !i.category).map(i => i.id))}
                       onAssignItem={(itemId, itemName) => {
                         const item = items.find(i => i.id === itemId);
+                        setAutoAdvanceMode(true);
+                        setSeqProcessed(new Set());
                         openAssignSheet(itemName, [itemId],
                           (item?.assignedTo as string[]) || [],
                           (item?.assignedQuantities as Record<string, number>) || {},
@@ -1008,6 +1012,8 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                     onAssignAll={() => openAssignSheet("All Items", items.map(i => i.id))}
                     onAssignItem={(itemId, itemName) => {
                       const item = items.find(i => i.id === itemId);
+                      setAutoAdvanceMode(true);
+                      setSeqProcessed(new Set());
                       openAssignSheet(itemName, [itemId],
                         (item?.assignedTo as string[]) || [],
                         (item?.assignedQuantities as Record<string, number>) || {},
@@ -1124,7 +1130,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
       </div>
 
       {/* ── Assign People Sheet ── */}
-      <BottomSheet open={!!assignSheet} onClose={() => setAssignSheet(null)}
+      <BottomSheet open={!!assignSheet} onClose={() => { setAssignSheet(null); setAutoAdvanceMode(false); }}
         title={assignSheet?.itemIds.length === 1
           ? <span>Who had a <strong>{assignSheet?.label}</strong>?</span>
           : `Assign ${assignSheet?.itemIds.length ?? ""} items`}
