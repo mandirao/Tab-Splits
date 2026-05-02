@@ -1893,34 +1893,35 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                 {urlCopied ? "Copied!" : "Copy Link"}
               </Button>
 
-              {/* Send via text — only shown when someone has a phone number */}
-              {peopleWithColors.filter(p => p.phone).length > 0 && (
+              {/* Send via text — all diners; disabled if no phone */}
+              {peopleWithColors.length > 0 && (
                 <>
                   <div className="border-t" />
                   <div className="space-y-2">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Send via Text</p>
-                    {peopleWithColors
-                      .filter(person => person.phone)
-                      .map((person) => (
-                        <Button
-                          key={person.id}
-                          variant="outline"
-                          className="w-full justify-between"
-                          onClick={() => handleSendSMS(person.id)}
-                          data-testid={`button-send-sms-${person.id}`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-6 h-6 rounded-full text-white text-xs font-semibold flex items-center justify-center"
-                              style={{ backgroundColor: person.color }}
-                            >
-                              {getInitials(person.name)}
-                            </div>
-                            <span>{person.name}</span>
+                    {peopleWithColors.map((person) => (
+                      <Button
+                        key={person.id}
+                        variant="outline"
+                        className="w-full justify-between"
+                        disabled={!person.phone}
+                        onClick={() => person.phone && handleSendSMS(person.id)}
+                        data-testid={`button-send-sms-${person.id}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-6 h-6 rounded-full text-white text-xs font-semibold flex items-center justify-center"
+                            style={{ backgroundColor: person.color }}
+                          >
+                            {getInitials(person.name)}
                           </div>
-                          <MessageSquare className="h-4 w-4" />
-                        </Button>
-                      ))}
+                          <span>{person.name}</span>
+                        </div>
+                        {person.phone
+                          ? <MessageSquare className="h-4 w-4" />
+                          : <span className="text-xs text-muted-foreground">Missing phone number</span>}
+                      </Button>
+                    ))}
                   </div>
                 </>
               )}

@@ -1215,30 +1215,32 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                     : <><Copy className="h-4 w-4 mr-2" />Copy Link</>}
                 </Button>
 
-                {receiptPeople.filter(p => (p as any).phone).length > 0 && (
+                {receiptPeople.length > 0 && (
                   <Card>
                     <CardContent className="p-4 space-y-2">
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Send via Text</p>
                       <div className="space-y-2">
-                        {receiptPeople
-                          .filter(p => (p as any).phone)
-                          .map(person => {
-                            const color = peopleWithColors.find(pw => pw.id === person.id)?.color ?? "#888";
-                            return (
-                              <Button key={person.id} variant="outline" className="w-full justify-between"
-                                onClick={() => handleWizardSMS({ name: person.name, phone: (person as any).phone })}
-                                data-testid={`button-wizard-sms-${person.id}`}>
-                                <div className="flex items-center gap-2">
-                                  <div className="w-6 h-6 rounded-full text-white text-xs font-semibold flex items-center justify-center"
-                                    style={{ backgroundColor: color }}>
-                                    {getInitials(person.name)}
-                                  </div>
-                                  <span>{person.name}</span>
+                        {receiptPeople.map(person => {
+                          const hasPhone = !!(person as any).phone;
+                          const color = peopleWithColors.find(pw => pw.id === person.id)?.color ?? "#888";
+                          return (
+                            <Button key={person.id} variant="outline" className="w-full justify-between"
+                              disabled={!hasPhone}
+                              onClick={() => hasPhone && handleWizardSMS({ name: person.name, phone: (person as any).phone })}
+                              data-testid={`button-wizard-sms-${person.id}`}>
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full text-white text-xs font-semibold flex items-center justify-center"
+                                  style={{ backgroundColor: color }}>
+                                  {getInitials(person.name)}
                                 </div>
-                                <MessageSquare className="h-4 w-4" />
-                              </Button>
-                            );
-                          })}
+                                <span>{person.name}</span>
+                              </div>
+                              {hasPhone
+                                ? <MessageSquare className="h-4 w-4" />
+                                : <span className="text-xs text-muted-foreground">Missing phone number</span>}
+                            </Button>
+                          );
+                        })}
                       </div>
                     </CardContent>
                   </Card>
