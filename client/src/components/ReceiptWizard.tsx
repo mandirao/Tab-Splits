@@ -746,20 +746,20 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                       key={fmt.id}
                       type="button"
                       onClick={() => setDiningFormat(fmt.id)}
-                      className={`relative rounded-lg border-2 flex flex-col items-center p-3 text-center transition-colors ${selected ? "border-primary bg-primary/5" : "border-border hover-elevate"}`}
+                      className={`relative rounded-lg border-2 flex flex-col items-center p-4 text-center transition-colors min-h-[160px] ${selected ? "border-primary bg-primary/5" : "border-border hover-elevate"}`}
                       data-testid={`button-format-${fmt.id}`}
                     >
                       {selected && (
                         <span className="absolute top-2 right-2">
-                          <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                          <CheckCircle2 className="h-4 w-4 text-primary" />
                         </span>
                       )}
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center mb-2 ${selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center mb-2.5 ${selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
                         <Icon className="h-5 w-5" />
                       </div>
-                      <p className={`text-xs font-semibold leading-tight mb-1.5 ${selected ? "text-primary" : ""}`}>{fmt.label}</p>
+                      <p className={`text-sm font-semibold leading-tight mb-2 ${selected ? "text-primary" : ""}`}>{fmt.label}</p>
                       {fmt.lines.map((line, i) => (
-                        <p key={i} className="text-[10px] leading-snug text-muted-foreground">{line}</p>
+                        <p key={i} className="text-xs leading-snug text-muted-foreground">{line}</p>
                       ))}
                     </button>
                   );
