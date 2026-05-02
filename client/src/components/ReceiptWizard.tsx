@@ -1531,15 +1531,18 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
             ) : (
               <div className="flex items-center gap-2 px-4 py-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{item.name}</p>
+                  <div className="flex items-center gap-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{item.name}</p>
+                    <Button size="icon" variant="ghost" className="shrink-0 -ml-1"
+                      onClick={() => startEdit(item)} data-testid={`button-edit-item-${item.id}`}>
+                      <Pencil className="h-3 w-3 text-muted-foreground" />
+                    </Button>
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     {item.quantity > 1 && !item.name.startsWith(`${item.quantity} `) && `${item.quantity}× · `}
                     ${parseFloat(item.price).toFixed(2)}
                   </p>
                 </div>
-                <Button size="icon" variant="ghost" onClick={() => startEdit(item)} data-testid={`button-edit-item-${item.id}`}>
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
                 <Select value={effectiveCat(item)} onValueChange={v => saveCategory(item.id, v)}>
                   <SelectTrigger className="w-28 flex-shrink-0 h-9 text-xs" data-testid={`select-category-${item.id}`}>
                     <SelectValue placeholder="Type?" />
