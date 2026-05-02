@@ -714,61 +714,61 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
         )}
 
         {/* ────────────────────────────── STEP 2: FORMAT ────────────────────────────── */}
-        {step === 2 && (
-          <div className="p-4 space-y-3">
-            {[
-              {
-                id: "family" as DiningFormat,
-                icon: Utensils,
-                label: "Family Style",
-                description: "Everyone splits all food equally. Each person pays for their own drinks.",
-                detail: "All food → everyone. Drinks → tap to assign per person.",
-              },
-              {
-                id: "courses" as DiningFormat,
-                icon: Layers,
-                label: "Courses",
-                description: "Appetizers & desserts split equally. Each person pays for their own entree and drinks.",
-                detail: "Apps + desserts → everyone. Entrees + drinks → assign individually.",
-              },
-              {
-                id: "mixed" as DiningFormat,
-                icon: Shuffle,
-                label: "Mixed Bag",
-                description: "Some things were shared, others were individual. You'll assign each item manually.",
-                detail: "Full control — assign every item yourself.",
-              },
-            ].map(fmt => {
-              const Icon = fmt.icon;
-              const selected = diningFormat === fmt.id;
-              return (
-                <button
-                  key={fmt.id}
-                  type="button"
-                  onClick={() => setDiningFormat(fmt.id)}
-                  className={`w-full text-left rounded-lg border-2 p-4 transition-colors ${selected ? "border-primary bg-primary/5" : "border-border hover-elevate"}`}
-                  data-testid={`button-format-${fmt.id}`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`mt-0.5 flex-shrink-0 h-9 w-9 rounded-full flex items-center justify-center ${selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-sm">{fmt.label}</p>
-                        {selected && <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">{fmt.description}</p>
+        {step === 2 && (() => {
+          const formats = [
+            {
+              id: "family" as DiningFormat,
+              icon: Utensils,
+              label: "Family Style",
+              detail: "All food split equally between everyone. Drinks assigned per person.",
+            },
+            {
+              id: "courses" as DiningFormat,
+              icon: Layers,
+              label: "Courses",
+              detail: "Apps & desserts split equally. Each person pays for their own entree and drinks.",
+            },
+            {
+              id: "mixed" as DiningFormat,
+              icon: Shuffle,
+              label: "Mixed Bag",
+              detail: "Full manual control — you assign every item yourself.",
+            },
+          ];
+          const selectedFmt = formats.find(f => f.id === diningFormat);
+          return (
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                {formats.map(fmt => {
+                  const Icon = fmt.icon;
+                  const selected = diningFormat === fmt.id;
+                  return (
+                    <button
+                      key={fmt.id}
+                      type="button"
+                      onClick={() => setDiningFormat(fmt.id)}
+                      className={`relative aspect-square rounded-lg border-2 flex flex-col items-center justify-center gap-2 p-3 text-center transition-colors ${selected ? "border-primary bg-primary/5" : "border-border hover-elevate"}`}
+                      data-testid={`button-format-${fmt.id}`}
+                    >
                       {selected && (
-                        <p className="text-xs text-primary font-medium mt-1.5">{fmt.detail}</p>
+                        <span className="absolute top-2 right-2">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                        </span>
                       )}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <p className={`text-xs font-semibold leading-tight ${selected ? "text-primary" : ""}`}>{fmt.label}</p>
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedFmt && (
+                <p className="text-sm text-muted-foreground text-center px-2">{selectedFmt.detail}</p>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ────────────────────────────── STEP 3: DINERS ────────────────────────────── */}
         {step === 3 && (
