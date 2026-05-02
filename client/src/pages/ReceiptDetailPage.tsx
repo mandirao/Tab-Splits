@@ -40,6 +40,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Receipt, ReceiptItem, Person } from "@shared/schema";
 import ReceiptWizard from "@/components/ReceiptWizard";
 import { CAT_LABELS, CAT_LABELS_SHORT, CATEGORY_ORDER, getInitials } from "@/lib/categories";
+import AssignPersonSheetBody from "@/components/AssignPersonSheetBody";
 
 interface Settlement {
   from: Person;
@@ -377,225 +378,6 @@ function AddPersonPanel({ receiptId, receiptPeopleIds, allPeople, onAdded, compa
   );
 }
 
-// ─── AssignmentSheetBody ─────────────────────────────────────────────────────
-
-interface AssignmentSheetBodyProps {
-  selectedItemId: string | null;
-  items: any[];
-  peopleWithColors: any[];
-  selectedPeople: string[];
-  assignedQuantities: Record<string, number>;
-  setAssignedQuantities: (q: Record<string, number>) => void;
-  setSelectedPeople: (p: string[]) => void;
-  receiptId: string;
-  receiptPeopleIds: string[];
-  allPeople: Person[];
-}
-
-function AssignmentSheetBody({
-  selectedItemId,
-  items,
-  peopleWithColors,
-  selectedPeople,
-  assignedQuantities,
-  setAssignedQuantities,
-  setSelectedPeople,
-  receiptId,
-  receiptPeopleIds,
-  allPeople,
-}: AssignmentSheetBodyProps) {
-  // Detect initial split mode: if any assigned person has a saved weight, start in "share" mode
-  const hasSavedShares = selectedPeople.length > 1 &&
-    selectedPeople.some(pid => (assignedQuantities[pid] ?? 0) > 0);
-  const [splitMode, setSplitMode] = useState<"equal" | "share">(hasSavedShares ? "share" : "equal");
-
-  // Reset split mode when the item changes
-  useEffect(() => {
-    const hasSaved = selectedPeople.length > 1 &&
-      selectedPeople.some(pid => (assignedQuantities[pid] ?? 0) > 0);
-    setSplitMode(hasSaved ? "share" : "equal");
-  }, [selectedItemId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleTogglePerson = (personId: string) => {
-    const isSelected = selectedPeople.includes(personId);
-    if (isSelected) {
-      const next = selectedPeople.filter(pid => pid !== personId);
-      setSelectedPeople(next);
-      const newQtys = { ...assignedQuantities };
-      delete newQtys[personId];
-      setAssignedQuantities(newQtys);
-    } else {
-      const next = [...selectedPeople, personId];
-      setSelectedPeople(next);
-      if (splitMode === "share") {
-        setAssignedQuantities({ ...assignedQuantities, [personId]: 1 });
-      }
-    }
-  };
-
-  const allPeopleIds = peopleWithColors.map((p: any) => p.id);
-  const everyoneSelected = allPeopleIds.length > 0 && allPeopleIds.every(id => selectedPeople.includes(id));
-
-  const handleSelectEveryone = () => {
-    if (everyoneSelected) {
-      setSelectedPeople([]);
-      setAssignedQuantities({});
-    } else {
-      setSelectedPeople(allPeopleIds);
-      if (splitMode === "share") {
-        const newQtys: Record<string, number> = {};
-        allPeopleIds.forEach(id => { newQtys[id] = assignedQuantities[id] || 1; });
-        setAssignedQuantities(newQtys);
-      }
-    }
-  };
-
-  const handleSplitModeChange = (mode: "equal" | "share") => {
-    setSplitMode(mode);
-    if (mode === "equal") {
-      setAssignedQuantities({});
-    } else {
-      const newQtys: Record<string, number> = {};
-      selectedPeople.forEach(pid => { newQtys[pid] = assignedQuantities[pid] || 1; });
-      setAssignedQuantities(newQtys);
-    }
-  };
-
-  const updateShare = (personId: string, value: number) => {
-    const clamped = Math.max(1, Math.round(value));
-    setAssignedQuantities({ ...assignedQuantities, [personId]: clamped });
-  };
-
-  const totalShares = selectedPeople.reduce((s, pid) => s + (assignedQuantities[pid] ?? 1), 0);
-
-  const selectedItem = selectedItemId ? items.find((i: any) => i.id === selectedItemId) : null;
-  const itemQty = selectedItem ? (Number(selectedItem.quantity) || 1) : 1;
-  const itemPrice = selectedItem ? Number(selectedItem.price) : 0;
-  const unitPrice = itemQty > 1 ? itemPrice / itemQty : itemPrice;
-  const nameHasCount = itemQty > 1 && selectedItem?.name?.startsWith(`${itemQty} `);
-  const displayItemName = nameHasCount
-    ? selectedItem!.name.slice(String(itemQty).length + 1)
-    : (selectedItem?.name ?? "");
-
-  return (
-    <div className="space-y-4">
-      {/* People chip selector */}
-      <div className="flex flex-wrap gap-2 items-center">
-        {allPeopleIds.length > 1 && (
-          <button
-            type="button"
-            onClick={handleSelectEveryone}
-            data-testid="button-select-everyone"
-            className={`flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium border transition-colors ${
-              everyoneSelected
-                ? "bg-foreground text-background border-foreground"
-                : "bg-background text-foreground border-border hover-elevate"
-            }`}
-          >
-            <Users className="h-3.5 w-3.5" />
-            Everyone
-          </button>
-        )}
-        {peopleWithColors.map((person: any) => (
-          <PersonChip
-            key={person.id}
-            name={person.name}
-            initials={getInitials(person.name)}
-            color={person.color}
-            selected={selectedPeople.includes(person.id)}
-            onSelect={() => handleTogglePerson(person.id)}
-          />
-        ))}
-        <AddPersonPanel
-          receiptId={receiptId}
-          receiptPeopleIds={receiptPeopleIds}
-          allPeople={allPeople}
-          onAdded={(id) => setSelectedPeople((prev: string[]) => [...prev, id])}
-          compact
-        />
-      </div>
-
-      {/* Split mode — only when 2+ people are assigned */}
-      {selectedPeople.length >= 2 && (
-        <div className="space-y-3">
-          {/* Toggle */}
-          <div className="flex gap-1 bg-muted rounded-md p-1">
-            <button
-              className={`flex-1 py-1.5 px-3 rounded text-sm font-medium transition-colors ${
-                splitMode === "equal"
-                  ? "bg-background shadow-sm text-foreground"
-                  : "text-muted-foreground"
-              }`}
-              onClick={() => handleSplitModeChange("equal")}
-              data-testid="button-split-equal"
-            >
-              Split equally
-            </button>
-            <button
-              className={`flex-1 py-1.5 px-3 rounded text-sm font-medium transition-colors ${
-                splitMode === "share"
-                  ? "bg-background shadow-sm text-foreground"
-                  : "text-muted-foreground"
-              }`}
-              onClick={() => handleSplitModeChange("share")}
-              data-testid="button-split-share"
-            >
-              Split by share
-            </button>
-          </div>
-
-          {/* Share weight controls */}
-          {splitMode === "share" && (
-            <div className="space-y-1">
-              {selectedPeople.map(pid => {
-                const person = peopleWithColors.find((p: any) => p.id === pid);
-                if (!person) return null;
-                const weight = assignedQuantities[pid] ?? 1;
-                const pct = totalShares > 0 ? Math.round((weight / totalShares) * 100) : 0;
-                return (
-                  <div key={pid} className="flex items-center gap-3 py-2">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0"
-                      style={{ backgroundColor: person.color }}
-                    >
-                      {getInitials(person.name)}
-                    </div>
-                    <span className="flex-1 text-sm font-medium">{person.name}</span>
-                    <span className="text-xs text-muted-foreground w-9 text-right tabular-nums">
-                      {pct}%
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        onClick={() => updateShare(pid, weight - 1)}
-                        disabled={weight <= 1}
-                        data-testid={`button-share-minus-${pid}`}
-                      >
-                        <span className="text-base leading-none select-none">−</span>
-                      </Button>
-                      <span className="w-8 text-center text-sm font-semibold tabular-nums" data-testid={`text-share-${pid}`}>
-                        {weight}
-                      </span>
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        onClick={() => updateShare(pid, weight + 1)}
-                        data-testid={`button-share-plus-${pid}`}
-                      >
-                        <span className="text-base leading-none select-none">+</span>
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function ReceiptDetailPage({ params }: { params: { id: string } }) {
   const receiptId = params?.id || window.location.pathname.split('/')[2];
@@ -1951,17 +1733,22 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           </Button>
         }
       >
-        <AssignmentSheetBody
-          selectedItemId={selectedItemId}
-          items={items}
-          peopleWithColors={peopleWithColors}
+        <AssignPersonSheetBody
+          people={peopleWithColors}
           selectedPeople={selectedPeople}
           assignedQuantities={assignedQuantities}
-          setAssignedQuantities={setAssignedQuantities}
-          setSelectedPeople={setSelectedPeople}
-          receiptId={receiptId}
-          receiptPeopleIds={peopleWithColors.map(p => p.id)}
-          allPeople={allPeople}
+          onSelectedPeopleChange={setSelectedPeople}
+          onAssignedQuantitiesChange={setAssignedQuantities}
+          resetKey={selectedItemId}
+          addPersonSlot={
+            <AddPersonPanel
+              receiptId={receiptId}
+              receiptPeopleIds={peopleWithColors.map(p => p.id)}
+              allPeople={allPeople}
+              onAdded={(id) => setSelectedPeople((prev: string[]) => [...prev, id])}
+              compact
+            />
+          }
         />
       </BottomSheet>
 
@@ -1981,17 +1768,22 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           </Button>
         }
       >
-        <AssignmentSheetBody
-          selectedItemId={null}
-          items={items}
-          peopleWithColors={peopleWithColors}
+        <AssignPersonSheetBody
+          people={peopleWithColors}
           selectedPeople={bulkSelectedPeople}
           assignedQuantities={bulkAssignedQuantities}
-          setAssignedQuantities={setBulkAssignedQuantities}
-          setSelectedPeople={setBulkSelectedPeople}
-          receiptId={receiptId}
-          receiptPeopleIds={peopleWithColors.map(p => p.id)}
-          allPeople={allPeople}
+          onSelectedPeopleChange={setBulkSelectedPeople}
+          onAssignedQuantitiesChange={setBulkAssignedQuantities}
+          resetKey={null}
+          addPersonSlot={
+            <AddPersonPanel
+              receiptId={receiptId}
+              receiptPeopleIds={peopleWithColors.map(p => p.id)}
+              allPeople={allPeople}
+              onAdded={(id) => setBulkSelectedPeople((prev: string[]) => [...prev, id])}
+              compact
+            />
+          }
         />
       </BottomSheet>
 

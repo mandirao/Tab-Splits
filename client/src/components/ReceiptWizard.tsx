@@ -17,6 +17,7 @@ import {
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import type { Receipt, ReceiptItem, Person } from "@shared/schema";
 import { CAT_LABELS, CAT_LABELS_SINGULAR, getInitials } from "@/lib/categories";
+import AssignPersonSheetBody from "@/components/AssignPersonSheetBody";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -76,7 +77,6 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
   } | null>(null);
   const [assignPeople, setAssignPeople] = useState<string[]>([]);
   const [assignedQuantities, setAssignedQuantities] = useState<Record<string, number>>({});
-  const [assignSplitMode, setAssignSplitMode] = useState<"equal" | "share">("equal");
   const [isAssigning, setIsAssigning] = useState(false);
   const [drawerCatOverrides, setDrawerCatOverrides] = useState<Record<string, string>>({});
   const [drawerQtyOverrides, setDrawerQtyOverrides] = useState<Record<string, number>>({});
@@ -363,7 +363,6 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
       (currentAssignment?.some(pid => (qtys[pid] ?? 0) > 0) ?? false);
     setAssignPeople(currentAssignment ?? []);
     setAssignedQuantities(qtys);
-    setAssignSplitMode(hasSaved ? "share" : "equal");
     setDrawerCatOverrides({});
     setDrawerQtyOverrides({});
     setAssignSheet({ label, itemIds });
@@ -394,7 +393,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
     if (!assignSheet || assignPeople.length === 0) return;
     setIsAssigning(true);
     try {
-      const qtys = assignSplitMode === "share" ? assignedQuantities : {};
+      const qtys = assignedQuantities;
       await Promise.all(
         assignSheet.itemIds.map(id =>
           apiRequest(`/api/items/${id}`, "PATCH", { assignedTo: assignPeople, assignedQuantities: qtys })
@@ -422,55 +421,6 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
     if (!assignSheet) return;
     setSeqProcessed(prev => new Set([...prev, ...assignSheet.itemIds]));
     setAssignSheet(null);
-  };
-
-  const everyoneSelected = peopleWithColors.length > 0 && peopleWithColors.every(p => assignPeople.includes(p.id));
-
-  const toggleAssignPerson = (pid: string) => {
-    const isSelected = assignPeople.includes(pid);
-    if (isSelected) {
-      setAssignPeople(assignPeople.filter(id => id !== pid));
-      if (assignSplitMode === "share") {
-        const newQ = { ...assignedQuantities };
-        delete newQ[pid];
-        setAssignedQuantities(newQ);
-      }
-    } else {
-      setAssignPeople([...assignPeople, pid]);
-      if (assignSplitMode === "share") {
-        setAssignedQuantities({ ...assignedQuantities, [pid]: 1 });
-      }
-    }
-  };
-
-  const toggleEveryone = () => {
-    if (everyoneSelected) {
-      setAssignPeople([]);
-      setAssignedQuantities({});
-    } else {
-      const allIds = peopleWithColors.map(p => p.id);
-      setAssignPeople(allIds);
-      if (assignSplitMode === "share") {
-        const newQ: Record<string, number> = {};
-        allIds.forEach(id => { newQ[id] = assignedQuantities[id] || 1; });
-        setAssignedQuantities(newQ);
-      }
-    }
-  };
-
-  const handleAssignSplitModeChange = (mode: "equal" | "share") => {
-    setAssignSplitMode(mode);
-    if (mode === "equal") {
-      setAssignedQuantities({});
-    } else {
-      const newQ: Record<string, number> = {};
-      assignPeople.forEach(pid => { newQ[pid] = assignedQuantities[pid] || 1; });
-      setAssignedQuantities(newQ);
-    }
-  };
-
-  const updateAssignShare = (pid: string, value: number) => {
-    setAssignedQuantities({ ...assignedQuantities, [pid]: Math.max(1, Math.round(value)) });
   };
 
   // ─── Step 5: Tip save ─────────────────────────────────────────────────────
@@ -1378,113 +1328,41 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
             );
           })()}
 
-          {/* Person chips */}
           {(() => {
-            const isSingleMeal = assignSheet?.itemIds.length === 1 &&
+            const isSingleMeal =
+              assignSheet?.itemIds.length === 1 &&
               diningFormat === "courses" &&
-              (() => {
-                const item = items.find(i => i.id === assignSheet.itemIds[0]);
-                return (drawerCatOverrides[assignSheet.itemIds[0]] ?? item?.category) === "meal";
-              })();
+              ((drawerCatOverrides[assignSheet.itemIds[0]] ??
+                items.find(i => i.id === assignSheet.itemIds[0])?.category) === "meal");
             const mealItems = isSingleMeal
               ? items.filter(i => i.category === "meal" && i.id !== assignSheet!.itemIds[0])
               : [];
             return (
-              <div className="flex flex-wrap gap-2">
-                {peopleWithColors.length > 1 && (
-                  <button type="button" onClick={toggleEveryone} data-testid="button-select-everyone"
-                    className={`flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium border transition-colors ${everyoneSelected ? "bg-foreground text-background border-foreground" : "bg-background text-foreground border-border hover-elevate"}`}>
-                    <Users className="h-3.5 w-3.5" /> Everyone
-                  </button>
-                )}
-                {peopleWithColors.map(person => {
-                  const theirMeals = isSingleMeal
-                    ? mealItems.filter(i => (i.assignedTo as string[])?.includes(person.id))
-                    : [];
-                  return (
-                    <div key={person.id} className="flex flex-col items-center gap-0.5">
-                      <PersonChip name={person.name} initials={getInitials(person.name)} color={person.color}
-                        selected={assignPeople.includes(person.id)} onSelect={() => toggleAssignPerson(person.id)} />
-                      {isSingleMeal && theirMeals.length === 1 && (
-                        <span className="text-[10px] font-medium text-green-600 max-w-[72px] truncate leading-none"
-                          title={theirMeals[0].name}>
-                          {theirMeals[0].name}
-                        </span>
-                      )}
-                      {isSingleMeal && theirMeals.length > 1 && (
-                        <span className="text-[10px] font-medium text-red-500 leading-none">
-                          ×{theirMeals.length} entrees
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
-
-          {/* Split mode — only when 2+ people selected */}
-          {assignPeople.length >= 2 && (() => {
-            const totalShares = assignPeople.reduce((s, pid) => s + (assignedQuantities[pid] ?? 1), 0);
-            return (
-              <div className="space-y-2">
-                {/* Subtle disclosure toggle */}
-                <div className="flex justify-center">
-                  {assignSplitMode === "equal" ? (
-                    <button type="button"
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
-                      onClick={() => handleAssignSplitModeChange("share")}
-                      data-testid="button-split-share">
-                      Not splitting equally? Adjust amounts
-                    </button>
-                  ) : (
-                    <button type="button"
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
-                      onClick={() => handleAssignSplitModeChange("equal")}
-                      data-testid="button-split-equal">
-                      Back to equal split
-                    </button>
-                  )}
-                </div>
-
-                {/* Per-person qty rows — compact, inline */}
-                {assignSplitMode === "share" && (
-                  <div className="rounded-lg border border-border divide-y divide-border overflow-hidden">
-                    {assignPeople.map(pid => {
-                      const person = peopleWithColors.find(p => p.id === pid);
-                      if (!person) return null;
-                      const weight = assignedQuantities[pid] ?? 1;
-                      const pct = totalShares > 0 ? Math.round((weight / totalShares) * 100) : 0;
-                      return (
-                        <div key={pid} className="flex items-center gap-2 px-3 py-2">
-                          <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0"
-                            style={{ backgroundColor: person.color }}>
-                            {getInitials(person.name)}
-                          </div>
-                          <span className="flex-1 text-sm truncate">{person.name}</span>
-                          <span className="text-xs text-muted-foreground w-8 text-right tabular-nums">{pct}%</span>
-                          <div className="flex items-center gap-1.5 ml-1">
-                            <Button size="icon" variant="outline"
-                              onClick={() => updateAssignShare(pid, weight - 1)}
-                              disabled={weight <= 1}
-                              data-testid={`button-share-minus-${pid}`}>
-                              <span className="text-base leading-none select-none">−</span>
-                            </Button>
-                            <span className="w-6 text-center text-sm font-semibold tabular-nums" data-testid={`text-share-${pid}`}>
-                              {weight}
-                            </span>
-                            <Button size="icon" variant="outline"
-                              onClick={() => updateAssignShare(pid, weight + 1)}
-                              data-testid={`button-share-plus-${pid}`}>
-                              <span className="text-base leading-none select-none">+</span>
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <AssignPersonSheetBody
+                people={peopleWithColors}
+                selectedPeople={assignPeople}
+                assignedQuantities={assignedQuantities}
+                onSelectedPeopleChange={setAssignPeople}
+                onAssignedQuantitiesChange={setAssignedQuantities}
+                resetKey={assignSheet?.itemIds.join(",") ?? null}
+                getChipAnnotation={isSingleMeal ? (personId) => {
+                  const theirMeals = mealItems.filter(i => (i.assignedTo as string[])?.includes(personId));
+                  if (theirMeals.length === 1)
+                    return (
+                      <span className="text-[10px] font-medium text-green-600 max-w-[72px] truncate leading-none"
+                        title={theirMeals[0].name}>
+                        {theirMeals[0].name}
+                      </span>
+                    );
+                  if (theirMeals.length > 1)
+                    return (
+                      <span className="text-[10px] font-medium text-red-500 leading-none">
+                        ×{theirMeals.length} entrees
+                      </span>
+                    );
+                  return null;
+                } : undefined}
+              />
             );
           })()}
 

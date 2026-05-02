@@ -81,6 +81,9 @@ Preferred communication style: Simple, everyday language.
 **Shared Utilities (`client/src/lib/`):**
 - `categories.ts` — single source of truth for category constants (`CAT_LABELS`, `CAT_LABELS_SINGULAR`, `CAT_LABELS_SHORT`, `CATEGORY_ORDER`) and `getInitials(name)` helper; imported by all pages and components
 
+**Shared Components (`client/src/components/`):**
+- `AssignPersonSheetBody.tsx` — shared person-assignment UI used by both the admin receipt detail page and the wizard; handles Everyone toggle, PersonChip list, split-mode disclosure link, and share-weight steppers; accepts `addPersonSlot` (ReactNode) for the admin's AddPersonPanel and `getChipAnnotation` (per-person ReactNode) for the wizard's entree-count badge
+
 **Server Architecture:**
 - Separation of concerns: routes.ts handles HTTP layer, storage.ts handles data layer
 - Interface-based storage layer (IStorage) for potential future abstraction
