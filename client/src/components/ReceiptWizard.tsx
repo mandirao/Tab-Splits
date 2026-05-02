@@ -12,8 +12,9 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Camera, Upload, Loader2, RotateCw, RotateCcw, Check, ArrowLeft, ArrowRight,
   Sparkles, Users, Plus, X, CheckCircle2, Circle, AlertTriangle,
-  Pencil, Trash2, Phone, MinusCircle, UserPlus, Utensils, Layers, Shuffle,
+  Pencil, Trash2, Phone, MinusCircle, UserPlus, Utensils, Layers, Shuffle, ImageIcon,
 } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import type { Receipt, ReceiptItem, Person } from "@shared/schema";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -1355,6 +1356,18 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
   const [addPrice, setAddPrice] = useState("");
   // Optimistic overrides for category selects so UI doesn't flicker while saving
   const [catOverrides, setCatOverrides] = useState<Record<string, string>>({});
+  // Restaurant name editing
+  const [editingRestaurantName, setEditingRestaurantName] = useState(false);
+  const [editRestaurantValue, setEditRestaurantValue] = useState("");
+  // Scanned image viewer
+  const [scannedImageUrl, setScannedImageUrl] = useState<string | null>(null);
+  const [showImageDialog, setShowImageDialog] = useState(false);
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem(`scanned_image_${receiptId}`);
+    if (stored) { setScannedImageUrl(stored); return; }
+    if (receipt?.imageUrl) setScannedImageUrl(receipt.imageUrl);
+  }, [receiptId, receipt?.imageUrl]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
@@ -1408,6 +1421,16 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
     } catch { toast({ title: "Failed to add item", variant: "destructive" }); }
   };
 
+  const saveRestaurantName = async () => {
+    const trimmed = editRestaurantValue.trim();
+    if (!trimmed) return;
+    try {
+      await apiRequest(`/api/receipts/${receiptId}`, "PATCH", { restaurantName: trimmed });
+      invalidate();
+      setEditingRestaurantName(false);
+    } catch { toast({ title: "Failed to update restaurant name", variant: "destructive" }); }
+  };
+
   const sub = parseFloat(receipt?.subtotal ?? "0") || 0;
   const itemsTotalUnit = items.reduce((s, i) => s + parseFloat(i.price) * i.quantity, 0);
   const itemsTotalLine = items.reduce((s, i) => s + parseFloat(i.price), 0);
@@ -1427,11 +1450,42 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
         </div>
       )}
 
-      {receipt?.restaurantName && (
-        <div className="text-center">
-          <p className="font-semibold text-lg">{receipt.restaurantName}</p>
-        </div>
-      )}
+      {/* Restaurant name — always editable, image icon when scan available */}
+      <div className="relative flex items-center justify-center min-h-[2.25rem]">
+        {editingRestaurantName ? (
+          <div className="flex items-center gap-1.5 w-full">
+            <Input
+              value={editRestaurantValue}
+              onChange={e => setEditRestaurantValue(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") saveRestaurantName(); if (e.key === "Escape") setEditingRestaurantName(false); }}
+              className="text-center font-semibold flex-1"
+              autoFocus
+              data-testid="input-restaurant-name"
+            />
+            <Button size="icon" variant="ghost" onClick={saveRestaurantName} data-testid="button-save-restaurant-name">
+              <Check className="h-4 w-4" />
+            </Button>
+            <Button size="icon" variant="ghost" onClick={() => setEditingRestaurantName(false)} data-testid="button-cancel-restaurant-name">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <>
+            <p className="font-semibold text-lg">{receipt?.restaurantName || "Unknown Restaurant"}</p>
+            <Button size="icon" variant="ghost" className="ml-1"
+              onClick={() => { setEditRestaurantValue(receipt?.restaurantName ?? ""); setEditingRestaurantName(true); }}
+              data-testid="button-edit-restaurant-name">
+              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+            </Button>
+          </>
+        )}
+        {scannedImageUrl && !editingRestaurantName && (
+          <Button size="icon" variant="ghost" className="absolute right-0"
+            onClick={() => setShowImageDialog(true)} data-testid="button-view-scanned-image">
+            <ImageIcon className="h-4 w-4 text-muted-foreground" />
+          </Button>
+        )}
+      </div>
 
       {/* Categorizing banner */}
       {isCategorizing && (
@@ -1579,6 +1633,16 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
           {sub > 0 && subtotalDiff <= 0.50 && <div className="flex items-center gap-1 text-xs text-green-600"><Check className="h-3 w-3" /> Totals match</div>}
         </CardContent>
       </Card>
+
+      {/* Scanned image dialog */}
+      <Dialog open={showImageDialog} onOpenChange={setShowImageDialog}>
+        <DialogContent className="max-w-sm p-2">
+          <DialogTitle className="sr-only">Receipt scan</DialogTitle>
+          {scannedImageUrl && (
+            <img src={scannedImageUrl} alt="Scanned receipt" className="w-full rounded-md object-contain max-h-[80vh]" />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
