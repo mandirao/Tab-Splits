@@ -1084,23 +1084,29 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                 </div>
               )}
 
-              {/* Person carousel navigation */}
-              <div className="flex items-center justify-between">
-                <Button size="icon" variant="outline" onClick={() => setReviewPersonIdx(i => Math.max(0, i - 1))} disabled={reviewPersonIdx === 0} data-testid="button-review-prev">
-                  <ArrowLeft className="h-4 w-4" />
-                </Button>
-                <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-semibold" style={{ backgroundColor: currentPerson.color }}>
-                    {getInitials(currentPerson.name)}
-                  </div>
-                  <div className="text-center">
-                    <p className="font-semibold leading-tight">{currentPerson.name}</p>
-                    <p className="text-xs text-muted-foreground">{reviewPersonIdx + 1} of {peopleWithColors.length}</p>
-                  </div>
+              {/* Person pill tab bar */}
+              <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
+                <div className="flex gap-2 min-w-max pb-0.5">
+                  {peopleWithColors.map((p, i) => {
+                    const active = i === reviewPersonIdx;
+                    return (
+                      <button key={p.id} type="button" onClick={() => setReviewPersonIdx(i)}
+                        className="flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium border transition-colors flex-shrink-0 whitespace-nowrap"
+                        style={{
+                          backgroundColor: active ? p.color : undefined,
+                          borderColor: p.color,
+                          color: active ? "white" : undefined,
+                        }}
+                        data-testid={`button-review-tab-${i}`}>
+                        <div className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0"
+                          style={{ backgroundColor: p.color }}>
+                          {getInitials(p.name)}
+                        </div>
+                        {p.name}
+                      </button>
+                    );
+                  })}
                 </div>
-                <Button size="icon" variant="outline" onClick={() => setReviewPersonIdx(i => Math.min(peopleWithColors.length - 1, i + 1))} disabled={reviewPersonIdx === peopleWithColors.length - 1} data-testid="button-review-next">
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
               </div>
 
               {/* Person bill card */}
@@ -1113,14 +1119,35 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                       {personItems.map(item => {
                         const share = getPersonItemShare(item, currentPerson.id);
                         const assignedTo = (item.assignedTo as string[]) || [];
-                        const isSplit = assignedTo.length > 1;
+                        const quantities = (item.assignedQuantities as Record<string, number>) || {};
+                        const hasQuantities = assignedTo.some(pid => (quantities[pid] ?? 0) > 0);
+
+                        // Compute the fraction label (e.g. "1/4" or "2/5")
+                        let fractionLabel: string | null = null;
+                        if (assignedTo.length > 1) {
+                          if (hasQuantities) {
+                            const totalWeight = assignedTo.reduce((s, pid) => s + (quantities[pid] ?? 1), 0);
+                            const myWeight = quantities[currentPerson.id] ?? 1;
+                            // Try to express as a simple fraction
+                            const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
+                            const g = gcd(myWeight, totalWeight);
+                            fractionLabel = `${myWeight / g}/${totalWeight / g}`;
+                          } else {
+                            fractionLabel = `1/${assignedTo.length}`;
+                          }
+                        }
+
                         return (
-                          <div key={item.id} className="flex items-center gap-2 py-1.5 rounded-md -mx-1 px-1 hover-elevate active-elevate-2 cursor-pointer" onClick={() => openAssignSheet(item.name, [item.id], (item.assignedTo as string[]) || [])} data-testid={`button-review-item-${item.id}`}>
+                          <div key={item.id} className="flex items-center gap-2 py-1.5 rounded-md -mx-1 px-1 hover-elevate active-elevate-2 cursor-pointer"
+                            onClick={() => openAssignSheet(item.name, [item.id], assignedTo, hasQuantities ? quantities : undefined)}
+                            data-testid={`button-review-item-${item.id}`}>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium leading-tight truncate">{item.name}</p>
-                              {isSplit && (
-                                <p className="text-xs text-muted-foreground">split {assignedTo.length} ways</p>
-                              )}
+                              <div className="flex items-baseline gap-1.5">
+                                {fractionLabel && (
+                                  <span className="text-xs text-muted-foreground font-medium tabular-nums flex-shrink-0">{fractionLabel}</span>
+                                )}
+                                <p className="text-sm font-medium leading-tight truncate">{item.name}</p>
+                              </div>
                             </div>
                             <span className="text-sm font-medium tabular-nums flex-shrink-0">${share.toFixed(2)}</span>
                             <button
@@ -1158,18 +1185,6 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                   </div>
                 </CardContent>
               </Card>
-
-              {/* Dot indicators */}
-              {peopleWithColors.length > 1 && (
-                <div className="flex justify-center gap-1.5">
-                  {peopleWithColors.map((p, i) => (
-                    <button key={p.id} type="button" onClick={() => setReviewPersonIdx(i)}
-                      className="h-2 rounded-full transition-all duration-200"
-                      style={{ width: i === reviewPersonIdx ? "20px" : "8px", backgroundColor: i === reviewPersonIdx ? currentPerson.color : undefined }}
-                      data-testid={`button-review-dot-${i}`} />
-                  ))}
-                </div>
-              )}
 
               <p className="text-xs text-muted-foreground text-center">Tap any item to reassign it</p>
             </div>
