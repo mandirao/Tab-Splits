@@ -1129,30 +1129,52 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                         }
 
                         return (
-                          <div key={item.id} className="flex items-center gap-2 py-1.5 rounded-md -mx-1 px-1 hover-elevate active-elevate-2 cursor-pointer"
-                            onClick={() => openAssignSheet(item.name, [item.id], assignedTo, hasQuantities ? quantities : undefined)}
-                            data-testid={`button-review-item-${item.id}`}>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-baseline gap-1.5">
-                                {fractionLabel && (
-                                  <span className="text-xs text-muted-foreground font-medium tabular-nums flex-shrink-0">{fractionLabel}</span>
-                                )}
-                                <p className="text-sm font-medium leading-tight truncate">{item.name}</p>
-                              </div>
+                          <div key={item.id} className="flex items-center gap-2 py-1.5 -mx-1 px-1">
+                            {/* Name + fraction label + pencil */}
+                            <div className="flex-1 min-w-0 flex items-center gap-1 min-w-0">
+                              {fractionLabel && (
+                                <span className="text-xs text-muted-foreground font-medium tabular-nums flex-shrink-0">{fractionLabel}</span>
+                              )}
+                              <p className="text-sm font-medium leading-tight truncate">{item.name}</p>
+                              <button
+                                type="button"
+                                onClick={() => setAssignEditSheet({ id: item.id, name: item.name, quantity: item.quantity ?? 1, price: item.price, category: item.category ?? null })}
+                                className="flex-shrink-0 p-0.5 text-muted-foreground rounded"
+                                data-testid={`button-review-edit-${item.id}`}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </button>
                             </div>
+                            {/* Share price */}
                             <span className="text-sm font-medium tabular-nums flex-shrink-0">${share.toFixed(2)}</span>
+                            {/* Initials — tap to reassign */}
                             <button
                               type="button"
-                              onClick={e => {
-                                e.stopPropagation();
-                                setReviewEditItem(item);
-                                setReviewEditName(item.name);
-                                setReviewEditPrice(item.price);
-                              }}
-                              className="p-1 text-muted-foreground rounded"
-                              data-testid={`button-review-edit-${item.id}`}
+                              onClick={() => openAssignSheet(item.name, [item.id], assignedTo, hasQuantities ? quantities : undefined)}
+                              className="flex-shrink-0 flex -space-x-1 rounded-full hover-elevate active-elevate-2 p-0.5"
+                              data-testid={`button-review-item-${item.id}`}
                             >
-                              <Pencil className="h-3.5 w-3.5" />
+                              {assignedTo.length === 0 && (
+                                <div className="h-6 w-6 rounded-full border-2 border-border bg-muted/50 flex items-center justify-center">
+                                  <Users className="h-3 w-3 text-muted-foreground" />
+                                </div>
+                              )}
+                              {assignedTo.slice(0, 3).map(pid => {
+                                const person = peopleWithColors.find(p => p.id === pid);
+                                if (!person) return null;
+                                return (
+                                  <div key={pid}
+                                    className="h-6 w-6 rounded-full border-2 border-background flex items-center justify-center text-white text-[9px] font-bold"
+                                    style={{ backgroundColor: person.color }}>
+                                    {getInitials(person.name)}
+                                  </div>
+                                );
+                              })}
+                              {assignedTo.length > 3 && (
+                                <div className="h-6 w-6 rounded-full border-2 border-background bg-muted flex items-center justify-center text-[9px] font-bold">
+                                  +{assignedTo.length - 3}
+                                </div>
+                              )}
                             </button>
                           </div>
                         );
@@ -1177,7 +1199,6 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                 </CardContent>
               </Card>
 
-              <p className="text-xs text-muted-foreground text-center">Tap any item to reassign it</p>
             </div>
           );
         })()}
