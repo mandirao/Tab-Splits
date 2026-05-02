@@ -1222,7 +1222,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                 {isAssigning
                   ? <Loader2 className="h-4 w-4 animate-spin" />
                   : isLast
-                    ? "Assign and done"
+                    ? "Assign and review"
                     : "Assign and continue"}
               </Button>
             );
