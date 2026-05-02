@@ -26,7 +26,7 @@ const PERSON_COLORS = [
   "hsl(60, 97%, 37%)",
 ];
 
-const STEP_LABELS = ["Scan", "Items", "Format", "Diners", "Assign", "Tip", "Paid by"];
+const STEP_LABELS = ["Scan", "Items", "Format", "Diners", "Assign", "Tip", "Review", "Paid by"];
 const STEP_SUBTITLES = [
   "Take or upload a photo of your receipt",
   "Verify items and review categories",
@@ -34,6 +34,7 @@ const STEP_SUBTITLES = [
   "Who's splitting the bill?",
   "Match items to people",
   "Confirm the tip amount",
+  "Check each person's bill before sharing",
   "Who covered the bill?",
 ];
 
@@ -94,6 +95,12 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
   const [autoAdvanceMode, setAutoAdvanceMode] = useState(true);
   const [autoAssignDone, setAutoAssignDone] = useState(false);
   const [seqProcessed, setSeqProcessed] = useState<Set<string>>(new Set());
+
+  // Step 6 review
+  const [reviewPersonIdx, setReviewPersonIdx] = useState(0);
+  const [reviewEditItem, setReviewEditItem] = useState<ReceiptItem | null>(null);
+  const [reviewEditName, setReviewEditName] = useState("");
+  const [reviewEditPrice, setReviewEditPrice] = useState("");
 
   // Step 5 tip
   const [tipPct, setTipPct] = useState(20);
@@ -575,14 +582,14 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
   // ─── Navigation ───────────────────────────────────────────────────────────
   const handleNext = async () => {
     if (step === 5) await saveTip();
-    if (step === 6) { await savePayer(); onClose(receiptId ?? undefined); return; }
+    if (step === 7) { await savePayer(); onClose(receiptId ?? undefined); return; }
     setStep(s => s + 1);
   };
 
   const nextDisabled = (() => {
     if (step === 0) return !previewUrl || isScanning;
     if (step === 2) return !diningFormat;
-    if (step === 6) return !payerId;
+    if (step === 7) return !payerId;
     return false;
   })();
 
@@ -619,7 +626,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
       <div className="flex-shrink-0 px-4 pt-safe-top pt-4 pb-2 border-b bg-card">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <p className="text-xs text-muted-foreground font-medium">Step {step + 1} of 7</p>
+            <p className="text-xs text-muted-foreground font-medium">Step {step + 1} of 8</p>
             <h1 className="text-lg font-bold leading-tight">{STEP_LABELS[step]}</h1>
             <p className="text-xs text-muted-foreground">{STEP_SUBTITLES[step]}</p>
           </div>
@@ -630,7 +637,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           )}
         </div>
         <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-          <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${((step + 1) / 7) * 100}%` }} />
+          <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${((step + 1) / 8) * 100}%` }} />
         </div>
         <div className="flex gap-1 mt-2 overflow-x-auto scrollbar-hide pb-0.5">
           {STEP_LABELS.map((label, i) => (
@@ -1018,8 +1025,159 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           </div>
         )}
 
-        {/* ────────────────────────────── STEP 6: PAYER ────────────────────────────── */}
-        {step === 6 && (
+        {/* ────────────────────────────── STEP 6: REVIEW ────────────────────────────── */}
+        {step === 6 && (() => {
+          const tipFromReceipt = parseFloat(receipt?.tip ?? "0") || tipAmt;
+          const taxFromReceipt = parseFloat(receipt?.tax ?? "0") || 0;
+
+          const getPersonItemShare = (item: ReceiptItem, personId: string): number => {
+            const assignedTo = (item.assignedTo as string[]) || [];
+            if (!assignedTo.includes(personId)) return 0;
+            const cost = effectiveItemCost(item);
+            const quantities = (item.assignedQuantities as Record<string, number>) || {};
+            const hasQuantities = assignedTo.some(pid => (quantities[pid] ?? 0) > 0);
+            if (hasQuantities) {
+              const totalWeight = assignedTo.reduce((s, pid) => s + (quantities[pid] ?? 1), 0);
+              return totalWeight > 0 ? cost * (quantities[personId] ?? 1) / totalWeight : cost / assignedTo.length;
+            }
+            return cost / assignedTo.length;
+          };
+
+          const getPersonSubtotal = (personId: string) =>
+            items.reduce((s, item) => s + getPersonItemShare(item, personId), 0);
+
+          const totalAssignedSubtotal = peopleWithColors.reduce(
+            (s, p) => s + getPersonSubtotal(p.id), 0
+          );
+
+          const unassignedItems = items.filter(i => !(i.assignedTo as string[])?.length);
+
+          const currentPerson = peopleWithColors[reviewPersonIdx] ?? peopleWithColors[0];
+
+          if (!currentPerson) {
+            return (
+              <div className="p-4 flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                <Users className="h-8 w-8" />
+                <p className="text-sm">Go back and add diners first.</p>
+              </div>
+            );
+          }
+
+          const personSubtotal = getPersonSubtotal(currentPerson.id);
+          const taxTip = taxFromReceipt + tipFromReceipt;
+          const personTaxTip = totalAssignedSubtotal > 0
+            ? (personSubtotal / totalAssignedSubtotal) * taxTip
+            : 0;
+          const personTotal = personSubtotal + personTaxTip;
+          const personItems = items.filter(i =>
+            (i.assignedTo as string[])?.includes(currentPerson.id)
+          );
+
+          return (
+            <div className="p-4 space-y-4">
+              {unassignedItems.length > 0 && (
+                <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    <strong>{unassignedItems.length} item{unassignedItems.length > 1 ? "s" : ""}</strong> not yet assigned — {unassignedItems.map(i => i.name).join(", ")}
+                  </p>
+                </div>
+              )}
+
+              {/* Person carousel navigation */}
+              <div className="flex items-center justify-between">
+                <Button size="icon" variant="outline" onClick={() => setReviewPersonIdx(i => Math.max(0, i - 1))} disabled={reviewPersonIdx === 0} data-testid="button-review-prev">
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-semibold" style={{ backgroundColor: currentPerson.color }}>
+                    {getInitials(currentPerson.name)}
+                  </div>
+                  <div className="text-center">
+                    <p className="font-semibold leading-tight">{currentPerson.name}</p>
+                    <p className="text-xs text-muted-foreground">{reviewPersonIdx + 1} of {peopleWithColors.length}</p>
+                  </div>
+                </div>
+                <Button size="icon" variant="outline" onClick={() => setReviewPersonIdx(i => Math.min(peopleWithColors.length - 1, i + 1))} disabled={reviewPersonIdx === peopleWithColors.length - 1} data-testid="button-review-next">
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Person bill card */}
+              <Card>
+                <CardContent className="p-4">
+                  {personItems.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No items assigned yet</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {personItems.map(item => {
+                        const share = getPersonItemShare(item, currentPerson.id);
+                        const assignedTo = (item.assignedTo as string[]) || [];
+                        const isSplit = assignedTo.length > 1;
+                        return (
+                          <div key={item.id} className="flex items-center gap-2 py-1.5 rounded-md -mx-1 px-1 hover-elevate active-elevate-2 cursor-pointer" onClick={() => openAssignSheet(item.name, [item.id], (item.assignedTo as string[]) || [])} data-testid={`button-review-item-${item.id}`}>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium leading-tight truncate">{item.name}</p>
+                              {isSplit && (
+                                <p className="text-xs text-muted-foreground">split {assignedTo.length} ways</p>
+                              )}
+                            </div>
+                            <span className="text-sm font-medium tabular-nums flex-shrink-0">${share.toFixed(2)}</span>
+                            <button
+                              type="button"
+                              onClick={e => {
+                                e.stopPropagation();
+                                setReviewEditItem(item);
+                                setReviewEditName(item.name);
+                                setReviewEditPrice(item.price);
+                              }}
+                              className="p-1 text-muted-foreground rounded"
+                              data-testid={`button-review-edit-${item.id}`}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="mt-3 pt-3 border-t space-y-1.5">
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>Subtotal</span>
+                      <span>${personSubtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>Tax + tip share</span>
+                      <span>${personTaxTip.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold text-base pt-1.5 border-t">
+                      <span>Total</span>
+                      <span>${personTotal.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Dot indicators */}
+              {peopleWithColors.length > 1 && (
+                <div className="flex justify-center gap-1.5">
+                  {peopleWithColors.map((p, i) => (
+                    <button key={p.id} type="button" onClick={() => setReviewPersonIdx(i)}
+                      className="h-2 rounded-full transition-all duration-200"
+                      style={{ width: i === reviewPersonIdx ? "20px" : "8px", backgroundColor: i === reviewPersonIdx ? currentPerson.color : undefined }}
+                      data-testid={`button-review-dot-${i}`} />
+                  ))}
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground text-center">Tap any item to reassign it</p>
+            </div>
+          );
+        })()}
+
+        {/* ────────────────────────────── STEP 7: PAYER ────────────────────────────── */}
+        {step === 7 && (
           <div className="p-4 space-y-4">
             <Card>
               <CardContent className="p-4">
@@ -1076,12 +1234,12 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
             {isScanning ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Scanning…</> : <>Scan Receipt <ArrowRight className="h-4 w-4 ml-2" /></>}
           </Button>
         )}
-        {step > 0 && step < 6 && (
+        {step > 0 && step < 7 && (
           <Button className="flex-1 h-12" onClick={handleNext} disabled={nextDisabled || tipSaving} data-testid="button-wizard-next">
             {tipSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Continue <ArrowRight className="h-4 w-4 ml-2" /></>}
           </Button>
         )}
-        {step === 6 && (
+        {step === 7 && (
           <Button className="flex-1 h-12" onClick={handleNext} disabled={nextDisabled || tipSaving} data-testid="button-wizard-done">
             {tipSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="h-4 w-4 mr-2" /> Done — View Receipt</>}
           </Button>
@@ -1329,6 +1487,40 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
 
         </div>
       </BottomSheet>
+
+      {/* ── Review Step: Item Edit Dialog ── */}
+      <Dialog open={!!reviewEditItem} onOpenChange={open => { if (!open) setReviewEditItem(null); }}>
+        <DialogContent className="max-w-sm mx-auto">
+          <DialogTitle>Edit item</DialogTitle>
+          <div className="space-y-3 pt-1">
+            <div>
+              <label className="text-xs text-muted-foreground font-medium block mb-1">Name</label>
+              <Input value={reviewEditName} onChange={e => setReviewEditName(e.target.value)} data-testid="input-review-edit-name" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground font-medium block mb-1">Price</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                <Input type="number" step="0.01" value={reviewEditPrice} onChange={e => setReviewEditPrice(e.target.value)} className="pl-6" data-testid="input-review-edit-price" />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="flex-1" onClick={() => setReviewEditItem(null)}>Cancel</Button>
+              <Button className="flex-1" onClick={async () => {
+                if (!reviewEditItem) return;
+                await apiRequest(`/api/items/${reviewEditItem.id}`, "PATCH", {
+                  name: reviewEditName.trim(),
+                  price: reviewEditPrice,
+                });
+                await queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
+                setReviewEditItem(null);
+                toast({ title: "Item updated" });
+              }} data-testid="button-review-edit-save">Save</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
