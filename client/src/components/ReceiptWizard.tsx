@@ -925,44 +925,6 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
               <p className="text-sm text-muted-foreground text-center py-4">Go back and add diners first.</p>
             )}
 
-            {/* Entree-count indicator — Courses format only */}
-            {diningFormat === "courses" && peopleWithColors.length > 0 && (() => {
-              const mealItems = items.filter(i => i.category === "meal");
-              if (mealItems.length === 0) return null;
-              return (
-                <Card>
-                  <CardContent className="p-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Entrees per person</p>
-                    <div className="flex flex-wrap gap-2">
-                      {peopleWithColors.map(person => {
-                        const count = mealItems.filter(i => (i.assignedTo as string[])?.includes(person.id)).length;
-                        const statusColor = count === 1
-                          ? "bg-green-500"
-                          : count === 0
-                            ? "bg-amber-400"
-                            : "bg-red-500";
-                        const statusLabel = count === 0 ? "none" : count === 1 ? "1" : `${count}!`;
-                        return (
-                          <div key={person.id} className="flex items-center gap-1.5" data-testid={`entree-count-${person.id}`}>
-                            <div className="h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
-                              style={{ backgroundColor: person.color }}>
-                              {getInitials(person.name)}
-                            </div>
-                            <span className={`text-[11px] font-bold text-white px-1.5 py-0.5 rounded-full ${statusColor}`}>
-                              {statusLabel}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-2">
-                      Green = 1 entree. Amber = none assigned yet. Red = more than one.
-                    </p>
-                  </CardContent>
-                </Card>
-              );
-            })()}
-
             {/* Category sections */}
             {hasCategoryData ? (
               <Card>
@@ -1259,18 +1221,49 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           })()}
 
           {/* Person chips */}
-          <div className="flex flex-wrap gap-2">
-            {peopleWithColors.length > 1 && (
-              <button type="button" onClick={toggleEveryone} data-testid="button-select-everyone"
-                className={`flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium border transition-colors ${everyoneSelected ? "bg-foreground text-background border-foreground" : "bg-background text-foreground border-border hover-elevate"}`}>
-                <Users className="h-3.5 w-3.5" /> Everyone
-              </button>
-            )}
-            {peopleWithColors.map(person => (
-              <PersonChip key={person.id} name={person.name} initials={getInitials(person.name)} color={person.color}
-                selected={assignPeople.includes(person.id)} onSelect={() => toggleAssignPerson(person.id)} />
-            ))}
-          </div>
+          {(() => {
+            const isSingleMeal = assignSheet?.itemIds.length === 1 &&
+              diningFormat === "courses" &&
+              (() => {
+                const item = items.find(i => i.id === assignSheet.itemIds[0]);
+                return (drawerCatOverrides[assignSheet.itemIds[0]] ?? item?.category) === "meal";
+              })();
+            const mealItems = isSingleMeal
+              ? items.filter(i => i.category === "meal" && i.id !== assignSheet!.itemIds[0])
+              : [];
+            return (
+              <div className="flex flex-wrap gap-2">
+                {peopleWithColors.length > 1 && (
+                  <button type="button" onClick={toggleEveryone} data-testid="button-select-everyone"
+                    className={`flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium border transition-colors ${everyoneSelected ? "bg-foreground text-background border-foreground" : "bg-background text-foreground border-border hover-elevate"}`}>
+                    <Users className="h-3.5 w-3.5" /> Everyone
+                  </button>
+                )}
+                {peopleWithColors.map(person => {
+                  const theirMeals = isSingleMeal
+                    ? mealItems.filter(i => (i.assignedTo as string[])?.includes(person.id))
+                    : [];
+                  return (
+                    <div key={person.id} className="flex flex-col items-center gap-0.5">
+                      <PersonChip name={person.name} initials={getInitials(person.name)} color={person.color}
+                        selected={assignPeople.includes(person.id)} onSelect={() => toggleAssignPerson(person.id)} />
+                      {isSingleMeal && theirMeals.length === 1 && (
+                        <span className="text-[10px] font-medium text-green-600 max-w-[72px] truncate leading-none"
+                          title={theirMeals[0].name}>
+                          {theirMeals[0].name}
+                        </span>
+                      )}
+                      {isSingleMeal && theirMeals.length > 1 && (
+                        <span className="text-[10px] font-medium text-red-500 leading-none">
+                          ×{theirMeals.length} entrees
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {/* Split mode — only when 2+ people selected */}
           {assignPeople.length >= 2 && (
