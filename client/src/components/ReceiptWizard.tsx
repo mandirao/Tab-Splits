@@ -83,6 +83,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
   const [assignedQuantities, setAssignedQuantities] = useState<Record<string, number>>({});
   const [assignSplitMode, setAssignSplitMode] = useState<"equal" | "share">("equal");
   const [isAssigning, setIsAssigning] = useState(false);
+  const [drawerCatOverrides, setDrawerCatOverrides] = useState<Record<string, string>>({});
   // Sequential auto-advance
   const [autoAdvanceMode, setAutoAdvanceMode] = useState(true);
   const [autoAssignDone, setAutoAssignDone] = useState(false);
@@ -361,7 +362,18 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
     setAssignPeople(currentAssignment ?? []);
     setAssignedQuantities(qtys);
     setAssignSplitMode(hasSaved ? "share" : "equal");
+    setDrawerCatOverrides({});
     setAssignSheet({ label, itemIds });
+  };
+
+  const changeItemCategory = async (itemId: string, cat: string) => {
+    setDrawerCatOverrides(prev => ({ ...prev, [itemId]: cat }));
+    try {
+      await apiRequest(`/api/items/${itemId}`, "PATCH", { category: cat === "__none__" ? null : cat });
+      queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
+    } catch {
+      setDrawerCatOverrides(prev => { const n = { ...prev }; delete n[itemId]; return n; });
+    }
   };
 
   const confirmAssign = async () => {
@@ -1100,11 +1112,68 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           ? <span>Who had the <strong>{assignSheet?.label}</strong>?</span>
           : `Assign ${assignSheet?.itemIds.length ?? ""} items`}>
         <div className="space-y-4 pb-2">
-          {(assignSheet?.itemIds.length ?? 0) > 1 && (
-            <p className="text-sm text-muted-foreground">
-              {assignSheet?.itemIds.length} items will be assigned to the selected people.
-            </p>
-          )}
+          {/* ── Item meta: category + price ── */}
+          {assignSheet && (() => {
+            const sheetItems = assignSheet.itemIds.map(id => items.find(i => i.id === id)).filter(Boolean) as ReceiptItem[];
+            const effectiveCat = (id: string) => drawerCatOverrides[id] ?? items.find(i => i.id === id)?.category ?? "__none__";
+            const catOptions = [...Object.entries(CAT_LABELS), ["__none__", "Uncategorized"]] as [string, string][];
+
+            if (assignSheet.itemIds.length === 1) {
+              const item = sheetItems[0];
+              if (!item) return null;
+              const unitPrice = parseFloat(item.price);
+              const qty = item.quantity ?? 1;
+              const totalPrice = unitPrice * qty;
+              return (
+                <div className="flex items-center gap-2">
+                  <Select value={effectiveCat(item.id)} onValueChange={v => changeItemCategory(item.id, v)}>
+                    <SelectTrigger className="w-auto h-7 text-xs gap-1 px-2 border-dashed" data-testid={`select-cat-${item.id}`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {catOptions.map(([val, label]) => (
+                        <SelectItem key={val} value={val}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="ml-auto text-sm text-muted-foreground tabular-nums" data-testid={`text-item-price-${item.id}`}>
+                    {qty > 1 ? `${qty}× $${unitPrice.toFixed(2)} = ` : ""}
+                    <span className="font-medium text-foreground">${totalPrice.toFixed(2)}</span>
+                  </span>
+                </div>
+              );
+            }
+
+            // Bulk: list each item with category + price
+            return (
+              <div className="space-y-1 rounded-md border border-border overflow-hidden">
+                {sheetItems.map((item, idx) => {
+                  const unitPrice = parseFloat(item.price);
+                  const qty = item.quantity ?? 1;
+                  const totalPrice = unitPrice * qty;
+                  return (
+                    <div key={item.id}
+                      className={`flex items-center gap-2 px-3 py-2 ${idx < sheetItems.length - 1 ? "border-b border-border" : ""}`}>
+                      <span className="flex-1 text-sm truncate">{item.name}</span>
+                      <Select value={effectiveCat(item.id)} onValueChange={v => changeItemCategory(item.id, v)}>
+                        <SelectTrigger className="w-auto h-6 text-xs gap-1 px-2 border-dashed shrink-0" data-testid={`select-cat-${item.id}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {catOptions.map(([val, label]) => (
+                            <SelectItem key={val} value={val}>{label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <span className="text-xs text-muted-foreground tabular-nums shrink-0" data-testid={`text-item-price-${item.id}`}>
+                        ${totalPrice.toFixed(2)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {/* Person chips */}
           <div className="flex flex-wrap gap-2">
