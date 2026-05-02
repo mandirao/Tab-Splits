@@ -1110,39 +1110,41 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
       <BottomSheet open={!!assignSheet} onClose={() => setAssignSheet(null)}
         title={assignSheet?.itemIds.length === 1
           ? <span>Who had the <strong>{assignSheet?.label}</strong>?</span>
-          : `Assign ${assignSheet?.itemIds.length ?? ""} items`}>
+          : `Assign ${assignSheet?.itemIds.length ?? ""} items`}
+        subtitle={(() => {
+          if (!assignSheet || assignSheet.itemIds.length !== 1) return undefined;
+          const item = items.find(i => i.id === assignSheet.itemIds[0]);
+          if (!item) return undefined;
+          const unitPrice = parseFloat(item.price);
+          const qty = item.quantity ?? 1;
+          const totalPrice = unitPrice * qty;
+          const effectiveCat = drawerCatOverrides[item.id] ?? item.category ?? "__none__";
+          const catOptions = [...Object.entries(CAT_LABELS), ["__none__", "Uncategorized"]] as [string, string][];
+          return (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground tabular-nums" data-testid={`text-item-price-${item.id}`}>
+                {qty > 1 ? `${qty}× $${unitPrice.toFixed(2)} = ` : ""}
+                <span className="font-medium text-foreground">${totalPrice.toFixed(2)}</span>
+              </span>
+              <Select value={effectiveCat} onValueChange={v => changeItemCategory(item.id, v)}>
+                <SelectTrigger className="w-auto h-7 text-xs gap-1 px-2 border-dashed" data-testid={`select-cat-${item.id}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {catOptions.map(([val, label]) => (
+                    <SelectItem key={val} value={val}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          );
+        })()}>
         <div className="space-y-4 pb-2">
-          {/* ── Item meta: category + price ── */}
-          {assignSheet && (() => {
+          {/* ── Bulk item meta: category + price per item ── */}
+          {assignSheet && assignSheet.itemIds.length > 1 && (() => {
             const sheetItems = assignSheet.itemIds.map(id => items.find(i => i.id === id)).filter(Boolean) as ReceiptItem[];
             const effectiveCat = (id: string) => drawerCatOverrides[id] ?? items.find(i => i.id === id)?.category ?? "__none__";
             const catOptions = [...Object.entries(CAT_LABELS), ["__none__", "Uncategorized"]] as [string, string][];
-
-            if (assignSheet.itemIds.length === 1) {
-              const item = sheetItems[0];
-              if (!item) return null;
-              const unitPrice = parseFloat(item.price);
-              const qty = item.quantity ?? 1;
-              const totalPrice = unitPrice * qty;
-              return (
-                <div className="flex items-center gap-2">
-                  <Select value={effectiveCat(item.id)} onValueChange={v => changeItemCategory(item.id, v)}>
-                    <SelectTrigger className="w-auto h-7 text-xs gap-1 px-2 border-dashed" data-testid={`select-cat-${item.id}`}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {catOptions.map(([val, label]) => (
-                        <SelectItem key={val} value={val}>{label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <span className="ml-auto text-sm text-muted-foreground tabular-nums" data-testid={`text-item-price-${item.id}`}>
-                    {qty > 1 ? `${qty}× $${unitPrice.toFixed(2)} = ` : ""}
-                    <span className="font-medium text-foreground">${totalPrice.toFixed(2)}</span>
-                  </span>
-                </div>
-              );
-            }
 
             // Bulk: list each item with category + price
             return (

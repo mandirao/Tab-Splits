@@ -6,11 +6,12 @@ interface BottomSheetProps {
   open: boolean;
   onClose: () => void;
   title: React.ReactNode;
+  subtitle?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
 }
 
-export default function BottomSheet({ open, onClose, title, children, footer }: BottomSheetProps) {
+export default function BottomSheet({ open, onClose, title, subtitle, children, footer }: BottomSheetProps) {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -39,11 +40,14 @@ export default function BottomSheet({ open, onClose, title, children, footer }: 
         }`}
         data-testid="container-bottom-sheet"
       >
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold" data-testid="text-bottom-sheet-title">{title}</h2>
-          <Button size="icon" variant="ghost" onClick={onClose} data-testid="button-close">
-            <X className="h-5 w-5" />
-          </Button>
+        <div className="p-4 border-b">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold" data-testid="text-bottom-sheet-title">{title}</h2>
+            <Button size="icon" variant="ghost" onClick={onClose} data-testid="button-close">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          {subtitle && <div className="mt-1.5" data-testid="container-bottom-sheet-subtitle">{subtitle}</div>}
         </div>
         <div className="flex-1 overflow-y-auto p-4">
           {children}
