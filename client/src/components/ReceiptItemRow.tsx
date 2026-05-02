@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Check } from "lucide-react";
+import { UserPlus, Check, Pencil } from "lucide-react";
 
 interface ReceiptItemRowProps {
   id: string;
@@ -85,19 +85,17 @@ export default function ReceiptItemRow({
         </button>
       )}
 
-      {/* Tappable content area */}
+      {/* Content area — tappable only in bulk mode */}
       <div
-        className="flex-1 min-w-0 cursor-pointer hover-elevate rounded-md -mx-1 px-1 py-0.5"
+        className={`flex-1 min-w-0 rounded-md -mx-1 px-1 py-0.5 ${bulkMode ? "cursor-pointer hover-elevate" : ""}`}
         onClick={() => {
-          if (bulkMode) {
+          if (bulkMode && !didLongPress.current) {
             onBulkSelect?.();
-          } else if (!didLongPress.current) {
-            onEdit?.();
           }
           didLongPress.current = false;
         }}
         data-testid="button-edit-item"
-        role="button"
+        role={bulkMode ? "button" : undefined}
       >
         <div className="flex items-baseline gap-2">
           <Badge variant="outline" className="text-xs px-1.5" data-testid="badge-quantity">
@@ -110,36 +108,45 @@ export default function ReceiptItemRow({
         </span>
       </div>
 
-      {/* Normal mode: assign button */}
+      {/* Normal mode: pencil edit + assign button */}
       {!bulkMode && (
-        isAssigned ? (
+        <>
           <button
-            onClick={onAssign}
-            className="flex -space-x-1 hover-elevate active-elevate-2 rounded-full p-0.5 transition-all flex-shrink-0"
-            data-testid="button-modify-assignment"
+            onClick={onEdit}
+            className="p-1.5 text-muted-foreground rounded-md hover-elevate active-elevate-2 flex-shrink-0"
+            data-testid="button-edit-item-pencil"
           >
-            {assignedInitials.map((initials, idx) => (
-              <div
-                key={idx}
-                className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center ring-2 ring-background"
-                style={{ backgroundColor: assignedColors[idx] || "hsl(var(--primary))" }}
-                data-testid={`badge-initials-${idx}`}
-              >
-                {initials}
-              </div>
-            ))}
+            <Pencil className="h-3.5 w-3.5" />
           </button>
-        ) : (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onAssign}
-            className="flex-shrink-0"
-            data-testid="button-assign"
-          >
-            <UserPlus className="h-4 w-4" />
-          </Button>
-        )
+          {isAssigned ? (
+            <button
+              onClick={onAssign}
+              className="flex -space-x-1 hover-elevate active-elevate-2 rounded-full p-0.5 transition-all flex-shrink-0"
+              data-testid="button-modify-assignment"
+            >
+              {assignedInitials.map((initials, idx) => (
+                <div
+                  key={idx}
+                  className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center ring-2 ring-background"
+                  style={{ backgroundColor: assignedColors[idx] || "hsl(var(--primary))" }}
+                  data-testid={`badge-initials-${idx}`}
+                >
+                  {initials}
+                </div>
+              ))}
+            </button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onAssign}
+              className="flex-shrink-0"
+              data-testid="button-assign"
+            >
+              <UserPlus className="h-4 w-4" />
+            </Button>
+          )}
+        </>
       )}
 
       {/* Bulk mode: show faint avatars so user can see existing assignment at a glance */}

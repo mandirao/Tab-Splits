@@ -589,7 +589,6 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
   const nextDisabled = (() => {
     if (step === 0) return !previewUrl || isScanning;
     if (step === 2) return !diningFormat;
-    if (step === 7) return !payerId;
     return false;
   })();
 
@@ -1520,6 +1519,21 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
               </div>
             </div>
             <div className="flex gap-2 pt-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-destructive flex-shrink-0"
+                onClick={async () => {
+                  if (!reviewEditItem) return;
+                  await apiRequest(`/api/items/${reviewEditItem.id}`, "DELETE");
+                  await queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
+                  setReviewEditItem(null);
+                  toast({ title: "Item deleted" });
+                }}
+                data-testid="button-review-delete-item"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
               <Button variant="outline" className="flex-1" onClick={() => setReviewEditItem(null)}>Cancel</Button>
               <Button className="flex-1" onClick={async () => {
                 if (!reviewEditItem) return;

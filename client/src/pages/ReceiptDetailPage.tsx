@@ -1443,49 +1443,48 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1 text-center">
-            <button 
-              className="text-xl font-bold flex items-center justify-center gap-1 hover:text-primary transition-colors mx-auto"
+            <button
+              className="text-xl font-bold px-2 py-0.5 rounded-md border border-border/50 bg-transparent cursor-text mx-auto block text-center transition-colors hover:border-border focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onClick={() => {
                 setNameInput(receipt.restaurantName || "");
                 setEditingName(true);
               }}
               data-testid="button-edit-name"
             >
-              <span>{receipt.restaurantName || "Receipt"}</span>
-              <Pencil className="h-3.5 w-3.5 opacity-50" />
+              {receipt.restaurantName || "Receipt"}
             </button>
             <div className="flex items-center justify-center gap-1 mt-0.5">
               <img src={logoUrl} alt="Tab Splits" className="h-4 w-4 rounded-md" />
               <span className="text-xs font-semibold tracking-wide text-primary">Tab Splits</span>
             </div>
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-0.5">
             {scannedImageUrl && (
-              <Button 
-                size="icon" 
-                variant="ghost"
+              <button
                 onClick={() => setShowScannedImage(true)}
+                className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-md hover-elevate active-elevate-2"
                 data-testid="button-view-receipt-image"
               >
-                <ImageIcon className="h-5 w-5" />
-              </Button>
+                <ImageIcon className="h-4 w-4" />
+                <span className="text-[9px] text-muted-foreground leading-none">Receipt</span>
+              </button>
             )}
-            <Button 
-              size="icon" 
-              variant="ghost"
+            <button
               onClick={() => setLocation(`/receipt/${receiptId}/view`)}
+              className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-md hover-elevate active-elevate-2"
               data-testid="button-view-summary"
             >
-              <PieChart className="h-5 w-5" />
-            </Button>
-            <Button 
-              size="icon" 
-              variant="ghost"
+              <PieChart className="h-4 w-4" />
+              <span className="text-[9px] text-muted-foreground leading-none">Summary</span>
+            </button>
+            <button
               onClick={handlePaymentsClick}
+              className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-md hover-elevate active-elevate-2"
               data-testid="button-open-payments"
             >
-              <DollarSign className="h-5 w-5" />
-            </Button>
+              <DollarSign className="h-4 w-4" />
+              <span className="text-[9px] text-muted-foreground leading-none">Payments</span>
+            </button>
           </div>
         </div>
       </header>
@@ -1697,18 +1696,16 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                     >
                       <ListChecks className="h-4 w-4" />
                     </Button>
-                    {selectedTab === "all" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setAddItemBottomSheetOpen(true)}
-                        className="flex items-center gap-1"
-                        data-testid="button-add-item"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        Add Item
-                      </Button>
-                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setAddItemBottomSheetOpen(true)}
+                      className="flex items-center gap-1"
+                      data-testid="button-add-item"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Item
+                    </Button>
                   </>
                 )}
               </div>
