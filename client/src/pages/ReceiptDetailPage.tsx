@@ -1675,26 +1675,27 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                   <>
                     {items.length > 0 && (
                       <Button
-                        size="icon"
+                        size="sm"
                         variant="ghost"
                         onClick={() => categorizeMutation.mutate()}
                         disabled={categorizeMutation.isPending}
-                        title={hasCategoryData ? "Re-categorize items with AI" : "Categorize items with AI"}
+                        className="flex items-center gap-1 px-2"
                         data-testid="button-categorize"
                       >
                         {categorizeMutation.isPending
-                          ? <RefreshCw className="h-4 w-4 animate-spin" />
-                          : <Sparkles className="h-4 w-4" />}
+                          ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" />Sorting…</>
+                          : <><Sparkles className="h-3.5 w-3.5" />Categorize</>}
                       </Button>
                     )}
                     <Button
-                      size="icon"
+                      size="sm"
                       variant="ghost"
                       onClick={() => enterBulkMode()}
-                      title="Select multiple items to assign"
+                      className="flex items-center gap-1 px-2"
                       data-testid="button-enter-bulk-mode"
                     >
-                      <ListChecks className="h-4 w-4" />
+                      <ListChecks className="h-3.5 w-3.5" />
+                      Select
                     </Button>
                     <Button
                       size="sm"
@@ -1887,15 +1888,14 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               <div className="flex items-center gap-2">
                 {isReadyToShare ? (
                   <>
-                    <Button
-                      size="icon"
-                      variant="ghost"
+                    <button
                       onClick={() => setWizardOpen(true)}
-                      title="Guide me through this"
+                      className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-md hover-elevate active-elevate-2 flex-shrink-0"
                       data-testid="button-cta-wizard"
                     >
                       <Wand2 className="h-4 w-4" />
-                    </Button>
+                      <span className="text-[9px] text-muted-foreground leading-none">Guide</span>
+                    </button>
                     <Button
                       className="flex-1"
                       onClick={handleShareClick}
@@ -1915,15 +1915,14 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                       <Wand2 className="h-4 w-4 mr-2" />
                       Guide me through this
                     </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
+                    <button
                       onClick={handleShareClick}
-                      title="Share"
+                      className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-md hover-elevate active-elevate-2 flex-shrink-0"
                       data-testid="button-cta-share"
                     >
                       <Share2 className="h-4 w-4" />
-                    </Button>
+                      <span className="text-[9px] text-muted-foreground leading-none">Share</span>
+                    </button>
                   </>
                 )}
               </div>
