@@ -208,12 +208,12 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
       <header className="p-4 border-b bg-card sticky top-0 z-50">
         <div className="flex items-center justify-between gap-2">
           <Button
-            size="icon"
-            variant="ghost"
+            size="sm"
+            variant="outline"
             onClick={() => setLocation(`/receipt/${receiptId}`)}
             data-testid="button-back"
           >
-            <ArrowLeft className="h-5 w-5" />
+            Edit tab
           </Button>
           <div className="text-center flex-1 min-w-0">
             <h1 className="text-xl font-bold truncate">{receipt.restaurantName || "Receipt"}</h1>

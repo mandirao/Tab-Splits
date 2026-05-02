@@ -555,7 +555,7 @@ export default function HomePage() {
           setWizardOpen(false);
           if (receiptId) {
             sessionStorage.setItem("wizard_done_receipt", receiptId);
-            setLocation(`/receipt/${receiptId}`);
+            setLocation(`/receipt/${receiptId}/summary`);
           }
         }}
       />

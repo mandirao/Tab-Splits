@@ -2305,10 +2305,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         onClose={(completedReceiptId) => {
           setWizardOpen(false);
           if (completedReceiptId) {
-            toast({
-              title: "Tab is ready!",
-              description: "Do a final review, then tap Share when you're ready to send it.",
-            });
+            setLocation(`/receipt/${completedReceiptId}/summary`);
           }
         }}
         initialReceiptId={receiptId}
