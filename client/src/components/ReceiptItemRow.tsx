@@ -97,27 +97,29 @@ export default function ReceiptItemRow({
         data-testid="button-edit-item"
         role={bulkMode ? "button" : undefined}
       >
-        <div className="flex items-baseline gap-2">
-          <Badge variant="outline" className="text-xs px-1.5" data-testid="badge-quantity">
+        <div className="flex items-center gap-1.5">
+          <Badge variant="outline" className="text-xs px-1.5 flex-shrink-0" data-testid="badge-quantity">
             {quantityText}
           </Badge>
-          <span className="font-medium text-sm" data-testid="text-item-name">{name}</span>
+          <span className="font-medium text-sm truncate" data-testid="text-item-name">{name}</span>
+          {!bulkMode && (
+            <button
+              onClick={e => { e.stopPropagation(); onEdit?.(); }}
+              className="p-0.5 text-muted-foreground rounded flex-shrink-0 hover-elevate active-elevate-2"
+              data-testid="button-edit-item-pencil"
+            >
+              <Pencil className="h-3 w-3" />
+            </button>
+          )}
         </div>
         <span className="text-base font-semibold" data-testid="text-item-price">
           ${price.toFixed(2)}
         </span>
       </div>
 
-      {/* Normal mode: pencil edit + assign button */}
+      {/* Normal mode: assign button */}
       {!bulkMode && (
         <>
-          <button
-            onClick={onEdit}
-            className="p-1.5 text-muted-foreground rounded-md hover-elevate active-elevate-2 flex-shrink-0"
-            data-testid="button-edit-item-pencil"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
           {isAssigned ? (
             <button
               onClick={onAssign}
