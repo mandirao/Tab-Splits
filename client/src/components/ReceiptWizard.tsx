@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Camera, Upload, Loader2, RotateCw, RotateCcw, Check, ArrowLeft, ArrowRight,
   Sparkles, Users, Plus, X, CheckCircle2, Circle, AlertTriangle,
-  Pencil, Trash2, Phone, MinusCircle, UserPlus,
+  Pencil, Trash2, Phone, MinusCircle, UserPlus, Utensils, Layers, Shuffle,
 } from "lucide-react";
 import type { Receipt, ReceiptItem, Person } from "@shared/schema";
 
@@ -25,15 +25,18 @@ const PERSON_COLORS = [
   "hsl(60, 97%, 37%)",
 ];
 
-const STEP_LABELS = ["Scan", "Items", "Diners", "Assign", "Tip", "Paid by"];
+const STEP_LABELS = ["Scan", "Items", "Format", "Diners", "Assign", "Tip", "Paid by"];
 const STEP_SUBTITLES = [
   "Take or upload a photo of your receipt",
   "Verify items and review categories",
+  "How did your table split the bill?",
   "Who's splitting the bill?",
   "Match items to people",
   "Confirm the tip amount",
   "Who covered the bill?",
 ];
+
+type DiningFormat = "family" | "courses" | "mixed";
 
 const CAT_LABELS: Record<string, string> = {
   appetizer: "Appetizers", meal: "Meals", drink: "Drinks", dessert: "Desserts", other: "Other",
@@ -59,6 +62,8 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
 
   const [step, setStep] = useState(0);
   const [receiptId, setReceiptId] = useState<string | null>(null);
+  const [diningFormat, setDiningFormat] = useState<DiningFormat | null>(null);
+  const autoAssignApplied = useRef(false);
 
   // Step 0 scan state
   const [previewUrl, setPreviewUrl] = useState("");
@@ -103,6 +108,8 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
       }
       setPayerId(null);
       setVenmoInput("");
+      setDiningFormat(null);
+      autoAssignApplied.current = false;
     }
   }, [open, initialReceiptId]);
 
@@ -450,16 +457,53 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
     } catch { /* ignore */ }
   };
 
+  // ─── Auto-assign based on dining format ──────────────────────────────────
+  useEffect(() => {
+    if (step !== 4 || !receiptId || !diningFormat || diningFormat === "mixed") return;
+    if (autoAssignApplied.current) return;
+    if (items.length === 0 || peopleWithColors.length === 0) return;
+    autoAssignApplied.current = true;
+
+    const allIds = peopleWithColors.map(p => p.id);
+    const toAssign: ReceiptItem[] = [];
+
+    if (diningFormat === "family") {
+      // Assign everyone to all non-drink items
+      toAssign.push(...items.filter(i => i.category !== "drink"));
+    } else if (diningFormat === "courses") {
+      // Assign everyone to appetizers + desserts + other; meals and drinks stay individual
+      toAssign.push(...items.filter(i => i.category === "appetizer" || i.category === "dessert" || i.category === "other"));
+    }
+
+    if (toAssign.length === 0) return;
+
+    const run = async () => {
+      try {
+        await Promise.all(
+          toAssign.map(item =>
+            apiRequest(`/api/items/${item.id}`, "PATCH", { assignedTo: allIds, assignedQuantities: {} })
+          )
+        );
+        await queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
+        const label = diningFormat === "family" ? "food items assigned to everyone" : "shared items assigned to everyone";
+        toast({ title: `Auto-assigned: ${toAssign.length} ${label}` });
+      } catch { /* silent — user can still assign manually */ }
+    };
+    run();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, receiptId, diningFormat, items.length, peopleWithColors.length]);
+
   // ─── Navigation ───────────────────────────────────────────────────────────
   const handleNext = async () => {
-    if (step === 4) await saveTip();
-    if (step === 5) { await savePayer(); onClose(receiptId ?? undefined); return; }
+    if (step === 5) await saveTip();
+    if (step === 6) { await savePayer(); onClose(receiptId ?? undefined); return; }
     setStep(s => s + 1);
   };
 
   const nextDisabled = (() => {
     if (step === 0) return !previewUrl || isScanning;
-    if (step === 5) return !payerId;
+    if (step === 2) return !diningFormat;
+    if (step === 6) return !payerId;
     return false;
   })();
 
@@ -496,7 +540,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
       <div className="flex-shrink-0 px-4 pt-safe-top pt-4 pb-2 border-b bg-card">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <p className="text-xs text-muted-foreground font-medium">Step {step + 1} of 6</p>
+            <p className="text-xs text-muted-foreground font-medium">Step {step + 1} of 7</p>
             <h1 className="text-lg font-bold leading-tight">{STEP_LABELS[step]}</h1>
             <p className="text-xs text-muted-foreground">{STEP_SUBTITLES[step]}</p>
           </div>
@@ -507,7 +551,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           )}
         </div>
         <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-          <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${((step + 1) / 6) * 100}%` }} />
+          <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${((step + 1) / 7) * 100}%` }} />
         </div>
         <div className="flex gap-1 mt-2 overflow-x-auto scrollbar-hide pb-0.5">
           {STEP_LABELS.map((label, i) => (
@@ -587,8 +631,65 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           />
         )}
 
-        {/* ────────────────────────────── STEP 2: DINERS ────────────────────────────── */}
+        {/* ────────────────────────────── STEP 2: FORMAT ────────────────────────────── */}
         {step === 2 && (
+          <div className="p-4 space-y-3">
+            {[
+              {
+                id: "family" as DiningFormat,
+                icon: Utensils,
+                label: "Family Style",
+                description: "Everyone splits all food equally. Each person pays for their own drinks.",
+                detail: "All food → everyone. Drinks → tap to assign per person.",
+              },
+              {
+                id: "courses" as DiningFormat,
+                icon: Layers,
+                label: "Courses",
+                description: "Appetizers & desserts split equally. Each person pays for their own entree and drinks.",
+                detail: "Apps + desserts → everyone. Entrees + drinks → assign individually.",
+              },
+              {
+                id: "mixed" as DiningFormat,
+                icon: Shuffle,
+                label: "Mixed Bag",
+                description: "Some things were shared, others were individual. You'll assign each item manually.",
+                detail: "Full control — assign every item yourself.",
+              },
+            ].map(fmt => {
+              const Icon = fmt.icon;
+              const selected = diningFormat === fmt.id;
+              return (
+                <button
+                  key={fmt.id}
+                  type="button"
+                  onClick={() => setDiningFormat(fmt.id)}
+                  className={`w-full text-left rounded-lg border-2 p-4 transition-colors ${selected ? "border-primary bg-primary/5" : "border-border hover-elevate"}`}
+                  data-testid={`button-format-${fmt.id}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`mt-0.5 flex-shrink-0 h-9 w-9 rounded-full flex items-center justify-center ${selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-sm">{fmt.label}</p>
+                        {selected && <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">{fmt.description}</p>
+                      {selected && (
+                        <p className="text-xs text-primary font-medium mt-1.5">{fmt.detail}</p>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ────────────────────────────── STEP 3: DINERS ────────────────────────────── */}
+        {step === 3 && (
           <div className="p-4 space-y-4">
             {/* Current diners on this receipt */}
             {receiptPeople.length > 0 && (
@@ -723,8 +824,8 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           </div>
         )}
 
-        {/* ────────────────────────────── STEP 3: ASSIGN ────────────────────────────── */}
-        {step === 3 && (
+        {/* ────────────────────────────── STEP 4: ASSIGN ────────────────────────────── */}
+        {step === 4 && (
           <div className="p-4 space-y-4">
             {/* Progress summary */}
             <div className={`flex items-center justify-between px-4 py-3 rounded-lg ${assignedCount === items.length ? "bg-green-50 dark:bg-green-900/20" : "bg-amber-50 dark:bg-amber-900/20"}`}>
@@ -735,6 +836,44 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
             {peopleWithColors.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">Go back and add diners first.</p>
             )}
+
+            {/* Entree-count indicator — Courses format only */}
+            {diningFormat === "courses" && peopleWithColors.length > 0 && (() => {
+              const mealItems = items.filter(i => i.category === "meal");
+              if (mealItems.length === 0) return null;
+              return (
+                <Card>
+                  <CardContent className="p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Entrees per person</p>
+                    <div className="flex flex-wrap gap-2">
+                      {peopleWithColors.map(person => {
+                        const count = mealItems.filter(i => (i.assignedTo as string[])?.includes(person.id)).length;
+                        const statusColor = count === 1
+                          ? "bg-green-500"
+                          : count === 0
+                            ? "bg-amber-400"
+                            : "bg-red-500";
+                        const statusLabel = count === 0 ? "none" : count === 1 ? "1" : `${count}!`;
+                        return (
+                          <div key={person.id} className="flex items-center gap-1.5" data-testid={`entree-count-${person.id}`}>
+                            <div className="h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
+                              style={{ backgroundColor: person.color }}>
+                              {getInitials(person.name)}
+                            </div>
+                            <span className={`text-[11px] font-bold text-white px-1.5 py-0.5 rounded-full ${statusColor}`}>
+                              {statusLabel}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-2">
+                      Green = 1 entree. Amber = none assigned yet. Red = more than one.
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })()}
 
             {/* Category sections */}
             {hasCategoryData ? (
@@ -792,8 +931,8 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           </div>
         )}
 
-        {/* ────────────────────────────── STEP 4: TIP ────────────────────────────── */}
-        {step === 4 && (
+        {/* ────────────────────────────── STEP 5: TIP ────────────────────────────── */}
+        {step === 5 && (
           <div className="p-4 space-y-4">
             {hasServiceCharge && (
               <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
@@ -826,8 +965,8 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           </div>
         )}
 
-        {/* ────────────────────────────── STEP 5: PAYER ────────────────────────────── */}
-        {step === 5 && (
+        {/* ────────────────────────────── STEP 6: PAYER ────────────────────────────── */}
+        {step === 6 && (
           <div className="p-4 space-y-4">
             <Card>
               <CardContent className="p-4">
@@ -884,12 +1023,12 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
             {isScanning ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Scanning…</> : <>Scan Receipt <ArrowRight className="h-4 w-4 ml-2" /></>}
           </Button>
         )}
-        {step > 0 && step < 5 && (
+        {step > 0 && step < 6 && (
           <Button className="flex-1 h-12" onClick={handleNext} disabled={nextDisabled || tipSaving} data-testid="button-wizard-next">
             {tipSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Continue <ArrowRight className="h-4 w-4 ml-2" /></>}
           </Button>
         )}
-        {step === 5 && (
+        {step === 6 && (
           <Button className="flex-1 h-12" onClick={handleNext} disabled={nextDisabled || tipSaving} data-testid="button-wizard-done">
             {tipSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="h-4 w-4 mr-2" /> Done — View Receipt</>}
           </Button>
