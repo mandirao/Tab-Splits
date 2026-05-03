@@ -1829,7 +1829,7 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
 
         const renderItemRow = (item: ReceiptItem) => (
           <div key={item.id} className="flex items-center divide-x">
-            {/* Name + price + category */}
+            {/* Name + price */}
             <div className="flex-1 min-w-0 px-4 py-3">
               <div className="flex items-center gap-1.5 min-w-0">
                 {item.quantity > 1 && !item.name.startsWith(`${item.quantity} `) && (
@@ -1837,23 +1837,29 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
                 )}
                 <p className="text-sm font-medium truncate">{item.name}</p>
               </div>
-              <div className="flex items-center gap-2 mt-0.5">
-                <p className="text-xs text-muted-foreground tabular-nums">${parseFloat(item.price).toFixed(2)}</p>
-                <select
-                  value={item.category ?? ""}
-                  onChange={e => updateItemCategory(item.id, e.target.value || null)}
-                  className="text-xs text-muted-foreground bg-transparent border-0 p-0 focus:outline-none cursor-pointer hover:text-foreground transition-colors"
+              <p className="text-xs text-muted-foreground tabular-nums mt-0.5">${parseFloat(item.price).toFixed(2)}</p>
+            </div>
+            {/* Category pill column */}
+            <div className="px-2 self-stretch flex items-center flex-shrink-0">
+              <Select
+                value={item.category ?? "none"}
+                onValueChange={val => updateItemCategory(item.id, val === "none" ? null : val)}
+              >
+                <SelectTrigger
+                  className="rounded-full h-7 text-xs px-3 min-w-[90px] gap-1"
                   data-testid={`select-category-${item.id}`}
-                  onClick={e => e.stopPropagation()}
                 >
-                  <option value="">— category</option>
-                  <option value="appetizer">Appetizer</option>
-                  <option value="meal">Meal</option>
-                  <option value="drink">Drink</option>
-                  <option value="dessert">Dessert</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
+                  <SelectValue placeholder="— None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— None</SelectItem>
+                  <SelectItem value="appetizer">Appetizer</SelectItem>
+                  <SelectItem value="meal">Meal</SelectItem>
+                  <SelectItem value="drink">Drink</SelectItem>
+                  <SelectItem value="dessert">Dessert</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {/* Pencil column — opens shared edit drawer */}
             <button
