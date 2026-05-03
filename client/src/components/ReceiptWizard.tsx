@@ -1862,33 +1862,41 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-2 px-4 py-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1 min-w-0">
+              <div className="flex items-center divide-x">
+                {/* Name + price */}
+                <div className="flex-1 min-w-0 px-4 py-3">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {item.quantity > 1 && !item.name.startsWith(`${item.quantity} `) && (
+                      <span className="text-xs text-muted-foreground font-medium tabular-nums flex-shrink-0">{item.quantity}×</span>
+                    )}
                     <p className="text-sm font-medium truncate">{item.name}</p>
-                    <Button size="icon" variant="ghost" className="shrink-0 -ml-1"
-                      onClick={() => startEdit(item)} data-testid={`button-edit-item-${item.id}`}>
-                      <Pencil className="h-3 w-3 text-muted-foreground" />
-                    </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {item.quantity > 1 && !item.name.startsWith(`${item.quantity} `) && `${item.quantity}× · `}
-                    ${parseFloat(item.price).toFixed(2)}
-                  </p>
+                  <p className="text-xs text-muted-foreground">${parseFloat(item.price).toFixed(2)}</p>
                 </div>
-                <Select value={effectiveCat(item)} onValueChange={v => saveCategory(item.id, v)}>
-                  <SelectTrigger className="w-28 flex-shrink-0 h-9 text-xs" data-testid={`select-category-${item.id}`}>
-                    <SelectValue placeholder="Type?" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Uncategorized</SelectItem>
-                    <SelectItem value="appetizer">Appetizer</SelectItem>
-                    <SelectItem value="meal">Meal</SelectItem>
-                    <SelectItem value="dessert">Dessert</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                    <SelectItem value="drink">Drink</SelectItem>
-                  </SelectContent>
-                </Select>
+                {/* Category select */}
+                <div className="flex-shrink-0 px-2 py-2">
+                  <Select value={effectiveCat(item)} onValueChange={v => saveCategory(item.id, v)}>
+                    <SelectTrigger className="w-28 h-9 text-xs border-0 shadow-none focus:ring-0" data-testid={`select-category-${item.id}`}>
+                      <SelectValue placeholder="Type?" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Uncategorized</SelectItem>
+                      <SelectItem value="appetizer">Appetizer</SelectItem>
+                      <SelectItem value="meal">Meal</SelectItem>
+                      <SelectItem value="dessert">Dessert</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                      <SelectItem value="drink">Drink</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* Pencil column */}
+                <button
+                  onClick={() => startEdit(item)}
+                  className="px-3 py-3 flex items-center justify-center self-stretch text-muted-foreground hover-elevate active-elevate-2 flex-shrink-0"
+                  data-testid={`button-edit-item-${item.id}`}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
               </div>
             )}
           </div>
