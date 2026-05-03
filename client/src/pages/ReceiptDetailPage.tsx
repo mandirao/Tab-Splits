@@ -1533,11 +1533,11 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
 
       </main>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-card border-t p-4">
-        <div className="space-y-3">
+      <div className="fixed bottom-0 left-0 right-0 bg-card border-t px-4 pt-2.5 pb-3">
+        <div className="space-y-1.5">
           {/* Bulk assign action bar */}
           {bulkAssignMode && (
-            <div className="flex gap-2">
+            <div className="flex gap-2 mb-1">
               <Button
                 variant="outline"
                 size="sm"
@@ -1558,33 +1558,27 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               </Button>
             </div>
           )}
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Subtotal</span>
-            <span data-testid="text-receipt-subtotal">${displayTotals.subtotal.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Tax</span>
-            <span data-testid="text-receipt-tax">${displayTotals.tax.toFixed(2)}</span>
-          </div>
-          {selectedTab === "all" ? (
-            <div className="flex justify-between items-center text-sm">
+          {/* Compact subtotals line */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
+            <span data-testid="text-receipt-subtotal">Subtotal ${displayTotals.subtotal.toFixed(2)}</span>
+            <span>·</span>
+            <span data-testid="text-receipt-tax">Tax ${displayTotals.tax.toFixed(2)}</span>
+            <span>·</span>
+            {selectedTab === "all" ? (
               <button
-                className="flex items-center gap-1.5 hover-elevate active-elevate-2 rounded-md -mx-1 px-1 py-0.5"
+                className="flex items-center gap-1 hover-elevate active-elevate-2 rounded"
                 onClick={() => setTipBottomSheetOpen(true)}
                 data-testid="button-edit-tip"
               >
-                <span className="text-muted-foreground">Tip ({tipPercentage.toFixed(0)}%)</span>
-                <Pencil className="h-3 w-3 text-muted-foreground" />
+                <span data-testid="text-receipt-tip">Tip ({tipPercentage.toFixed(0)}%) ${displayTotals.tip.toFixed(2)}</span>
+                <Pencil className="h-2.5 w-2.5" />
               </button>
-              <span data-testid="text-receipt-tip">${displayTotals.tip.toFixed(2)}</span>
-            </div>
-          ) : (
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Tip ({tipPercentage.toFixed(0)}%)</span>
-              <span data-testid="text-receipt-tip">${displayTotals.tip.toFixed(2)}</span>
-            </div>
-          )}
-          <div className="flex justify-between items-center text-xl font-bold pt-2 border-t">
+            ) : (
+              <span data-testid="text-receipt-tip">Tip ({tipPercentage.toFixed(0)}%) ${displayTotals.tip.toFixed(2)}</span>
+            )}
+          </div>
+          {/* Total row */}
+          <div className="flex justify-between items-center font-bold border-t pt-1.5">
             <span>Total</span>
             <div className="flex items-center gap-1.5">
               <span data-testid="text-receipt-total">${displayTotals.total.toFixed(2)}</span>
@@ -1596,7 +1590,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
 
           {/* ── Dynamic CTA bar ── */}
           {!bulkAssignMode && (
-            <div className="pt-3 mt-1 border-t">
+            <div className="pt-1.5 border-t">
               <div className="flex items-center gap-2">
                 {isReadyToShare ? (
                   <>
