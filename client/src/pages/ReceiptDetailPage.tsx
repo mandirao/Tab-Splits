@@ -1294,28 +1294,28 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           })}
 
           {/* Manage People */}
-          <Button
-            variant="outline"
-            size="sm"
+          <button
             onClick={handleManagePeopleClick}
-            className="whitespace-nowrap flex items-center gap-1.5 text-muted-foreground"
+            className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-dashed border-border text-muted-foreground text-sm font-medium hover-elevate"
             data-testid="button-add-person-tab"
           >
             <Users className="h-3.5 w-3.5" />
             Manage
-          </Button>
+          </button>
 
           {/* Unassigned — only when needed, after categories */}
           {hasUnassignedItems && (
-            <Button
-              variant={selectedTab === "unassigned" ? "default" : "outline"}
-              size="sm"
+            <button
               onClick={() => setSelectedTab("unassigned")}
-              className="whitespace-nowrap"
+              className={`whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-medium transition-colors ${
+                selectedTab === "unassigned"
+                  ? "bg-amber-500 text-white border-amber-500"
+                  : "border-amber-400 text-amber-700 dark:text-amber-400 dark:border-amber-600 hover-elevate"
+              }`}
               data-testid="tab-unassigned"
             >
               Unassigned
-            </Button>
+            </button>
           )}
         </div>
       </div>

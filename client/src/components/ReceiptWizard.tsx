@@ -320,6 +320,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
 
   // ─── Step 3: Diners ───────────────────────────────────────────────────────
   const [newPersonName, setNewPersonName] = useState("");
+  const [newPersonLastName, setNewPersonLastName] = useState("");
   const [newPersonPhone, setNewPersonPhone] = useState("");
   const [isAddingPerson, setIsAddingPerson] = useState(false);
   const [addMode, setAddMode] = useState<"contacts" | "manual">("manual");
@@ -344,6 +345,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
     setAddMode(contactsSupported ? "contacts" : "manual");
     setPendingContact(null);
     setNewPersonName("");
+    setNewPersonLastName("");
     setNewPersonPhone("");
     setIsAddingPerson(true);
   };
@@ -357,7 +359,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "people"] });
       queryClient.invalidateQueries({ queryKey: ["/api/people"] });
-      setNewPersonName(""); setNewPersonPhone(""); setIsAddingPerson(false);
+      setNewPersonName(""); setNewPersonLastName(""); setNewPersonPhone(""); setIsAddingPerson(false);
       setPendingContact(null);
     },
     onError: (err: any) => toast({ title: "Failed to add person", description: err.message, variant: "destructive" }),
@@ -634,7 +636,6 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           <div>
             <p className="text-xs text-muted-foreground font-medium">Step {step + 1} of 9</p>
             <h1 className="text-lg font-bold leading-tight">{STEP_LABELS[step]}</h1>
-            <p className="text-xs text-muted-foreground">{STEP_SUBTITLES[step]}</p>
           </div>
           {receiptId && (
             <Button size="sm" variant="ghost" onClick={() => onClose(receiptId)} className="text-xs text-muted-foreground" data-testid="button-exit-wizard">
@@ -651,10 +652,10 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
               <button
                 key={label}
                 onClick={() => setStep(i)}
-                className="flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium bg-primary/20 text-primary hover:bg-primary/35 transition-colors"
+                className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full font-medium bg-primary/20 text-primary hover:bg-primary/35 transition-colors"
                 data-testid={`wizard-step-pill-${i}`}
               >
-                ✓ {label}
+                <Check className="h-2.5 w-2.5 flex-shrink-0" />{label}
               </button>
             ) : (
               <span
@@ -757,7 +758,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
               id: "mixed" as DiningFormat,
               icon: Shuffle,
               label: "Mixed Bag",
-              lines: ["Full manual control."],
+              lines: ["Full manual control.", "Assign every item yourself."],
             },
           ];
           return (
@@ -867,7 +868,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                         { id: "manual" as const, label: "Manual", icon: UserPlus },
                       ]).map(({ id, label, icon: Icon }) => (
                         <button key={id} type="button"
-                          onClick={() => { setAddMode(id); setPendingContact(null); setNewPersonName(""); setNewPersonPhone(""); }}
+                          onClick={() => { setAddMode(id); setPendingContact(null); setNewPersonName(""); setNewPersonLastName(""); setNewPersonPhone(""); }}
                           className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-1.5 rounded transition-colors ${addMode === id ? "bg-background shadow-sm text-foreground" : "text-muted-foreground"}`}
                           data-testid={`button-add-mode-${id}`}>
                           <Icon className="h-3.5 w-3.5" />{label}
@@ -915,10 +916,13 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                     {/* Manual mode */}
                     {addMode === "manual" && (
                       <div className="space-y-2">
-                        <Input placeholder="Name *" value={newPersonName} onChange={e => setNewPersonName(e.target.value)} data-testid="input-new-person-name" />
+                        <div className="flex gap-2">
+                          <Input className="flex-1" placeholder="First *" value={newPersonName} onChange={e => setNewPersonName(e.target.value)} data-testid="input-new-person-first" autoFocus />
+                          <Input className="flex-1" placeholder="Last" value={newPersonLastName} onChange={e => setNewPersonLastName(e.target.value)} data-testid="input-new-person-last" />
+                        </div>
                         <Input placeholder="Phone (optional)" type="tel" value={newPersonPhone} onChange={e => setNewPersonPhone(e.target.value)} data-testid="input-new-person-phone" />
                         <Button className="w-full" disabled={!newPersonName.trim() || addPersonMutation.isPending}
-                          onClick={() => addPersonMutation.mutate({ name: newPersonName.trim(), phone: newPersonPhone.trim() || undefined })}
+                          onClick={() => addPersonMutation.mutate({ name: [newPersonName.trim(), newPersonLastName.trim()].filter(Boolean).join(" "), phone: newPersonPhone.trim() || undefined })}
                           data-testid="button-save-new-person">
                           {addPersonMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add diner"}
                         </Button>
@@ -1331,18 +1335,16 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
               </CardContent>
             </Card>
 
-            {payerId && (
-              <Card>
-                <CardContent className="p-4">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-2">Venmo username (optional)</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">@</span>
-                    <Input className="pl-7" placeholder="username" value={venmoInput} onChange={e => setVenmoInput(e.target.value.replace("@", ""))} data-testid="input-venmo-username" />
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">Diners will get a one-tap Venmo link to pay them back.</p>
-                </CardContent>
-              </Card>
-            )}
+            <Card className={!payerId ? "opacity-50" : ""}>
+              <CardContent className="p-4">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-2">Venmo username (optional)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">@</span>
+                  <Input className="pl-7" placeholder="username" disabled={!payerId} value={venmoInput} onChange={e => setVenmoInput(e.target.value.replace("@", ""))} data-testid="input-venmo-username" />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">Diners will get a one-tap Venmo link to pay them back.</p>
+              </CardContent>
+            </Card>
 
             {receiptPeople.length === 0 && (
               <p className="text-sm text-muted-foreground text-center">Go back and add diners first.</p>
