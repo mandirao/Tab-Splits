@@ -707,7 +707,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
             receipt={receipt}
             subtotalDiff={subtotalDiff}
             fromExistingReceipt={!!initialReceiptId}
-            onCategoryUpdated={refetchItems}
+            onEditItem={(item) => setAssignEditSheet({ id: item.id, name: item.name, quantity: item.quantity ?? 1, price: item.price, category: item.category ?? null })}
             isCategorizing={isCategorizing}
           />
         )}
@@ -1688,27 +1688,21 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
-function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExistingReceipt, onCategoryUpdated, isCategorizing }: {
+function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExistingReceipt, onEditItem, isCategorizing }: {
   receiptId: string;
   items: ReceiptItem[];
   receipt: Receipt | undefined;
   subtotalDiff: number;
   fromExistingReceipt?: boolean;
-  onCategoryUpdated: () => void;
+  onEditItem: (item: ReceiptItem) => void;
   isCategorizing: boolean;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editQty, setEditQty] = useState("1");
-  const [editPrice, setEditPrice] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [addName, setAddName] = useState("");
   const [addQty, setAddQty] = useState("1");
   const [addPrice, setAddPrice] = useState("");
-  // Optimistic overrides for category selects so UI doesn't flicker while saving
-  const [catOverrides, setCatOverrides] = useState<Record<string, string>>({});
   // Restaurant name editing
   const [editingRestaurantName, setEditingRestaurantName] = useState(false);
   const [editRestaurantValue, setEditRestaurantValue] = useState("");
@@ -1725,42 +1719,6 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
     queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId] });
-  };
-
-  const startEdit = (item: ReceiptItem) => {
-    setEditingId(item.id);
-    setEditName(item.name);
-    setEditQty(String(item.quantity));
-    setEditPrice(parseFloat(item.price).toFixed(2));
-  };
-
-  const saveEdit = async () => {
-    if (!editingId) return;
-    try {
-      await apiRequest(`/api/items/${editingId}`, "PATCH", {
-        name: editName.trim(), quantity: parseInt(editQty) || 1, price: parseFloat(editPrice).toFixed(2),
-      });
-      invalidate();
-      setEditingId(null);
-    } catch { toast({ title: "Failed to update item", variant: "destructive" }); }
-  };
-
-  const deleteItem = async (id: string) => {
-    try {
-      await apiRequest(`/api/items/${id}`, "DELETE");
-      invalidate();
-      setEditingId(null);
-    } catch { toast({ title: "Failed to delete item", variant: "destructive" }); }
-  };
-
-  const saveCategory = async (itemId: string, newCat: string) => {
-    setCatOverrides(prev => ({ ...prev, [itemId]: newCat }));
-    try {
-      await apiRequest(`/api/items/${itemId}`, "PATCH", { category: newCat === "__none__" ? null : newCat });
-      onCategoryUpdated();
-    } catch {
-      setCatOverrides(prev => { const n = { ...prev }; delete n[itemId]; return n; });
-    }
   };
 
   const addItem = async () => {
@@ -1832,73 +1790,29 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
       )}
 
       {(() => {
-        const effectiveCat = (item: ReceiptItem) => catOverrides[item.id] ?? item.category ?? "__none__";
         const showGrouped = !isCategorizing && items.some(i => i.category);
         const CAT_ORDER_LOCAL = ["appetizer", "meal", "dessert", "other", "drink", "__none__"] as const;
 
         const renderItemRow = (item: ReceiptItem) => (
-          <div key={item.id}>
-            {editingId === item.id ? (
-              <div className="px-4 py-3 space-y-2">
-                <Input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Item name" className="text-sm" data-testid={`input-edit-name-${item.id}`} />
-                <div className="flex gap-2">
-                  <div className="w-20">
-                    <label className="text-[10px] text-muted-foreground">Qty</label>
-                    <Input type="number" min="1" value={editQty} onChange={e => setEditQty(e.target.value)} className="text-sm" data-testid={`input-edit-qty-${item.id}`} />
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-[10px] text-muted-foreground">Price</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
-                      <Input type="number" step="0.01" value={editPrice} onChange={e => setEditPrice(e.target.value)} className="pl-6 text-sm" data-testid={`input-edit-price-${item.id}`} />
-                    </div>
-                  </div>
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteItem(item.id)} data-testid={`button-delete-item-${item.id}`}>Delete</Button>
-                  <div className="flex-1" />
-                  <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
-                  <Button size="sm" onClick={saveEdit} data-testid={`button-save-edit-${item.id}`}>Save</Button>
-                </div>
+          <div key={item.id} className="flex items-center divide-x">
+            {/* Name + price */}
+            <div className="flex-1 min-w-0 px-4 py-3">
+              <div className="flex items-center gap-1.5 min-w-0">
+                {item.quantity > 1 && !item.name.startsWith(`${item.quantity} `) && (
+                  <span className="text-xs text-muted-foreground font-medium tabular-nums flex-shrink-0">{item.quantity}×</span>
+                )}
+                <p className="text-sm font-medium truncate">{item.name}</p>
               </div>
-            ) : (
-              <div className="flex items-center divide-x">
-                {/* Name + price */}
-                <div className="flex-1 min-w-0 px-4 py-3">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    {item.quantity > 1 && !item.name.startsWith(`${item.quantity} `) && (
-                      <span className="text-xs text-muted-foreground font-medium tabular-nums flex-shrink-0">{item.quantity}×</span>
-                    )}
-                    <p className="text-sm font-medium truncate">{item.name}</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">${parseFloat(item.price).toFixed(2)}</p>
-                </div>
-                {/* Category select */}
-                <div className="flex-shrink-0 px-2 py-2">
-                  <Select value={effectiveCat(item)} onValueChange={v => saveCategory(item.id, v)}>
-                    <SelectTrigger className="w-28 h-9 text-xs border-0 shadow-none focus:ring-0" data-testid={`select-category-${item.id}`}>
-                      <SelectValue placeholder="Type?" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">Uncategorized</SelectItem>
-                      <SelectItem value="appetizer">Appetizer</SelectItem>
-                      <SelectItem value="meal">Meal</SelectItem>
-                      <SelectItem value="dessert">Dessert</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                      <SelectItem value="drink">Drink</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {/* Pencil column */}
-                <button
-                  onClick={() => startEdit(item)}
-                  className="px-3 py-3 flex items-center justify-center self-stretch text-muted-foreground hover-elevate active-elevate-2 flex-shrink-0"
-                  data-testid={`button-edit-item-${item.id}`}
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
+              <p className="text-xs text-muted-foreground">${parseFloat(item.price).toFixed(2)}</p>
+            </div>
+            {/* Pencil column — opens shared edit drawer */}
+            <button
+              onClick={() => onEditItem(item)}
+              className="px-3 py-3 flex items-center justify-center self-stretch text-muted-foreground hover-elevate active-elevate-2 flex-shrink-0"
+              data-testid={`button-edit-item-${item.id}`}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
           </div>
         );
 
@@ -1907,7 +1821,7 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
             .map(cat => ({
               cat,
               label: cat === "__none__" ? "Uncategorized" : CAT_LABELS[cat],
-              groupItems: items.filter(i => effectiveCat(i) === cat),
+              groupItems: items.filter(i => (i.category ?? "__none__") === cat),
             }))
             .filter(g => g.groupItems.length > 0);
           return (
