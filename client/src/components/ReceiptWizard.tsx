@@ -634,8 +634,15 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
       {/* ── Header ── */}
       <div className="flex-shrink-0 px-4 pt-safe-top pt-4 pb-2 border-b bg-card">
         <div className="flex items-center justify-between mb-2">
-          <div>
+          <div className="flex items-center gap-2 min-w-0">
             <h1 className="text-lg font-bold leading-tight">{STEP_LABELS[step]}</h1>
+            {step === 4 && items.length > 0 && (
+              <span className={`flex-shrink-0 flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${assignedCount === items.length ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-500"}`}>
+                {assignedCount === items.length
+                  ? <><Check className="h-3 w-3" /> Done</>
+                  : `${assignedCount}/${items.length}`}
+              </span>
+            )}
           </div>
           {receiptId && (
             <Button size="sm" variant="ghost" onClick={() => onClose(receiptId)} className="text-xs text-muted-foreground" data-testid="button-exit-wizard">
@@ -942,12 +949,6 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
         {/* ────────────────────────────── STEP 4: ASSIGN ────────────────────────────── */}
         {step === 4 && (
           <div className="p-4 space-y-4">
-            {/* Progress summary */}
-            <div className={`flex items-center justify-between px-4 py-3 rounded-lg ${assignedCount === items.length ? "bg-green-50 dark:bg-green-900/20" : "bg-amber-50 dark:bg-amber-900/20"}`}>
-              <span className="text-sm font-medium">{assignedCount === items.length ? "All items assigned!" : `${assignedCount} of ${items.length} items assigned`}</span>
-              {assignedCount === items.length ? <Check className="h-4 w-4 text-green-600" /> : <span className="text-xs text-amber-600 font-medium">{items.length - assignedCount} remaining</span>}
-            </div>
-
             {peopleWithColors.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">Go back and add diners first.</p>
             )}
