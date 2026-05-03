@@ -1260,15 +1260,15 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       <div className="flex-shrink-0 border-b bg-card overflow-x-auto scrollbar-hide">
         <div className="flex gap-2 p-2 min-w-max">
           {/* All Items — always first */}
-          <Button
-            variant={selectedTab === "all" ? "default" : "outline"}
-            size="sm"
+          <button
             onClick={() => setSelectedTab("all")}
-            className="whitespace-nowrap"
+            className={`whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-medium transition-colors ${
+              selectedTab === "all" ? "text-white border-transparent bg-foreground" : "border-border text-foreground hover-elevate"
+            }`}
             data-testid="tab-all-items"
           >
-            All Items
-          </Button>
+            All
+          </button>
 
           {/* Person tabs */}
           {peopleWithColors.map((person) => {
