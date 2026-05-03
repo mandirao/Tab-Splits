@@ -1310,38 +1310,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             Manage
           </Button>
 
-          {/* Categories dropdown */}
-          {hasCategoryData && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant={CATEGORY_TABS.includes(selectedTab as any) ? "default" : "outline"}
-                  size="sm"
-                  className="whitespace-nowrap flex items-center gap-1"
-                  data-testid="tab-categories-menu"
-                >
-                  {CATEGORY_TABS.includes(selectedTab as any)
-                    ? CAT_LABELS_SHORT[selectedTab]
-                    : "Categories"}
-                  <ChevronDown className="h-3 w-3 opacity-60" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {(["appetizer", "meal", "dessert", "other", "drink"] as const).map(cat => {
-                  const catCount = items.filter(i => i.category === cat).length;
-                  if (catCount === 0) return null;
-                  const catLabel = CAT_LABELS[cat];
-                  return (
-                    <DropdownMenuItem key={cat} onClick={() => setSelectedTab(cat)} data-testid={`tab-category-${cat}`}>
-                      {catLabel}
-                      <span className="ml-auto pl-4 text-muted-foreground text-xs">{catCount}</span>
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-
           {/* Unassigned — only when needed, after categories */}
           {hasUnassignedItems && (
             <Button
@@ -1370,15 +1338,58 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                   </h2>
                 ) : (
                   <>
-                    <h2 className="font-semibold text-base truncate">
-                      {selectedTab === "all"
-                        ? "All Items"
-                        : selectedTab === "unassigned"
-                        ? "Unassigned Items"
-                        : CATEGORY_TABS.includes(selectedTab as any)
-                        ? CAT_LABELS[selectedTab]
-                        : `${getPersonById(selectedTab)?.name}'s Items`}
-                    </h2>
+                    {hasCategoryData ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            className="flex items-center gap-1 font-semibold text-base rounded-md hover:text-foreground/80 focus:outline-none"
+                            data-testid="dropdown-item-view-filter"
+                          >
+                            {selectedTab === "all"
+                              ? "All Items"
+                              : selectedTab === "unassigned"
+                              ? "Unassigned Items"
+                              : CATEGORY_TABS.includes(selectedTab as any)
+                              ? CAT_LABELS[selectedTab]
+                              : `${getPersonById(selectedTab)?.name}'s Items`}
+                            <ChevronDown className="h-3.5 w-3.5 opacity-60 flex-shrink-0" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem
+                            onClick={() => setSelectedTab("all")}
+                            className={selectedTab === "all" ? "font-semibold" : ""}
+                            data-testid="filter-all-items"
+                          >
+                            All Items
+                            <span className="ml-auto pl-4 text-muted-foreground text-xs">{items.length}</span>
+                          </DropdownMenuItem>
+                          {(["appetizer", "meal", "drink", "dessert", "other"] as const).map(cat => {
+                            const catCount = items.filter(i => i.category === cat).length;
+                            if (catCount === 0) return null;
+                            return (
+                              <DropdownMenuItem
+                                key={cat}
+                                onClick={() => setSelectedTab(cat)}
+                                className={selectedTab === cat ? "font-semibold" : ""}
+                                data-testid={`filter-category-${cat}`}
+                              >
+                                {CAT_LABELS[cat]}
+                                <span className="ml-auto pl-4 text-muted-foreground text-xs">{catCount}</span>
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : (
+                      <h2 className="font-semibold text-base truncate">
+                        {selectedTab === "all"
+                          ? "All Items"
+                          : selectedTab === "unassigned"
+                          ? "Unassigned Items"
+                          : `${getPersonById(selectedTab)?.name}'s Items`}
+                      </h2>
+                    )}
                     <span className="text-xs text-muted-foreground flex-shrink-0">
                       {filteredItems.length}
                       {selectedTab === "all" && hasUnassignedItems && (
