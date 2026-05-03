@@ -1166,8 +1166,9 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      <header className="flex-shrink-0 p-4 border-b bg-card">
-        <div className="flex items-center justify-between mb-3">
+      <header className="flex-shrink-0 px-3 py-2 border-b bg-card">
+        <div className="flex items-center gap-1">
+          <img src={logoUrl} alt="Tab Splits" className="h-5 w-5 rounded-md flex-shrink-0" />
           <Button 
             size="icon" 
             variant="ghost" 
@@ -1176,23 +1177,17 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="flex-1 text-center">
-            <button
-              className="text-xl font-bold px-2 py-0.5 rounded-md border border-border/50 bg-transparent cursor-text mx-auto block text-center transition-colors hover:border-border focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              onClick={() => {
-                setNameInput(receipt.restaurantName || "");
-                setEditingName(true);
-              }}
-              data-testid="button-edit-name"
-            >
-              {receipt.restaurantName || "Receipt"}
-            </button>
-            <div className="flex items-center justify-center gap-1 mt-0.5">
-              <img src={logoUrl} alt="Tab Splits" className="h-4 w-4 rounded-md" />
-              <span className="text-xs font-semibold tracking-wide text-primary">Tab Splits</span>
-            </div>
-          </div>
-          <div className="flex gap-0.5">
+          <button
+            className="flex-1 text-left text-lg font-bold px-2 py-0.5 rounded-md border border-transparent bg-transparent cursor-text transition-colors hover:border-border focus:outline-none focus-visible:ring-2 focus-visible:ring-ring truncate"
+            onClick={() => {
+              setNameInput(receipt.restaurantName || "");
+              setEditingName(true);
+            }}
+            data-testid="button-edit-name"
+          >
+            {receipt.restaurantName || "Receipt"}
+          </button>
+          <div className="flex gap-0.5 flex-shrink-0">
             {scannedImageUrl && (
               <button
                 onClick={() => setShowScannedImage(true)}
