@@ -8,7 +8,7 @@ import type { ReceiptItem } from "@shared/schema";
 import { Image, ChevronRight, ArrowRight } from "lucide-react";
 import logoUrl from "@assets/icon-1024_1775014486817.png";
 import { getDisplayNames } from "@/lib/personDisplay";
-import { CAT_LABELS, CATEGORY_ORDER, getInitials, PERSON_COLORS } from "@/lib/categories";
+import { getInitials, PERSON_COLORS } from "@/lib/categories";
 
 interface RedactedPerson {
   id: string;
@@ -82,21 +82,16 @@ function SharedItemRow({
 
   return (
     <div
-      className={`flex items-center gap-3 py-3 ${!isAssigned ? 'opacity-60' : ''}`}
+      className={`flex items-center gap-2 py-2 ${!isAssigned ? 'opacity-60' : ''}`}
       data-testid={`item-row-${item.id}`}
     >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-2">
-          {effBadge && (
-            <Badge variant="outline" className="text-xs px-1.5 shrink-0">
-              {effBadge}
-            </Badge>
-          )}
-          <span className="font-medium text-sm truncate">{item.name}</span>
-        </div>
-        <span className="text-base font-semibold">${displayPrice.toFixed(2)}</span>
-      </div>
-
+      {effBadge && (
+        <Badge variant="outline" className="text-xs px-1.5 shrink-0">
+          {effBadge}
+        </Badge>
+      )}
+      <span className="flex-1 min-w-0 font-medium text-sm truncate">{item.name}</span>
+      <span className="text-sm text-muted-foreground tabular-nums shrink-0">${displayPrice.toFixed(2)}</span>
       {isAllTab && isAssigned && (
         <div className="flex -space-x-1 shrink-0">
           {assignedPeople.map((pid, idx) => (
@@ -280,9 +275,6 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
 
   const myTotals = !isAllTab ? personTotals.get(selectedTab) : null;
 
-  const hasCategoryData = items.some(item => item.category);
-  const CAT_ORDER = CATEGORY_ORDER;
-
   // Only show tabs for people who have at least one item assigned
   const peopleInTabs = peopleWithColors.filter(p => personTotals.has(p.id));
 
@@ -390,49 +382,22 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
             </h2>
           </CardHeader>
           <CardContent className="p-0">
-            {filteredItems.length === 0 ? (
-              <div className="px-4">
+            <div className="px-4">
+              {filteredItems.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-3">No items assigned.</p>
-              </div>
-            ) : hasCategoryData ? (
-              // ── Category-grouped view ──────────────────────────────────────────
-              <>
-                {CAT_ORDER.map(cat => {
-                  const catItems = filteredItems.filter(i => i.category === cat);
-                  if (catItems.length === 0) return null;
-                  return (
-                    <div key={cat}>
-                      <div className="px-4 py-1.5 bg-muted/50 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground border-b">
-                        {CAT_LABELS[cat]}
-                      </div>
-                      <div className="divide-y px-4">
-                        {catItems.map(item => <SharedItemRow key={item.id} item={item} isAllTab={isAllTab} selectedTab={selectedTab} getColorForPerson={getColorForPerson} getPersonById={getPersonById} />)}
-                      </div>
-                    </div>
-                  );
-                })}
-                {/* Uncategorized items */}
-                {(() => {
-                  const uncatItems = filteredItems.filter(i => !i.category);
-                  if (uncatItems.length === 0) return null;
-                  return (
-                    <div>
-                      <div className="px-4 py-1.5 bg-muted/50 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground border-b">
-                        Other
-                      </div>
-                      <div className="divide-y px-4">
-                        {uncatItems.map(item => <SharedItemRow key={item.id} item={item} isAllTab={isAllTab} selectedTab={selectedTab} getColorForPerson={getColorForPerson} getPersonById={getPersonById} />)}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </>
-            ) : (
-              // ── Flat view (no categories) ──────────────────────────────────────
-              <div className="divide-y px-4">
-                {filteredItems.map(item => <SharedItemRow key={item.id} item={item} isAllTab={isAllTab} selectedTab={selectedTab} getColorForPerson={getColorForPerson} getPersonById={getPersonById} />)}
-              </div>
-            )}
+              ) : (
+                filteredItems.map(item => (
+                  <SharedItemRow
+                    key={item.id}
+                    item={item}
+                    isAllTab={isAllTab}
+                    selectedTab={selectedTab}
+                    getColorForPerson={getColorForPerson}
+                    getPersonById={getPersonById}
+                  />
+                ))
+              )}
+            </div>
 
             {/* Person-tab totals — connected at the bottom of the items card */}
             {!isAllTab && myTotals && (

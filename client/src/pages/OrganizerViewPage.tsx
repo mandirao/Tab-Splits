@@ -8,7 +8,7 @@ import type { Receipt, ReceiptItem, Person, Payment } from "@shared/schema";
 import { ArrowLeft, Image } from "lucide-react";
 import { useLocation } from "wouter";
 import { getDisplayNames } from "@/lib/personDisplay";
-import { CAT_LABELS, CATEGORY_ORDER, getInitials, PERSON_COLORS } from "@/lib/categories";
+import { getInitials, PERSON_COLORS } from "@/lib/categories";
 
 function gcd(a: number, b: number): number { return b === 0 ? a : gcd(b, a % b); }
 
@@ -17,7 +17,6 @@ function firstNameOnly(fullName: string) {
   return fullName.trim().split(/\s+/)[0] ?? fullName;
 }
 
-const CAT_ORDER = CATEGORY_ORDER;
 
 function OrganizerItemRow({
   item,
@@ -59,20 +58,16 @@ function OrganizerItemRow({
 
   return (
     <div
-      className={`flex items-center gap-3 py-3 ${!isAssigned ? 'opacity-60' : ''}`}
+      className={`flex items-center gap-2 py-2 ${!isAssigned ? 'opacity-60' : ''}`}
       data-testid={`item-row-${item.id}`}
     >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-2">
-          {effBadge && (
-            <Badge variant="outline" className="text-xs px-1.5 shrink-0">
-              {effBadge}
-            </Badge>
-          )}
-          <span className="font-medium text-sm truncate">{item.name}</span>
-        </div>
-        <span className="text-base font-semibold">${displayPrice.toFixed(2)}</span>
-      </div>
+      {effBadge && (
+        <Badge variant="outline" className="text-xs px-1.5 shrink-0">
+          {effBadge}
+        </Badge>
+      )}
+      <span className="flex-1 min-w-0 font-medium text-sm truncate">{item.name}</span>
+      <span className="text-sm text-muted-foreground tabular-nums shrink-0">${displayPrice.toFixed(2)}</span>
       {isAllTab && isAssigned && (
         <div className="flex -space-x-1 shrink-0">
           {assignedPeople.map((pid, idx) => (
@@ -190,8 +185,6 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
   const peopleInTabs = peopleWithColors.filter(p => personTotals.has(p.id));
   const displayNames = getDisplayNames(peopleInTabs);
 
-  const hasCategoryData = filteredItems.some(item => item.category);
-
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -287,32 +280,9 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
           </CardHeader>
 
           <CardContent className="p-0">
-            <div className="divide-y px-4">
+            <div className="px-4">
               {filteredItems.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-3">No items assigned.</p>
-              ) : hasCategoryData ? (
-                CAT_ORDER.filter(cat =>
-                  filteredItems.some(item => (item.category || "other") === cat)
-                ).map(cat => (
-                  <div key={cat}>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-3 pb-1">
-                      {CAT_LABELS[cat]}
-                    </p>
-                    {filteredItems
-                      .filter(item => (item.category || "other") === cat)
-                      .map(item => (
-                        <OrganizerItemRow
-                          key={item.id}
-                          item={item}
-                          isAllTab={isAllTab}
-                          selectedTab={selectedTab}
-                          getColorForPerson={getColorForPerson}
-                          getInitialsForPerson={getInitialsForPerson}
-                        />
-                      ))
-                    }
-                  </div>
-                ))
               ) : (
                 filteredItems.map(item => (
                   <OrganizerItemRow
