@@ -647,9 +647,24 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
         </div>
         <div className="flex gap-1 mt-2 overflow-x-auto scrollbar-hide pb-0.5">
           {STEP_LABELS.map((label, i) => (
-            <span key={label} className={`flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium ${i === step ? "bg-primary text-primary-foreground" : i < step ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>
-              {i < step && "✓ "}{label}
-            </span>
+            i < step ? (
+              <button
+                key={label}
+                onClick={() => setStep(i)}
+                className="flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium bg-primary/20 text-primary hover:bg-primary/35 transition-colors"
+                data-testid={`wizard-step-pill-${i}`}
+              >
+                ✓ {label}
+              </button>
+            ) : (
+              <span
+                key={label}
+                className={`flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium ${i === step ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+                data-testid={`wizard-step-pill-${i}`}
+              >
+                {label}
+              </span>
+            )
           ))}
         </div>
       </div>
