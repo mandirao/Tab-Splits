@@ -1567,17 +1567,17 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             <span data-testid="text-receipt-tax">${displayTotals.tax.toFixed(2)}</span>
           </div>
           {selectedTab === "all" ? (
-            <button
-              className="flex justify-between items-center text-sm w-full hover-elevate active-elevate-2 rounded-md -mx-2 px-2 py-1"
-              onClick={() => setTipBottomSheetOpen(true)}
-              data-testid="button-edit-tip"
-            >
-              <div className="flex items-center gap-1.5">
+            <div className="flex justify-between items-center text-sm">
+              <button
+                className="flex items-center gap-1.5 hover-elevate active-elevate-2 rounded-md -mx-1 px-1 py-0.5"
+                onClick={() => setTipBottomSheetOpen(true)}
+                data-testid="button-edit-tip"
+              >
                 <span className="text-muted-foreground">Tip ({tipPercentage.toFixed(0)}%)</span>
                 <Pencil className="h-3 w-3 text-muted-foreground" />
-              </div>
+              </button>
               <span data-testid="text-receipt-tip">${displayTotals.tip.toFixed(2)}</span>
-            </button>
+            </div>
           ) : (
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Tip ({tipPercentage.toFixed(0)}%)</span>
