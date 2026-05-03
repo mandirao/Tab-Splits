@@ -26,6 +26,7 @@ import AssignPersonSheetBody from "@/components/AssignPersonSheetBody";
 
 
 const STEP_LABELS = ["Scan receipt", "Verify item details", "Describe meal format", "Add diners", "Assign items", "Choose tip amount", "Review diner totals", "Choose who paid", "Share the tab"];
+const STEP_PILLS = ["Scan", "Items", "Format", "Diners", "Assign", "Tip", "Review", "Paid by", "Share"];
 const STEP_SUBTITLES = [
   "Take or upload a photo of your receipt",
   "Verify items and review categories",
@@ -646,23 +647,23 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${((step + 1) / 9) * 100}%` }} />
         </div>
         <div className="flex gap-1 mt-2 overflow-x-auto scrollbar-hide pb-0.5">
-          {STEP_LABELS.map((label, i) => (
+          {STEP_PILLS.map((pill, i) => (
             i < step ? (
               <button
-                key={label}
+                key={pill}
                 onClick={() => setStep(i)}
                 className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full font-medium bg-primary/20 text-primary hover:bg-primary/35 transition-colors"
                 data-testid={`wizard-step-pill-${i}`}
               >
-                <Check className="h-2.5 w-2.5 flex-shrink-0" />{label}
+                <Check className="h-2.5 w-2.5 flex-shrink-0" />{pill}
               </button>
             ) : (
               <span
-                key={label}
+                key={pill}
                 className={`flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium ${i === step ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
                 data-testid={`wizard-step-pill-${i}`}
               >
-                {label}
+                {pill}
               </span>
             )
           ))}
