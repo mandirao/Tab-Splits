@@ -25,7 +25,7 @@ import AssignPersonSheetBody from "@/components/AssignPersonSheetBody";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 
-const STEP_LABELS = ["Scan", "Items", "Format", "Diners", "Assign", "Tip", "Review", "Paid by", "Share"];
+const STEP_LABELS = ["Scan receipt", "Verify item details", "Describe meal format", "Add diners", "Assign items", "Choose tip amount", "Review diner totals", "Choose who paid", "Share the tab"];
 const STEP_SUBTITLES = [
   "Take or upload a photo of your receipt",
   "Verify items and review categories",
@@ -1748,6 +1748,13 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
     queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId] });
   };
 
+  const updateItemCategory = async (itemId: string, category: string | null) => {
+    try {
+      await apiRequest(`/api/receipts/${receiptId}/items/${itemId}`, "PATCH", { category: category || null });
+      invalidate();
+    } catch { toast({ title: "Failed to update category", variant: "destructive" }); }
+  };
+
   const addItem = async () => {
     if (!addName.trim() || !addPrice) return;
     try {
@@ -1822,7 +1829,7 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
 
         const renderItemRow = (item: ReceiptItem) => (
           <div key={item.id} className="flex items-center divide-x">
-            {/* Name + price */}
+            {/* Name + price + category */}
             <div className="flex-1 min-w-0 px-4 py-3">
               <div className="flex items-center gap-1.5 min-w-0">
                 {item.quantity > 1 && !item.name.startsWith(`${item.quantity} `) && (
@@ -1830,7 +1837,23 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
                 )}
                 <p className="text-sm font-medium truncate">{item.name}</p>
               </div>
-              <p className="text-xs text-muted-foreground">${parseFloat(item.price).toFixed(2)}</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-xs text-muted-foreground tabular-nums">${parseFloat(item.price).toFixed(2)}</p>
+                <select
+                  value={item.category ?? ""}
+                  onChange={e => updateItemCategory(item.id, e.target.value || null)}
+                  className="text-xs text-muted-foreground bg-transparent border-0 p-0 focus:outline-none cursor-pointer hover:text-foreground transition-colors"
+                  data-testid={`select-category-${item.id}`}
+                  onClick={e => e.stopPropagation()}
+                >
+                  <option value="">— category</option>
+                  <option value="appetizer">Appetizer</option>
+                  <option value="meal">Meal</option>
+                  <option value="drink">Drink</option>
+                  <option value="dessert">Dessert</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
             </div>
             {/* Pencil column — opens shared edit drawer */}
             <button
