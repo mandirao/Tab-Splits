@@ -81,7 +81,7 @@ export default function ReceiptItemRow({
         {/* Bulk mode checkbox */}
         {bulkMode && (
           <button
-            onClick={onBulkSelect}
+            onClick={e => { e.stopPropagation(); onBulkSelect?.(); }}
             className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
               selected
                 ? "bg-primary border-primary text-primary-foreground"
