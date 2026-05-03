@@ -425,9 +425,9 @@ export default function HomePage() {
     return uniquePeople.size;
   };
 
-  const filteredReceipts = receipts.filter(r => 
-    !searchQuery || r.restaurantName?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredReceipts = receipts
+    .filter(r => !searchQuery || r.restaurantName?.toLowerCase().includes(searchQuery.toLowerCase()))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const deleteReceiptMutation = useMutation({
     mutationFn: async (receiptId: string) => {
