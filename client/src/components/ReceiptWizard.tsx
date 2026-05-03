@@ -634,7 +634,6 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
       <div className="flex-shrink-0 px-4 pt-safe-top pt-4 pb-2 border-b bg-card">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <p className="text-xs text-muted-foreground font-medium">Step {step + 1} of 9</p>
             <h1 className="text-lg font-bold leading-tight">{STEP_LABELS[step]}</h1>
           </div>
           {receiptId && (
