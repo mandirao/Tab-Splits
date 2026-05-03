@@ -758,7 +758,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
             {
               id: "courses" as DiningFormat,
               icon: Layers,
-              label: "Courses",
+              label: "Coursed",
               lines: ["Apps & desserts split equally.", "People pay for their own entree and drinks."],
             },
             {
