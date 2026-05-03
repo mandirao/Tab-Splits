@@ -8,20 +8,10 @@ import type { Receipt, ReceiptItem, Person, Payment } from "@shared/schema";
 import { ArrowLeft, Image } from "lucide-react";
 import { useLocation } from "wouter";
 import { getDisplayNames } from "@/lib/personDisplay";
-import { CAT_LABELS, CATEGORY_ORDER, getInitials } from "@/lib/categories";
+import { CAT_LABELS, CATEGORY_ORDER, getInitials, PERSON_COLORS } from "@/lib/categories";
 
 function gcd(a: number, b: number): number { return b === 0 ? a : gcd(b, a % b); }
 
-const PERSON_COLORS = [
-  'hsl(38, 92%, 50%)',   // Amber
-  'hsl(17, 81%, 53%)',   // Coral
-  'hsl(345, 77%, 57%)',  // Raspberry
-  'hsl(258, 90%, 66%)',  // Violet
-  'hsl(217, 91%, 60%)',  // Blue
-  'hsl(164, 87%, 39%)',  // Teal
-  'hsl(142, 71%, 45%)',  // Lime
-  'hsl(330, 81%, 60%)',  // Pink
-];
 
 function firstNameOnly(fullName: string) {
   return fullName.trim().split(/\s+/)[0] ?? fullName;

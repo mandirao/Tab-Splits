@@ -19,17 +19,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 import QRCodeLib from "qrcode";
 import type { Receipt, ReceiptItem, Person } from "@shared/schema";
-import { CAT_LABELS, CAT_LABELS_SINGULAR, getInitials } from "@/lib/categories";
+import { CAT_LABELS, CAT_LABELS_SINGULAR, getInitials, PERSON_COLORS } from "@/lib/categories";
 import AssignPersonSheetBody from "@/components/AssignPersonSheetBody";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PERSON_COLORS = [
-  "hsl(221, 83%, 53%)", "hsl(142, 71%, 45%)", "hsl(37, 91%, 55%)",
-  "hsl(0, 72%, 51%)", "hsl(271, 81%, 56%)", "hsl(199, 89%, 48%)",
-  "hsl(24, 95%, 53%)", "hsl(330, 81%, 60%)", "hsl(168, 83%, 35%)",
-  "hsl(60, 97%, 37%)",
-];
 
 const STEP_LABELS = ["Scan", "Items", "Format", "Diners", "Assign", "Tip", "Review", "Paid by", "Share"];
 const STEP_SUBTITLES = [

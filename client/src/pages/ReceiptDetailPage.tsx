@@ -39,7 +39,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Receipt, ReceiptItem, Person } from "@shared/schema";
 import ReceiptWizard from "@/components/ReceiptWizard";
-import { CAT_LABELS, CAT_LABELS_SHORT, CATEGORY_ORDER, getInitials } from "@/lib/categories";
+import { CAT_LABELS, CAT_LABELS_SHORT, CATEGORY_ORDER, getInitials, PERSON_COLORS } from "@/lib/categories";
 import AssignPersonSheetBody from "@/components/AssignPersonSheetBody";
 
 interface Settlement {
@@ -54,16 +54,6 @@ interface PersonWithColor extends Person {
   color: string;
 }
 
-const PERSON_COLORS = [
-  'hsl(38, 92%, 50%)',   // Amber
-  'hsl(17, 81%, 53%)',   // Coral
-  'hsl(345, 77%, 57%)',  // Raspberry
-  'hsl(258, 90%, 66%)',  // Violet
-  'hsl(217, 91%, 60%)',  // Blue
-  'hsl(164, 87%, 39%)',  // Teal
-  'hsl(142, 71%, 45%)',  // Lime
-  'hsl(330, 81%, 60%)',  // Pink
-];
 
 // ─── AddPersonPanel ─────────────────────────────────────────────────────────
 
