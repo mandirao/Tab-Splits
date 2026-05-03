@@ -2295,7 +2295,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         onClose={(completedReceiptId) => {
           setWizardOpen(false);
           if (completedReceiptId) {
-            setLocation(`/receipt/${completedReceiptId}/summary`);
+            setLocation(`/receipt/${completedReceiptId}`);
           }
         }}
         initialReceiptId={receiptId}
