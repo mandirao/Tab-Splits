@@ -587,7 +587,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
 
   // ─── Navigation ───────────────────────────────────────────────────────────
   const handleNext = async () => {
-    if (step === 5) await saveTip();
+    if (step === 5) saveTip(); // fire-and-forget — don't block step transition
     if (step === 7) savePayer(); // fire-and-forget — don't block step transition
     if (step === 8) { onClose(receiptId ?? undefined, true); return; }
     setStep(s => s + 1);
