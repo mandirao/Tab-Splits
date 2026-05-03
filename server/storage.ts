@@ -18,7 +18,7 @@ import {
   users,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, isNull, or } from "drizzle-orm";
+import { eq, and, isNull, or, desc } from "drizzle-orm";
 
 export interface IStorage {
   // Auth / User operations
@@ -113,7 +113,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(receipts)
       .where(eq(receipts.userId, userId))
-      .orderBy(receipts.date);
+      .orderBy(desc(receipts.date));
   }
 
   async updateReceipt(id: string, receipt: Partial<InsertReceipt>): Promise<Receipt> {
