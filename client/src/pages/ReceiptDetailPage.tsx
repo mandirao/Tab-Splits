@@ -1263,7 +1263,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           <button
             onClick={() => setSelectedTab("all")}
             className={`whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-medium transition-colors ${
-              selectedTab === "all" ? "text-white border-transparent bg-foreground" : "border-border text-foreground hover-elevate"
+              selectedTab === "all" ? "bg-primary text-primary-foreground border-primary" : "border-border text-foreground hover-elevate"
             }`}
             data-testid="tab-all-items"
           >
