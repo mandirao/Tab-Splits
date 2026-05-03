@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { getDisplayNames } from "@/lib/personDisplay";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -1187,7 +1188,8 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           >
             {receipt.restaurantName || "Receipt"}
           </button>
-          <div className="flex gap-0.5 flex-shrink-0">
+          <div className="flex gap-0.5 flex-shrink-0 items-center">
+            <ThemeToggle />
             {scannedImageUrl && (
               <button
                 onClick={() => setShowScannedImage(true)}

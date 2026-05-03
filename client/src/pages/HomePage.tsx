@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ReceiptWizard from "@/components/ReceiptWizard";
@@ -472,6 +473,7 @@ export default function HomePage() {
             )}
           </div>
           <div className="flex items-center gap-1">
+            <ThemeToggle />
             <Button
               variant="ghost"
               size="icon"

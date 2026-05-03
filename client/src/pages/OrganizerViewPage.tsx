@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -202,31 +203,32 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
             <h1 className="text-xl font-bold truncate">{receipt.restaurantName || "Receipt"}</h1>
             <p className="text-sm text-muted-foreground">Summary</p>
           </div>
-          {receipt.imageUrl ? (
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button size="sm" variant="outline" className="gap-1.5 shrink-0" data-testid="button-view-receipt-image">
-                  <Image className="h-3.5 w-3.5" />
-                  <span>View photo</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-auto" aria-describedby={undefined}>
-                <DialogHeader>
-                  <DialogTitle>Receipt Photo</DialogTitle>
-                </DialogHeader>
-                <div className="flex items-center justify-center">
-                  <img
-                    src={receipt.imageUrl}
-                    alt="Original receipt"
-                    className="max-w-full max-h-[70vh] object-contain rounded-lg"
-                    data-testid="img-receipt-scan"
-                  />
-                </div>
-              </DialogContent>
-            </Dialog>
-          ) : (
-            <div className="w-10 shrink-0" />
-          )}
+          <div className="flex items-center gap-1 shrink-0">
+            <ThemeToggle />
+            {receipt.imageUrl && (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline" className="gap-1.5" data-testid="button-view-receipt-image">
+                    <Image className="h-3.5 w-3.5" />
+                    <span>View photo</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-auto" aria-describedby={undefined}>
+                  <DialogHeader>
+                    <DialogTitle>Receipt Photo</DialogTitle>
+                  </DialogHeader>
+                  <div className="flex items-center justify-center">
+                    <img
+                      src={receipt.imageUrl}
+                      alt="Original receipt"
+                      className="max-w-full max-h-[70vh] object-contain rounded-lg"
+                      data-testid="img-receipt-scan"
+                    />
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
         </div>
       </header>
 
