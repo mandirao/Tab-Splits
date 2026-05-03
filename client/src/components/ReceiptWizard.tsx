@@ -46,7 +46,7 @@ const SERVICE_CHARGE_TERMS = ["gratuity", "service charge", "service fee", "auto
 
 interface ReceiptWizardProps {
   open: boolean;
-  onClose: (receiptId?: string) => void;
+  onClose: (receiptId?: string, completed?: boolean) => void;
   initialReceiptId?: string;
 }
 
@@ -589,7 +589,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
   const handleNext = async () => {
     if (step === 5) await saveTip();
     if (step === 7) await savePayer();
-    if (step === 8) { onClose(receiptId ?? undefined); return; }
+    if (step === 8) { onClose(receiptId ?? undefined, true); return; }
     setStep(s => s + 1);
   };
 

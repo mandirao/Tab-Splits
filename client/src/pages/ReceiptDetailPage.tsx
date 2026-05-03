@@ -2292,10 +2292,12 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       {/* Wizard — launched from "Guide me through this" button */}
       <ReceiptWizard
         open={wizardOpen}
-        onClose={(completedReceiptId) => {
+        onClose={(completedReceiptId, completed) => {
           setWizardOpen(false);
           if (completedReceiptId) {
-            setLocation(`/receipt/${completedReceiptId}`);
+            setLocation(completed
+              ? `/receipt/${completedReceiptId}/summary`
+              : `/receipt/${completedReceiptId}`);
           }
         }}
         initialReceiptId={receiptId}
