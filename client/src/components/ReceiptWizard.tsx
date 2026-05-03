@@ -25,7 +25,7 @@ import AssignPersonSheetBody from "@/components/AssignPersonSheetBody";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 
-const STEP_LABELS = ["Scan receipt", "Verify item details", "Describe meal format", "Add diners", "Assign items", "Choose tip amount", "Review diner totals", "Choose who paid", "Share the tab"];
+const STEP_LABELS = ["Scan receipt", "Verify item details", "Choose meal format", "Add diners", "Assign items", "Choose tip amount", "Review diner totals", "Choose who paid", "Share the tab"];
 const STEP_PILLS = ["Scan", "Items", "Format", "Diners", "Assign", "Tip", "Review", "Paid by", "Share"];
 const STEP_SUBTITLES = [
   "Take or upload a photo of your receipt",
