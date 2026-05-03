@@ -1572,11 +1572,11 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
               onClick={() => setTipBottomSheetOpen(true)}
               data-testid="button-edit-tip"
             >
-              <span className="text-muted-foreground">Tip ({tipPercentage.toFixed(0)}%)</span>
-              <div className="flex items-center gap-2">
-                <span data-testid="text-receipt-tip">${displayTotals.tip.toFixed(2)}</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-muted-foreground">Tip ({tipPercentage.toFixed(0)}%)</span>
                 <Pencil className="h-3 w-3 text-muted-foreground" />
               </div>
+              <span data-testid="text-receipt-tip">${displayTotals.tip.toFixed(2)}</span>
             </button>
           ) : (
             <div className="flex justify-between text-sm">
