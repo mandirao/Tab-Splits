@@ -58,6 +58,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
   const [receiptId, setReceiptId] = useState<string | null>(null);
   const [diningFormat, setDiningFormat] = useState<DiningFormat | null>(null);
   const autoAssignApplied = useRef(false);
+  const hasInitializedFromReceipt = useRef(false);
 
   // Step 0 scan state
   const [previewUrl, setPreviewUrl] = useState("");
@@ -126,6 +127,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
       setWizardUrlCopied(false);
       setDiningFormat(null);
       autoAssignApplied.current = false;
+      hasInitializedFromReceipt.current = false;
       setAutoAssignDone(false);
       setAutoAdvanceMode(true);
       setSeqProcessed(new Set());
@@ -165,6 +167,21 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
     peopleWithColors.find(p => p.id === pid)?.color ?? PERSON_COLORS[0];
 
   const availablePeople = allPeople.filter(p => !receiptPeople.find(rp => rp.id === p.id));
+
+  // Populate diningFormat and paidBy from saved receipt data (once per open session)
+  useEffect(() => {
+    if (!open || !receipt || hasInitializedFromReceipt.current) return;
+    hasInitializedFromReceipt.current = true;
+    if (receipt.diningFormat) {
+      setDiningFormat(receipt.diningFormat as DiningFormat);
+    }
+    if (receipt.paidById) {
+      setPayerId(receipt.paidById);
+      const payer = receiptPeople.find(p => p.id === receipt.paidById)
+        || allPeople.find(p => p.id === receipt.paidById);
+      if (payer?.venmoUsername) setVenmoInput(payer.venmoUsername);
+    }
+  }, [open, receipt, receiptPeople, allPeople]);
 
   // Tip: init from receipt when it loads (Step 5)
   useEffect(() => {
@@ -738,7 +755,12 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                     <button
                       key={fmt.id}
                       type="button"
-                      onClick={() => setDiningFormat(fmt.id)}
+                      onClick={() => {
+                        setDiningFormat(fmt.id);
+                        if (receiptId) {
+                          apiRequest(`/api/receipts/${receiptId}`, "PATCH", { diningFormat: fmt.id });
+                        }
+                      }}
                       className={`relative rounded-lg border-2 flex flex-col items-center p-4 text-center transition-colors min-h-[160px] ${selected ? "border-primary bg-primary/5" : "border-border hover-elevate"}`}
                       data-testid={`button-format-${fmt.id}`}
                     >

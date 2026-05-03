@@ -72,7 +72,7 @@ Preferred communication style: Simple, everyday language.
 
 **Database Schema:**
 - Three main tables: `receipts`, `receipt_items`, `people`
-- Receipts store: restaurant name, date, financial totals (subtotal, tax, tip, total), optional image URL
+- Receipts store: restaurant name, date, financial totals (subtotal, tax, tip, total), optional image URL, diningFormat (family/courses/mixed), paidById
 - Receipt items store: name, quantity, price, and array of assigned person IDs (JSONB column)
 - People store: name, contact info (phone, email), and regular status flag
 - All numeric currency values stored as DECIMAL(10,2) for precision

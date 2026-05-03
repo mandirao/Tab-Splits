@@ -25,6 +25,7 @@ export const receipts = pgTable("receipts", {
   imageUrl: text("image_url"),
   shareToken: varchar("share_token").unique(),
   paidById: varchar("paid_by_id"),
+  diningFormat: text("dining_format"),
 });
 
 export const receiptItems = pgTable("receipt_items", {
@@ -90,6 +91,7 @@ export const updateReceiptSchema = z.object({
   total: numericStringSchema.optional(),
   imageUrl: z.string().optional(),
   paidById: z.string().nullable().optional(),
+  diningFormat: z.enum(["family", "courses", "mixed"]).nullable().optional(),
 }).strict();
 
 export const updateReceiptItemSchema = z.object({
