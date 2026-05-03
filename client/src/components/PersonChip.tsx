@@ -1,9 +1,8 @@
-import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 
 interface PersonChipProps {
   name: string;
-  initials: string;
+  initials?: string;
   color?: string;
   selected?: boolean;
   onSelect?: () => void;
@@ -13,7 +12,6 @@ interface PersonChipProps {
 
 export default function PersonChip({
   name,
-  initials,
   color = 'hsl(var(--primary))',
   selected = false,
   onSelect,
@@ -23,30 +21,31 @@ export default function PersonChip({
   return (
     <div
       className={`
-        inline-flex items-center gap-2 h-10 px-3 rounded-lg border-2 cursor-pointer
-        transition-colors
-        ${selected 
-          ? 'bg-primary/10 border-primary text-primary' 
-          : 'bg-card border-border hover-elevate'
+        inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border cursor-pointer
+        transition-colors text-sm font-medium
+        ${selected
+          ? 'text-white border-transparent'
+          : 'border-border text-foreground hover-elevate'
         }
       `}
+      style={selected ? { backgroundColor: color, borderColor: color } : undefined}
       onClick={onSelect}
       data-testid="chip-person"
     >
-      <div 
-        className="w-6 h-6 rounded-full text-white text-xs font-semibold flex items-center justify-center flex-shrink-0"
-        style={{ backgroundColor: color }}
-      >
-        {initials}
-      </div>
-      <span className="font-medium text-sm">{name}</span>
+      {!selected && (
+        <div
+          className="w-3.5 h-3.5 rounded-full flex-shrink-0"
+          style={{ backgroundColor: color }}
+        />
+      )}
+      <span>{name}</span>
       {showRemove && (
         <button
           onClick={(e) => {
             e.stopPropagation();
             onRemove?.();
           }}
-          className="ml-1 hover-elevate rounded-full p-0.5"
+          className="ml-0.5 hover-elevate rounded-full p-0.5"
           data-testid="button-remove-person"
         >
           <X className="h-3 w-3" />

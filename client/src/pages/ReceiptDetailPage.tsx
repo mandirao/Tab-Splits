@@ -1275,28 +1275,21 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             const personTotal = personTotals.get(person.id);
             if (!personTotal) return null;
             return (
-              <Button
+              <button
                 key={person.id}
-                variant={selectedTab === person.id ? "default" : "outline"}
-                size="sm"
                 onClick={() => setSelectedTab(person.id)}
-                className="whitespace-nowrap flex items-center gap-1.5"
-                style={{
-                  backgroundColor: selectedTab === person.id ? person.color : undefined,
-                  borderColor: person.color,
-                  color: selectedTab === person.id ? 'white' : undefined
-                }}
+                className={`whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-medium transition-colors ${
+                  selectedTab === person.id ? "text-white border-transparent" : "border-border text-foreground hover-elevate"
+                }`}
+                style={selectedTab === person.id ? { backgroundColor: person.color, borderColor: person.color } : undefined}
                 data-testid={`tab-person-${person.id}`}
               >
-                <div
-                  className="w-4 h-4 rounded-full text-white text-[10px] font-semibold flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: person.color }}
-                >
-                  {getInitialsForPerson(person.id)}
-                </div>
+                {selectedTab !== person.id && (
+                  <div className="w-3.5 h-3.5 rounded-full flex-shrink-0" style={{ backgroundColor: person.color }} />
+                )}
                 <span>{displayNames.get(person.id) ?? person.name}</span>
                 <span className="font-semibold">${personTotal.total.toFixed(2)}</span>
-              </Button>
+              </button>
             );
           })}
 
