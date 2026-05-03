@@ -1113,17 +1113,12 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                     const active = i === reviewPersonIdx;
                     return (
                       <button key={p.id} type="button" onClick={() => setReviewPersonIdx(i)}
-                        className="flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium border transition-colors flex-shrink-0 whitespace-nowrap"
-                        style={{
-                          backgroundColor: active ? p.color : undefined,
-                          borderColor: p.color,
-                          color: active ? "white" : undefined,
-                        }}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors flex-shrink-0 whitespace-nowrap ${active ? "text-white border-transparent" : "border-border text-foreground hover-elevate"}`}
+                        style={active ? { backgroundColor: p.color, borderColor: p.color } : undefined}
                         data-testid={`button-review-tab-${i}`}>
-                        <div className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0"
-                          style={{ backgroundColor: p.color }}>
-                          {getInitials(p.name)}
-                        </div>
+                        {!active && (
+                          <div className="w-3.5 h-3.5 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
+                        )}
                         {p.name}
                       </button>
                     );
