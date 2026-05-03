@@ -1129,52 +1129,56 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                         }
 
                         return (
-                          <div key={item.id} className="flex items-center gap-2 py-1.5 -mx-1 px-1">
-                            {/* Name + fraction label + pencil */}
-                            <div className="flex-1 min-w-0 flex items-center gap-1 min-w-0">
-                              {fractionLabel && (
-                                <span className="text-xs text-muted-foreground font-medium tabular-nums flex-shrink-0">{fractionLabel}</span>
-                              )}
-                              <p className="text-sm font-medium leading-tight truncate">{item.name}</p>
+                          <div key={item.id} className="flex items-center divide-x">
+                            {/* Main: name + price below + bubbles */}
+                            <div className="flex-1 flex items-center gap-3 py-2 min-w-0">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  {fractionLabel && (
+                                    <span className="text-xs text-muted-foreground font-medium tabular-nums flex-shrink-0">{fractionLabel}</span>
+                                  )}
+                                  <p className="text-sm font-medium leading-tight truncate">{item.name}</p>
+                                </div>
+                                <p className="text-xs text-muted-foreground">${share.toFixed(2)}</p>
+                              </div>
+                              {/* Bubbles — tap to reassign */}
                               <button
                                 type="button"
-                                onClick={() => setAssignEditSheet({ id: item.id, name: item.name, quantity: item.quantity ?? 1, price: item.price, category: item.category ?? null })}
-                                className="flex-shrink-0 p-0.5 text-muted-foreground rounded"
-                                data-testid={`button-review-edit-${item.id}`}
+                                onClick={() => openAssignSheet(item.name, [item.id], assignedTo, hasQuantities ? quantities : undefined)}
+                                className="flex -space-x-1.5 flex-shrink-0 hover-elevate active-elevate-2 rounded-full p-0.5"
+                                data-testid={`button-review-item-${item.id}`}
                               >
-                                <Pencil className="h-3 w-3" />
+                                {assignedTo.length === 0 && (
+                                  <div className="w-7 h-7 rounded-full ring-2 ring-border bg-muted/50 flex items-center justify-center">
+                                    <Users className="h-3 w-3 text-muted-foreground" />
+                                  </div>
+                                )}
+                                {assignedTo.slice(0, 3).map(pid => {
+                                  const person = peopleWithColors.find(p => p.id === pid);
+                                  if (!person) return null;
+                                  return (
+                                    <div key={pid}
+                                      className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center ring-2 ring-background"
+                                      style={{ backgroundColor: person.color }}>
+                                      {getInitials(person.name)}
+                                    </div>
+                                  );
+                                })}
+                                {assignedTo.length > 3 && (
+                                  <div className="w-7 h-7 rounded-full ring-2 ring-background bg-muted flex items-center justify-center text-xs font-semibold">
+                                    +{assignedTo.length - 3}
+                                  </div>
+                                )}
                               </button>
                             </div>
-                            {/* Share price */}
-                            <span className="text-sm font-medium tabular-nums flex-shrink-0">${share.toFixed(2)}</span>
-                            {/* Initials — tap to reassign */}
+                            {/* Pencil column */}
                             <button
                               type="button"
-                              onClick={() => openAssignSheet(item.name, [item.id], assignedTo, hasQuantities ? quantities : undefined)}
-                              className="flex-shrink-0 flex -space-x-1 rounded-full hover-elevate active-elevate-2 p-0.5"
-                              data-testid={`button-review-item-${item.id}`}
+                              onClick={() => setAssignEditSheet({ id: item.id, name: item.name, quantity: item.quantity ?? 1, price: item.price, category: item.category ?? null })}
+                              className="px-3 py-3 flex items-center justify-center self-stretch text-muted-foreground hover-elevate active-elevate-2 flex-shrink-0"
+                              data-testid={`button-review-edit-${item.id}`}
                             >
-                              {assignedTo.length === 0 && (
-                                <div className="h-6 w-6 rounded-full border-2 border-border bg-muted/50 flex items-center justify-center">
-                                  <Users className="h-3 w-3 text-muted-foreground" />
-                                </div>
-                              )}
-                              {assignedTo.slice(0, 3).map(pid => {
-                                const person = peopleWithColors.find(p => p.id === pid);
-                                if (!person) return null;
-                                return (
-                                  <div key={pid}
-                                    className="h-6 w-6 rounded-full border-2 border-background flex items-center justify-center text-white text-[9px] font-bold"
-                                    style={{ backgroundColor: person.color }}>
-                                    {getInitials(person.name)}
-                                  </div>
-                                );
-                              })}
-                              {assignedTo.length > 3 && (
-                                <div className="h-6 w-6 rounded-full border-2 border-background bg-muted flex items-center justify-center text-[9px] font-bold">
-                                  +{assignedTo.length - 3}
-                                </div>
-                              )}
+                              <Pencil className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         );
@@ -2074,21 +2078,21 @@ function AssignCategorySection({ label, items, assigned, peopleWithColors, getPe
                 </p>
                 <p className="text-xs text-muted-foreground">${parseFloat(item.price).toFixed(2)}</p>
               </div>
-              <div className="flex -space-x-1 flex-shrink-0">
+              <div className="flex -space-x-1.5 flex-shrink-0">
                 {!isAssigned && <span className="text-xs text-muted-foreground italic pr-1">tap to assign</span>}
                 {assignedPeople.slice(0, 4).map(pid => {
                   const person = peopleWithColors.find(p => p.id === pid);
                   if (!person) return null;
                   return (
                     <div key={pid} title={person.name}
-                      className="h-6 w-6 rounded-full border-2 border-background flex items-center justify-center text-white text-[9px] font-bold"
+                      className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center ring-2 ring-background"
                       style={{ backgroundColor: person.color }}>
                       {getInitials(person.name)}
                     </div>
                   );
                 })}
                 {assignedPeople.length > 4 && (
-                  <div className="h-6 w-6 rounded-full border-2 border-background bg-muted flex items-center justify-center text-[9px] font-bold">
+                  <div className="w-7 h-7 rounded-full ring-2 ring-background bg-muted flex items-center justify-center text-xs font-semibold">
                     +{assignedPeople.length - 4}
                   </div>
                 )}
