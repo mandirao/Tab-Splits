@@ -9,6 +9,7 @@ import PersonChip from "@/components/PersonChip";
 import TipCalculator from "@/components/TipCalculator";
 import { apiRequest } from "@/lib/queryClient";
 import { trySessionStore } from "@/lib/imageUtils";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import {
   Camera, Upload, Loader2, RotateCw, RotateCcw, Check, ArrowLeft, ArrowRight,
@@ -55,12 +56,14 @@ interface ReceiptWizardProps {
 export default function ReceiptWizard({ open, onClose, initialReceiptId }: ReceiptWizardProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const [step, setStep] = useState(0);
   const [receiptId, setReceiptId] = useState<string | null>(null);
   const [diningFormat, setDiningFormat] = useState<DiningFormat | null>(null);
   const autoAssignApplied = useRef(false);
   const hasInitializedFromReceipt = useRef(false);
+  const selfAddedRef = useRef(false);
 
   // Step 0 scan state
   const [previewUrl, setPreviewUrl] = useState("");
@@ -130,6 +133,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
       setDiningFormat(null);
       autoAssignApplied.current = false;
       hasInitializedFromReceipt.current = false;
+      selfAddedRef.current = false;
       setAutoAssignDone(false);
       setAutoAdvanceMode(true);
       setSeqProcessed(new Set());
@@ -319,6 +323,27 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, receiptId, items.length]);
+
+  // Auto-add the logged-in user when entering the Add Diners step
+  useEffect(() => {
+    if (step !== 3 || !receiptId || !user || selfAddedRef.current) return;
+    // Wait until people data has loaded
+    if (!allPeople) return;
+    selfAddedRef.current = true;
+    const alreadyOnTab = receiptPeople.some(
+      p => p.name.trim().toLowerCase() === user.name.trim().toLowerCase()
+    );
+    if (alreadyOnTab) return;
+    const existing = allPeople.find(
+      p => p.name.trim().toLowerCase() === user.name.trim().toLowerCase()
+    );
+    if (existing) {
+      addExistingToReceipt(existing.id);
+    } else {
+      addPersonMutation.mutate({ name: user.name });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, receiptId, user, receiptPeople.length, allPeople.length]);
 
   // ─── Step 3: Diners ───────────────────────────────────────────────────────
   const [newPersonName, setNewPersonName] = useState("");
