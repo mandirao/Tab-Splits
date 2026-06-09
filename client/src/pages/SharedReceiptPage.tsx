@@ -59,14 +59,18 @@ function SharedItemRow({
   const assignedPeople = (item.assignedTo as string[]) || [];
   const isAssigned = assignedPeople.length > 0;
   const qtys = (item.assignedQuantities as Record<string, number>) || {};
-  const totalQty = assignedPeople.reduce((s, pid) => s + (qtys[pid] ?? 1), 0);
+  const hasQtys = assignedPeople.some(pid => (qtys[pid] ?? 0) > 0);
+  const totalQty = hasQtys
+    ? assignedPeople.reduce((s, pid) => s + (qtys[pid] ?? 0), 0)
+    : assignedPeople.length;
 
-  const myQty = !isAllTab ? (qtys[selectedTab] ?? 1) : 1;
-  let displayPrice = parseFloat(item.price) || 0;
+  const unitPrice = parseFloat(item.price) || 0;
+  const myQty = !isAllTab ? (hasQtys ? (qtys[selectedTab] ?? 0) : 1) : 1;
+  let displayPrice = unitPrice;
   if (!isAllTab && isAssigned) {
-    displayPrice = totalQty > 0
-      ? (myQty / totalQty) * displayPrice
-      : displayPrice / assignedPeople.length;
+    displayPrice = hasQtys
+      ? (qtys[selectedTab] ?? 0) * unitPrice
+      : (unitPrice * (item.quantity || 1)) / assignedPeople.length;
   }
 
   const itemQty = item.quantity || 1;
