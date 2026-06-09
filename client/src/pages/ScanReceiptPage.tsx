@@ -5,6 +5,7 @@ import { ArrowLeft, Camera, Upload, Loader2, RotateCw, RotateCcw } from "lucide-
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { trySessionStore } from "@/lib/imageUtils";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ScanReceiptPage() {
@@ -171,7 +172,7 @@ export default function ScanReceiptPage() {
 
       // Always save the rotated image for reference
       const rotatedImageDataUrl = `data:image/jpeg;base64,${base64Image}`;
-      sessionStorage.setItem(`scanned_image_${receipt.id}`, rotatedImageDataUrl);
+      trySessionStore(`scanned_image_${receipt.id}`, rotatedImageDataUrl);
       
       // Upload image to object storage for sharing
       try {

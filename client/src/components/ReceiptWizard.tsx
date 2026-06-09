@@ -8,6 +8,7 @@ import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
 import TipCalculator from "@/components/TipCalculator";
 import { apiRequest } from "@/lib/queryClient";
+import { trySessionStore } from "@/lib/imageUtils";
 import { useToast } from "@/hooks/use-toast";
 import {
   Camera, Upload, Loader2, RotateCw, RotateCcw, Check, ArrowLeft, ArrowRight,
@@ -244,7 +245,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
       }
 
       const rotatedDataUrl = `data:image/jpeg;base64,${base64Image}`;
-      sessionStorage.setItem(`scanned_image_${newReceipt.id}`, rotatedDataUrl);
+      trySessionStore(`scanned_image_${newReceipt.id}`, rotatedDataUrl);
 
       // Upload to storage (best-effort)
       try {
