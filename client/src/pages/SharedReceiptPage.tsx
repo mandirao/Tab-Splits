@@ -247,15 +247,16 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
 
   const personTotals = new Map<string, { subtotal: number; tax: number; tip: number; total: number }>();
   items.forEach(item => {
-    const itemPrice = parseFloat(item.price) || 0;
+    const unitPrice = parseFloat(item.price) || 0;
+    const itemQty = Number(item.quantity) || 1;
     const assignedPeople = (item.assignedTo as string[]) || [];
     const qtys = (item.assignedQuantities as Record<string, number>) || {};
     if (assignedPeople.length > 0) {
-      const totalQty = assignedPeople.reduce((s, pid) => s + (qtys[pid] ?? 1), 0);
+      const hasQtys = assignedPeople.some(pid => (qtys[pid] ?? 0) > 0);
       assignedPeople.forEach(pid => {
-        const share = totalQty > 0
-          ? ((qtys[pid] ?? 1) / totalQty) * itemPrice
-          : itemPrice / assignedPeople.length;
+        const share = hasQtys
+          ? (qtys[pid] ?? 0) * unitPrice
+          : (unitPrice * itemQty) / assignedPeople.length;
         if (!personTotals.has(pid)) personTotals.set(pid, { subtotal: 0, tax: 0, tip: 0, total: 0 });
         personTotals.get(pid)!.subtotal += share;
       });

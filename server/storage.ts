@@ -337,12 +337,24 @@ export class DatabaseStorage implements IStorage {
     items.forEach(item => {
       const assignedTo = (item.assignedTo as string[]) || [];
       if (assignedTo.length > 0) {
-        const itemPrice = parseFloat(item.price) * item.quantity;
-        const pricePerPerson = itemPrice / assignedTo.length;
-        assignedTo.forEach(personId => {
-          const current = owedByPerson.get(personId) || 0;
-          owedByPerson.set(personId, current + pricePerPerson);
-        });
+        const unitPrice = parseFloat(item.price);
+        const itemQty = Number(item.quantity) || 1;
+        const qtys = (item.assignedQuantities as Record<string, number> | null) || {};
+        const hasQtys = assignedTo.some(pid => (qtys[pid] ?? 0) > 0);
+        if (hasQtys) {
+          assignedTo.forEach(personId => {
+            const personShare = (qtys[personId] ?? 0) * unitPrice;
+            const current = owedByPerson.get(personId) || 0;
+            owedByPerson.set(personId, current + personShare);
+          });
+        } else {
+          const totalLineCost = unitPrice * itemQty;
+          const pricePerPerson = totalLineCost / assignedTo.length;
+          assignedTo.forEach(personId => {
+            const current = owedByPerson.get(personId) || 0;
+            owedByPerson.set(personId, current + pricePerPerson);
+          });
+        }
       }
     });
 

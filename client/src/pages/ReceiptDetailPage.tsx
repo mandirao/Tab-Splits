@@ -1003,17 +1003,17 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const personTotals = new Map<string, { subtotal: number; tax: number; tip: number; total: number }>();
   
   items.forEach(item => {
-    const itemPrice = parseFloat(item.price) || 0;
+    const unitPrice = parseFloat(item.price) || 0;
+    const itemQty = Number(item.quantity) || 1;
     const assignedPeople = (item.assignedTo as string[]) || [];
     const qtys = (item.assignedQuantities as Record<string, number>) || {};
     
     if (assignedPeople.length > 0) {
-      // Use assignedQuantities for proportional split if present, else equal split
-      const totalAssignedQty = assignedPeople.reduce((sum, pid) => sum + (qtys[pid] ?? 1), 0);
-      
+      const hasQtys = assignedPeople.some(pid => (qtys[pid] ?? 0) > 0);
       assignedPeople.forEach(personId => {
-        const personQty = qtys[personId] ?? 1;
-        const personShare = totalAssignedQty > 0 ? (personQty / totalAssignedQty) * itemPrice : itemPrice / assignedPeople.length;
+        const personShare = hasQtys
+          ? (qtys[personId] ?? 0) * unitPrice
+          : (unitPrice * itemQty) / assignedPeople.length;
         if (!personTotals.has(personId)) {
           personTotals.set(personId, { subtotal: 0, tax: 0, tip: 0, total: 0 });
         }
@@ -1131,11 +1131,13 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       const adjustedQty = getAdjustedQuantity(item, selectedTab);
       displayQuantity = formatQuantity(adjustedQty);
       const qtys = (item.assignedQuantities as Record<string, number>) || {};
-      const totalAssignedQty = assignedPeople.reduce((sum, pid) => sum + (qtys[pid] ?? 1), 0);
-      const personQty = qtys[selectedTab] ?? 1;
-      displayPrice = totalAssignedQty > 0
-        ? (personQty / totalAssignedQty) * displayPrice
-        : displayPrice / assignedPeople.length;
+      const unitP = parseFloat(item.price) || 0;
+      const hasQtys = assignedPeople.some(pid => (qtys[pid] ?? 0) > 0);
+      if (hasQtys) {
+        displayPrice = (qtys[selectedTab] ?? 0) * unitP;
+      } else {
+        displayPrice = (unitP * (Number(item.quantity) || 1)) / assignedPeople.length;
+      }
     }
     return (
       <ReceiptItemRow
