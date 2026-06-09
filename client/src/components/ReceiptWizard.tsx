@@ -359,7 +359,9 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
       const contacts = await (navigator as any).contacts.select(["name", "tel"], { multiple: false });
       if (contacts?.length > 0) {
         const c = contacts[0];
-        setPendingContact({ name: c.name?.[0] ?? "", phone: c.tel?.[0] ?? "" });
+        const name = c.name?.[0] ?? "";
+        const phone = c.tel?.[0] ?? "";
+        if (name) addPersonMutation.mutate({ name, phone: phone || undefined });
       }
     } catch (e: any) {
       if (e?.name !== "AbortError") {
@@ -912,31 +914,11 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                     {/* Contacts mode */}
                     {addMode === "contacts" && (
                       <div className="space-y-3">
-                        {pendingContact ? (
-                          <>
-                            <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
-                              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                <span className="text-sm font-semibold text-primary">
-                                  {getInitials(pendingContact.name)}
-                                </span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-sm truncate">{pendingContact.name}</p>
-                                {pendingContact.phone && <p className="text-xs text-muted-foreground">{pendingContact.phone}</p>}
-                              </div>
-                              <Button size="icon" variant="ghost" onClick={() => setPendingContact(null)} className="h-8 w-8" data-testid="button-clear-contact">
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                            <Button className="w-full" disabled={!pendingContact.name || addPersonMutation.isPending}
-                              onClick={() => addPersonMutation.mutate({ name: pendingContact.name, phone: pendingContact.phone || undefined })}
-                              data-testid="button-confirm-add-contact">
-                              {addPersonMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : `Add ${pendingContact.name.split(" ")[0]}`}
-                            </Button>
-                          </>
-                        ) : contactsSupported ? (
-                          <Button variant="outline" className="w-full" onClick={handleOpenContacts} data-testid="button-open-contacts">
-                            <Phone className="h-4 w-4 mr-2" /> Choose from Contacts
+                        {contactsSupported ? (
+                          <Button variant="outline" className="w-full" onClick={handleOpenContacts} disabled={addPersonMutation.isPending} data-testid="button-open-contacts">
+                            {addPersonMutation.isPending
+                              ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Adding…</>
+                              : <><Phone className="h-4 w-4 mr-2" /> Choose from Contacts</>}
                           </Button>
                         ) : (
                           <p className="text-sm text-muted-foreground text-center py-3">
