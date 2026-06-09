@@ -371,6 +371,7 @@ AUTO-GRATUITY / INCLUDED TIP DETECTION (very important):
 ITEMS LIST:
 - Skip ONLY: order numbers, dates, phone numbers, addresses, headers/footers, tax lines, and any gratuity/tip/service charge lines (those go in "tip")
 - Do NOT skip modifiers, add-ons, or substitutions that have a price
+- If the same item name appears on multiple lines (e.g. "2x Lychee Martini" and "1x Lychee Martini"), COMBINE them into a single entry with the total quantity and the per-unit price
 
 MATH VERIFICATION:
 - sum of (item.price * item.quantity) should equal subtotal (before tax/tip)
@@ -425,6 +426,28 @@ Return ONLY the JSON object, no additional text.`
         if (t > 0 && Math.abs((s + x) - tot) < 0.05) {
           data.subtotal = +(s - t).toFixed(2);
         }
+      }
+
+      // Merge duplicate item names (same name, possibly split across multiple lines)
+      if (Array.isArray(data.items) && data.items.length > 1) {
+        const normalize = (s: string) => String(s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+        const seen: Record<string, { name: string; quantity: number; totalPrice: number }> = {};
+        for (const item of data.items) {
+          const key = normalize(item.name);
+          const qty = Math.max(1, Number(item.quantity) || 1);
+          const unitPrice = Number(item.price) || 0;
+          if (seen[key]) {
+            seen[key].quantity += qty;
+            seen[key].totalPrice += unitPrice * qty;
+          } else {
+            seen[key] = { name: item.name, quantity: qty, totalPrice: unitPrice * qty };
+          }
+        }
+        data.items = Object.values(seen).map(m => ({
+          name: m.name,
+          quantity: m.quantity,
+          price: +(m.totalPrice / m.quantity).toFixed(2),
+        }));
       }
 
       res.json(data);
