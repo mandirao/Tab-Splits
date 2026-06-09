@@ -866,11 +866,11 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
             {availablePeople.length > 0 && (
               <Card>
                 <CardContent className="p-4">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Add from regulars</p>
-                  <div className="flex flex-wrap gap-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Add from regulars</p>
+                  <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
                     {availablePeople.map(person => (
                       <button key={person.id} type="button" onClick={() => addExistingToReceipt(person.id)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm hover-elevate active-elevate-2" data-testid={`button-add-regular-${person.id}`}>
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm hover-elevate active-elevate-2 flex-shrink-0" data-testid={`button-add-regular-${person.id}`}>
                         <Plus className="h-3.5 w-3.5" />
                         {person.name}
                       </button>
