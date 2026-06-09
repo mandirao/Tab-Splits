@@ -1753,7 +1753,7 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
 
   const updateItemCategory = async (itemId: string, category: string | null) => {
     try {
-      await apiRequest(`/api/receipts/${receiptId}/items/${itemId}`, "PATCH", { category: category || null });
+      await apiRequest(`/api/items/${itemId}`, "PATCH", { category: category || null });
       invalidate();
     } catch { toast({ title: "Failed to update category", variant: "destructive" }); }
   };
