@@ -635,26 +635,17 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
   // ─── Derived data for steps ───────────────────────────────────────────────
   const sub = parseFloat(receipt?.subtotal ?? "0") || 0;
   const tax = parseFloat(receipt?.tax ?? "0") || 0;
-  // OCR often stores line totals as the price (not unit prices), so we check both
-  // sum(price × qty) and sum(price) and use whichever is closer to the receipt subtotal.
+  // item.price is always the per-unit price (OCR combines duplicate lines into
+  // quantity × per-unit price), so the line cost is always price × quantity.
   const itemsSubtotalByUnit = items.reduce((s, i) => s + parseFloat(i.price) * i.quantity, 0);
-  const itemsSubtotalByLine = items.reduce((s, i) => s + parseFloat(i.price), 0);
-  const subtotalDiff = sub > 0
-    ? Math.min(Math.abs(itemsSubtotalByUnit - sub), Math.abs(itemsSubtotalByLine - sub))
-    : 0;
+  const subtotalDiff = sub > 0 ? Math.abs(itemsSubtotalByUnit - sub) : 0;
   const hasCategoryData = items.some(i => i.category);
   const hasServiceCharge = items.some(i =>
     SERVICE_CHARGE_TERMS.some(term => i.name.toLowerCase().includes(term))
   );
   const assignedCount = items.filter(i => (i.assignedTo as string[])?.length > 0).length;
 
-  // Determine whether OCR stored line totals or unit prices in the price field
-  // (same logic used for the subtotal warning banner)
-  const usePriceAsLineTotal = sub > 0
-    ? Math.abs(itemsSubtotalByLine - sub) < Math.abs(itemsSubtotalByUnit - sub)
-    : false;
-  const effectiveItemCost = (item: ReceiptItem) =>
-    usePriceAsLineTotal ? parseFloat(item.price) : parseFloat(item.price) * item.quantity;
+  const effectiveItemCost = (item: ReceiptItem) => parseFloat(item.price) * item.quantity;
 
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col" data-testid="wizard-overlay">
