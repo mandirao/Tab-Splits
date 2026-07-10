@@ -35,14 +35,18 @@ function OrganizerItemRow({
   const assignedPeople = (item.assignedTo as string[]) || [];
   const isAssigned = assignedPeople.length > 0;
   const qtys = (item.assignedQuantities as Record<string, number>) || {};
-  const totalQty = assignedPeople.reduce((s, pid) => s + (qtys[pid] ?? 1), 0);
+  const hasQtys = assignedPeople.some(pid => (qtys[pid] ?? 0) > 0);
+  const totalQty = hasQtys
+    ? assignedPeople.reduce((s, pid) => s + (qtys[pid] ?? 0), 0)
+    : assignedPeople.length;
 
-  const myQty = !isAllTab ? (qtys[selectedTab] ?? 1) : 1;
-  let displayPrice = parseFloat(item.price) || 0;
+  const unitPrice = parseFloat(item.price) || 0;
+  const myQty = !isAllTab ? (hasQtys ? (qtys[selectedTab] ?? 0) : 1) : 1;
+  let displayPrice = unitPrice;
   if (!isAllTab && isAssigned) {
-    displayPrice = totalQty > 0
-      ? (myQty / totalQty) * displayPrice
-      : displayPrice / assignedPeople.length;
+    displayPrice = hasQtys
+      ? (qtys[selectedTab] ?? 0) * unitPrice
+      : (unitPrice * (item.quantity || 1)) / assignedPeople.length;
   }
 
   const itemQty = item.quantity || 1;
@@ -151,16 +155,19 @@ export default function OrganizerViewPage({ params }: { params: { id: string } }
 
   const personTotals = new Map<string, { subtotal: number; tax: number; tip: number; total: number }>();
   items.forEach(item => {
-    const itemPrice = parseFloat(item.price) || 0;
+    const unitPrice = parseFloat(item.price) || 0;
+    const lineCost = unitPrice * (item.quantity || 1);
     const assignedPeople = (item.assignedTo as string[]) || [];
     const qtys = (item.assignedQuantities as Record<string, number>) || {};
     if (assignedPeople.length === 0) return;
-    const totalAssignedQty = assignedPeople.reduce((s, pid) => s + (qtys[pid] ?? 1), 0);
+    const hasQtys = assignedPeople.some(pid => (qtys[pid] ?? 0) > 0);
     assignedPeople.forEach(personId => {
-      const personQty = qtys[personId] ?? 1;
-      const personShare = totalAssignedQty > 0
-        ? (personQty / totalAssignedQty) * itemPrice
-        : itemPrice / assignedPeople.length;
+      let personShare: number;
+      if (hasQtys) {
+        personShare = (qtys[personId] ?? 0) * unitPrice;
+      } else {
+        personShare = lineCost / assignedPeople.length;
+      }
       if (!personTotals.has(personId)) personTotals.set(personId, { subtotal: 0, tax: 0, tip: 0, total: 0 });
       personTotals.get(personId)!.subtotal += personShare;
     });
