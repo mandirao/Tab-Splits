@@ -7,7 +7,7 @@ import { pool } from "./db";
 
 const app = express();
 
-// Trust Replit's reverse proxy so secure cookies work in production
+// Trust the hosting platform's reverse proxy so secure cookies work in production
 app.set("trust proxy", 1);
 
 declare module 'http' {
@@ -35,7 +35,7 @@ app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 const PgSession = connectPgSimple(session);
 app.use(session({
   store: new PgSession({
-    pool: pool as any,
+    pool,
     createTableIfMissing: true,
   }),
   secret: process.env.SESSION_SECRET || "fallback-dev-secret-change-in-prod",

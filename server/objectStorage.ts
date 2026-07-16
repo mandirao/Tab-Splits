@@ -1,0 +1,66 @@
+import type { Express } from "express";
+import { randomUUID } from "crypto";
+import { createClient } from "@supabase/supabase-js";
+
+// Receipt images live in a private Supabase Storage bucket. Uploads use
+// short-lived signed upload URLs (client PUTs the file directly to Supabase);
+// reads redirect to short-lived signed download URLs. Stored paths keep the
+// pre-migration `/objects/uploads/<uuid>` shape so existing imageUrl values
+// in the database remain valid.
+const BUCKET = "receipts";
+
+function getSupabase() {
+  const url = process.env.SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) {
+    throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set");
+  }
+  return createClient(url, serviceRoleKey);
+}
+
+export function registerObjectStorageRoutes(app: Express): void {
+  // Request a signed URL for a direct-to-storage upload.
+  // The client sends JSON metadata only, then PUTs the file to uploadURL.
+  app.post("/api/uploads/request-url", async (req, res) => {
+    try {
+      const { name, size, contentType } = req.body;
+      if (!name) {
+        return res.status(400).json({ error: "Missing required field: name" });
+      }
+
+      const objectPath = `uploads/${randomUUID()}`;
+      const { data, error } = await getSupabase()
+        .storage.from(BUCKET)
+        .createSignedUploadUrl(objectPath);
+      if (error || !data) {
+        throw error ?? new Error("No signed URL returned");
+      }
+
+      res.json({
+        uploadURL: data.signedUrl,
+        objectPath: `/objects/${objectPath}`,
+        metadata: { name, size, contentType },
+      });
+    } catch (error) {
+      console.error("Error generating upload URL:", error);
+      res.status(500).json({ error: "Failed to generate upload URL" });
+    }
+  });
+
+  // Serve uploaded objects by redirecting to a signed download URL.
+  app.get("/objects/:objectPath(*)", async (req, res) => {
+    try {
+      const objectPath = req.params.objectPath;
+      const { data, error } = await getSupabase()
+        .storage.from(BUCKET)
+        .createSignedUrl(objectPath, 3600);
+      if (error || !data) {
+        return res.status(404).json({ error: "Object not found" });
+      }
+      res.redirect(302, data.signedUrl);
+    } catch (error) {
+      console.error("Error serving object:", error);
+      res.status(500).json({ error: "Failed to serve object" });
+    }
+  });
+}

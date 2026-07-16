@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { randomBytes } from "crypto";
 import { storage } from "./storage";
 import { db } from "./db";
-import { getUncachableResendClient } from "./resend";
+import { getResendClient } from "./resend";
 import { ipRateLimit, userRateLimit } from "./rateLimit";
 import { sql, gte, isNotNull } from "drizzle-orm";
 import { users as usersTable, receipts as receiptsTable } from "@shared/schema";
@@ -22,12 +22,11 @@ import {
 } from "@shared/schema";
 import { fromError } from "zod-validation-error";
 import OpenAI from "openai";
-import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { registerObjectStorageRoutes } from "./objectStorage";
 import bcrypt from "bcrypt";
 
 const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 // ─── Auth middleware ──────────────────────────────────────────────────────────
@@ -167,7 +166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
       try {
-        const { client, fromEmail } = await getUncachableResendClient();
+        const { client, fromEmail } = await getResendClient();
         await client.emails.send({
           from: `Tab Splits <${fromEmail}>`,
           to: user.email,
