@@ -16,7 +16,7 @@ import {
   receiptPeople,
   payments,
   users,
-} from "@shared/schema";
+} from "../shared/schema";
 import { db } from "./db";
 import { eq, and, isNull, or, desc } from "drizzle-orm";
 

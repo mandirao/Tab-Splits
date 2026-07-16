@@ -6,7 +6,7 @@ import { db } from "./db";
 import { getResendClient } from "./resend";
 import { ipRateLimit, userRateLimit } from "./rateLimit";
 import { sql, gte, isNotNull } from "drizzle-orm";
-import { users as usersTable, receipts as receiptsTable } from "@shared/schema";
+import { users as usersTable, receipts as receiptsTable } from "../shared/schema";
 import { 
   insertReceiptSchema, 
   insertReceiptItemSchema, 
@@ -19,7 +19,7 @@ import {
   loginSchema,
   type Receipt,
   type Person,
-} from "@shared/schema";
+} from "../shared/schema";
 import { fromError } from "zod-validation-error";
 import OpenAI from "openai";
 import { registerObjectStorageRoutes } from "./objectStorage";
