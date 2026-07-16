@@ -31,7 +31,7 @@ function isAllowed(key: string, maxCount: number, windowMs: number): boolean {
   return true;
 }
 
-// Returns the real client IP, respecting Replit's reverse proxy header.
+// Returns the real client IP, respecting the reverse proxy header.
 function clientIp(req: Request): string {
   const forwarded = req.headers["x-forwarded-for"];
   if (typeof forwarded === "string") return forwarded.split(",")[0].trim();
