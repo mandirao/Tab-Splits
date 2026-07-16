@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { randomUUID } from "crypto";
-import { createClient } from "@supabase/supabase-js";
+import { StorageClient } from "@supabase/storage-js";
 
 // Receipt images live in a private Supabase Storage bucket. Uploads use
 // short-lived signed upload URLs (client PUTs the file directly to Supabase);
@@ -9,13 +9,16 @@ import { createClient } from "@supabase/supabase-js";
 // in the database remain valid.
 const BUCKET = "receipts";
 
-function getSupabase() {
+function getStorage() {
   const url = process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceRoleKey) {
     throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set");
   }
-  return createClient(url, serviceRoleKey);
+  return new StorageClient(`${url}/storage/v1`, {
+    apikey: serviceRoleKey,
+    Authorization: `Bearer ${serviceRoleKey}`,
+  });
 }
 
 export function registerObjectStorageRoutes(app: Express): void {
@@ -29,8 +32,8 @@ export function registerObjectStorageRoutes(app: Express): void {
       }
 
       const objectPath = `uploads/${randomUUID()}`;
-      const { data, error } = await getSupabase()
-        .storage.from(BUCKET)
+      const { data, error } = await getStorage()
+        .from(BUCKET)
         .createSignedUploadUrl(objectPath);
       if (error || !data) {
         throw error ?? new Error("No signed URL returned");
@@ -51,8 +54,8 @@ export function registerObjectStorageRoutes(app: Express): void {
   app.get("/objects/:objectPath(*)", async (req, res) => {
     try {
       const objectPath = req.params.objectPath;
-      const { data, error } = await getSupabase()
-        .storage.from(BUCKET)
+      const { data, error } = await getStorage()
+        .from(BUCKET)
         .createSignedUrl(objectPath, 3600);
       if (error || !data) {
         return res.status(404).json({ error: "Object not found" });
