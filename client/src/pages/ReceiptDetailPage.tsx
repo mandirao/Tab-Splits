@@ -3,6 +3,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { getDisplayNames } from "@/lib/personDisplay";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +12,7 @@ import ReceiptItemRow from "@/components/ReceiptItemRow";
 import TipCalculator from "@/components/TipCalculator";
 import BottomSheet from "@/components/BottomSheet";
 import PersonChip from "@/components/PersonChip";
-import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, DollarSign, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw, ListChecks, Sparkles, UtensilsCrossed, GlassWater, Cake, Tag, Circle, CheckCircle2, MinusCircle, Wand2, Salad, ChevronDown } from "lucide-react";
+import { ArrowLeft, Users, Share2, QrCode, MessageSquare, Pencil, Trash2, Plus, AlertTriangle, X, Image as ImageIcon, Copy, Check, PieChart, RefreshCw, Sparkles, UtensilsCrossed, GlassWater, Cake, Tag, Wand2, Salad, ChevronDown } from "lucide-react";
 import logoUrl from "@assets/icon-1024_1775014486817.png";
 import {
   AlertDialog,
@@ -400,7 +401,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const [newItemData, setNewItemData] = useState({ name: "", quantity: 1, price: "" });
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
-  const [bulkAssignMode, setBulkAssignMode] = useState(false);
   const [bulkSelectedItems, setBulkSelectedItems] = useState<Set<string>>(new Set());
   const [bulkAssignSheetOpen, setBulkAssignSheetOpen] = useState(false);
   const [bulkSelectedPeople, setBulkSelectedPeople] = useState<string[]>([]);
@@ -762,7 +762,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       queryClient.invalidateQueries({ queryKey: ["/api/receipts", receiptId, "items"] });
       const n = bulkSelectedItems.size;
       toast({ title: `Assigned ${n} item${n !== 1 ? "s" : ""}` });
-      exitBulkMode();
+      clearBulkSelection();
     },
     onError: (error: any) => {
       toast({ title: "Failed to assign items", description: error.message, variant: "destructive" });
@@ -770,15 +770,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   });
 
 
-  const enterBulkMode = (initialItemId?: string) => {
-    setBulkAssignMode(true);
-    setBulkSelectedItems(initialItemId ? new Set([initialItemId]) : new Set());
-    setBulkSelectedPeople([]);
-    setBulkAssignedQuantities({});
-  };
-
-  const exitBulkMode = () => {
-    setBulkAssignMode(false);
+  const clearBulkSelection = () => {
     setBulkSelectedItems(new Set());
     setBulkAssignSheetOpen(false);
     setBulkSelectedPeople([]);
@@ -996,14 +988,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const hasUnassignedItems = items.some(item => (item.assignedTo as string[] || []).length === 0);
 
   // CTA state — drives the bottom action bar
-  const unassignedCount = items.filter(i => (i.assignedTo as string[] || []).length === 0).length;
-  const hasPeople = peopleWithColors.length > 0;
-  const isReadyToShare = items.length > 0 && hasPeople && !hasUnassignedItems;
-  const ctaHint = !hasPeople
-    ? "Add diners to get started"
-    : unassignedCount > 0
-    ? `${unassignedCount} item${unassignedCount !== 1 ? "s" : ""} still need assignment`
-    : `All ${items.length} item${items.length !== 1 ? "s" : ""} assigned across ${peopleWithColors.length} ${peopleWithColors.length === 1 ? "person" : "people"}`;
+  const isReadyToShare = items.length > 0 && peopleWithColors.length > 0 && !hasUnassignedItems;
 
   // Calculate running total of all items
   const itemsSubtotal = items.reduce((sum, item) => {
@@ -1029,6 +1014,20 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         const assignedPeople = (item.assignedTo as string[]) || [];
         return assignedPeople.includes(selectedTab);
       });
+
+  const allVisibleSelected = filteredItems.length > 0 && filteredItems.every(i => bulkSelectedItems.has(i.id));
+  const someVisibleSelected = filteredItems.some(i => bulkSelectedItems.has(i.id));
+  const toggleSelectAllVisible = () => {
+    setBulkSelectedItems(prev => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        filteredItems.forEach(i => next.delete(i.id));
+      } else {
+        filteredItems.forEach(i => next.add(i.id));
+      }
+      return next;
+    });
+  };
 
   // Calculate adjusted quantity for person-specific tabs
   const getAdjustedQuantity = (item: ReceiptItem, personId: string) => {
@@ -1106,9 +1105,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
         onAssign={() => handleAssignClick(item.id)}
         onEdit={() => handleEditClick(item.id)}
         displayQuantity={displayQuantity}
-        bulkMode={bulkAssignMode}
         selected={bulkSelectedItems.has(item.id)}
-        onLongPress={() => enterBulkMode(item.id)}
         onBulkSelect={() => toggleBulkItem(item.id)}
       />
     );
@@ -1121,6 +1118,9 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       </div>
     );
   }
+
+  const payer = receipt.paidById ? getPersonById(receipt.paidById) : undefined;
+  const payerLabel = payer ? (displayNames.get(payer.id) ?? payer.name) : null;
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -1164,14 +1164,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             >
               <PieChart className="h-4 w-4" />
               <span className="text-[9px] text-muted-foreground leading-none">Summary</span>
-            </button>
-            <button
-              onClick={handlePaymentsClick}
-              className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-md hover-elevate active-elevate-2"
-              data-testid="button-open-payments"
-            >
-              <DollarSign className="h-4 w-4" />
-              <span className="text-[9px] text-muted-foreground leading-none">Payments</span>
             </button>
           </div>
         </div>
@@ -1280,209 +1272,120 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       <main className="flex-1 overflow-y-auto p-4 pb-80">
         <Card className="mb-4">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                {bulkAssignMode ? (
-                  <h2 className="font-semibold text-base">
-                    {bulkSelectedItems.size === 0
-                      ? "Tap to select items"
-                      : `${bulkSelectedItems.size} selected`}
-                  </h2>
-                ) : (
-                  <>
-                    {hasCategoryData ? (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button
-                            className="flex items-center gap-1 font-semibold text-base rounded-md hover:text-foreground/80 focus:outline-none"
-                            data-testid="dropdown-item-view-filter"
-                          >
-                            {selectedTab === "all"
-                              ? "All Items"
-                              : selectedTab === "unassigned"
-                              ? "Unassigned Items"
-                              : CATEGORY_TABS.includes(selectedTab as any)
-                              ? CAT_LABELS[selectedTab]
-                              : `${getPersonById(selectedTab)?.name}'s Items`}
-                            <ChevronDown className="h-3.5 w-3.5 opacity-60 flex-shrink-0" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start">
-                          <DropdownMenuItem
-                            onClick={() => setSelectedTab("all")}
-                            className={selectedTab === "all" ? "font-semibold" : ""}
-                            data-testid="filter-all-items"
-                          >
-                            All Items
-                            <span className="ml-auto pl-4 text-muted-foreground text-xs">{items.length}</span>
-                          </DropdownMenuItem>
-                          {(["appetizer", "meal", "drink", "dessert", "other"] as const).map(cat => {
-                            const catCount = items.filter(i => i.category === cat).length;
-                            if (catCount === 0) return null;
-                            return (
-                              <DropdownMenuItem
-                                key={cat}
-                                onClick={() => setSelectedTab(cat)}
-                                className={selectedTab === cat ? "font-semibold" : ""}
-                                data-testid={`filter-category-${cat}`}
-                              >
-                                {CAT_LABELS[cat]}
-                                <span className="ml-auto pl-4 text-muted-foreground text-xs">{catCount}</span>
-                              </DropdownMenuItem>
-                            );
-                          })}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    ) : (
-                      <h2 className="font-semibold text-base truncate">
+            <div className="flex items-center gap-2">
+              {/* Select-all checkbox — aligned with the per-item checkboxes below */}
+              <div className="pl-4 flex items-center flex-shrink-0">
+                <Checkbox
+                  checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
+                  onCheckedChange={toggleSelectAllVisible}
+                  disabled={filteredItems.length === 0}
+                  data-testid="checkbox-select-all"
+                />
+              </div>
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                {hasCategoryData ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className="flex items-center gap-1 font-semibold text-base rounded-md hover:text-foreground/80 focus:outline-none"
+                        data-testid="dropdown-item-view-filter"
+                      >
                         {selectedTab === "all"
                           ? "All Items"
                           : selectedTab === "unassigned"
                           ? "Unassigned Items"
+                          : CATEGORY_TABS.includes(selectedTab as any)
+                          ? CAT_LABELS[selectedTab]
                           : `${getPersonById(selectedTab)?.name}'s Items`}
-                      </h2>
-                    )}
-                    <span className="text-xs text-muted-foreground flex-shrink-0">
-                      {filteredItems.length}
-                      {selectedTab === "all" && hasUnassignedItems && (
-                        <span className="ml-1.5 text-amber-600 dark:text-amber-400 font-medium">
-                          · {items.filter(i => (i.assignedTo as string[] || []).length === 0).length} unassigned
-                        </span>
-                      )}
-                    </span>
-                  </>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                {bulkAssignMode ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={exitBulkMode}
-                    data-testid="button-exit-bulk-mode"
-                  >
-                    Cancel
-                  </Button>
+                        <ChevronDown className="h-3.5 w-3.5 opacity-60 flex-shrink-0" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      <DropdownMenuItem
+                        onClick={() => setSelectedTab("all")}
+                        className={selectedTab === "all" ? "font-semibold" : ""}
+                        data-testid="filter-all-items"
+                      >
+                        All Items
+                        <span className="ml-auto pl-4 text-muted-foreground text-xs">{items.length}</span>
+                      </DropdownMenuItem>
+                      {(["appetizer", "meal", "drink", "dessert", "other"] as const).map(cat => {
+                        const catCount = items.filter(i => i.category === cat).length;
+                        if (catCount === 0) return null;
+                        return (
+                          <DropdownMenuItem
+                            key={cat}
+                            onClick={() => setSelectedTab(cat)}
+                            className={selectedTab === cat ? "font-semibold" : ""}
+                            data-testid={`filter-category-${cat}`}
+                          >
+                            {CAT_LABELS[cat]}
+                            <span className="ml-auto pl-4 text-muted-foreground text-xs">{catCount}</span>
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 ) : (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => enterBulkMode()}
-                      className="flex items-center gap-1 px-2"
-                      data-testid="button-enter-bulk-mode"
-                    >
-                      <ListChecks className="h-3.5 w-3.5" />
-                      Select
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setAddItemBottomSheetOpen(true)}
-                      className="flex items-center gap-1"
-                      data-testid="button-add-item"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      Add Item
-                    </Button>
-                  </>
+                  <h2 className="font-semibold text-base truncate">
+                    {selectedTab === "all"
+                      ? "All Items"
+                      : selectedTab === "unassigned"
+                      ? "Unassigned Items"
+                      : `${getPersonById(selectedTab)?.name}'s Items`}
+                  </h2>
                 )}
+                <span className="text-xs text-muted-foreground flex-shrink-0">
+                  {filteredItems.length}
+                  {selectedTab === "all" && hasUnassignedItems && (
+                    <span className="ml-1.5 text-amber-600 dark:text-amber-400 font-medium">
+                      · {items.filter(i => (i.assignedTo as string[] || []).length === 0).length} unassigned
+                    </span>
+                  )}
+                </span>
               </div>
             </div>
           </CardHeader>
           <CardContent className={showCategoryGroups ? "p-0" : "divide-y"}>
             {showCategoryGroups ? (
-              (["appetizer", "meal", "dessert", "other", "drink"] as const).map(cat => {
+              <>
+              {(["appetizer", "meal", "dessert", "other", "drink"] as const).map(cat => {
                 const catItems = filteredItems.filter(i => i.category === cat);
                 if (catItems.length === 0) return null;
                 const catLabel = CAT_LABELS[cat];
-                const selectedCount = bulkAssignMode ? catItems.filter(i => bulkSelectedItems.has(i.id)).length : 0;
-                const allCatSelected = bulkAssignMode && selectedCount === catItems.length;
-                const someCatSelected = bulkAssignMode && selectedCount > 0 && !allCatSelected;
                 return (
                   <div key={cat}>
-                    {bulkAssignMode ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setBulkSelectedItems(prev => {
-                            const next = new Set(prev);
-                            if (allCatSelected) {
-                              catItems.forEach(i => next.delete(i.id));
-                            } else {
-                              catItems.forEach(i => next.add(i.id));
-                            }
-                            return next;
-                          });
-                        }}
-                        className="w-full flex items-center gap-2 px-6 py-2 bg-muted/50 border-y first:border-t-0 hover-elevate active-elevate-2"
-                        data-testid={`button-select-category-${cat}`}
-                      >
-                        {allCatSelected
-                          ? <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
-                          : someCatSelected
-                            ? <MinusCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                            : <Circle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        }
-                        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest flex-1 text-left">
-                          {catLabel}
-                        </span>
-                        <span className="text-xs text-muted-foreground tabular-nums">
-                          {selectedCount > 0 ? `${selectedCount}/${catItems.length}` : catItems.length}
-                        </span>
-                      </button>
-                    ) : (
-                      <div className="px-6 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest bg-muted/50 border-y first:border-t-0">
-                        {catLabel}
-                      </div>
-                    )}
+                    <div className="px-6 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest bg-muted/50 border-y first:border-t-0">
+                      {catLabel}
+                    </div>
                     <div className="divide-y px-6">
                       {catItems.map(renderItemRow)}
                     </div>
                   </div>
                 );
-              })
+              })}
+              <button
+                type="button"
+                onClick={() => setAddItemBottomSheetOpen(true)}
+                className="w-full flex items-center gap-2 px-4 py-3 text-muted-foreground hover-elevate active-elevate-2 border-t"
+                data-testid="button-add-item"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="text-sm font-medium">Add Item</span>
+              </button>
+              </>
             ) : (
               <>
-                {/* Select-all banner — only in bulk mode on a category tab */}
-                {bulkAssignMode && CATEGORY_TABS.includes(selectedTab as any) && (() => {
-                  const catLabel = CAT_LABELS[selectedTab];
-                  const selectedCount = filteredItems.filter(i => bulkSelectedItems.has(i.id)).length;
-                  const allSelected = filteredItems.length > 0 && selectedCount === filteredItems.length;
-                  const someSelected = selectedCount > 0 && !allSelected;
-                  return (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBulkSelectedItems(prev => {
-                          const next = new Set(prev);
-                          if (allSelected) {
-                            filteredItems.forEach(i => next.delete(i.id));
-                          } else {
-                            filteredItems.forEach(i => next.add(i.id));
-                          }
-                          return next;
-                        });
-                      }}
-                      className="w-full flex items-center gap-2 px-6 py-2 bg-muted/50 border-b hover-elevate active-elevate-2"
-                      data-testid={`button-select-category-${selectedTab}`}
-                    >
-                      {allSelected
-                        ? <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
-                        : someSelected
-                          ? <MinusCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                          : <Circle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      }
-                      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest flex-1 text-left">
-                        {catLabel}
-                      </span>
-                      <span className="text-xs text-muted-foreground tabular-nums">
-                        {selectedCount > 0 ? `${selectedCount}/${filteredItems.length}` : filteredItems.length}
-                      </span>
-                    </button>
-                  );
-                })()}
                 {filteredItems.map(renderItemRow)}
+                <button
+                  type="button"
+                  onClick={() => setAddItemBottomSheetOpen(true)}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-muted-foreground hover-elevate active-elevate-2"
+                  data-testid="button-add-item"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className="text-sm font-medium">Add Item</span>
+                </button>
               </>
             )}
           </CardContent>
@@ -1493,12 +1396,12 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
       <div className="fixed bottom-0 left-0 right-0 bg-card border-t px-4 pt-2.5 pb-3">
         <div className="space-y-1.5">
           {/* Bulk assign action bar */}
-          {bulkAssignMode && (
+          {bulkSelectedItems.size > 0 && (
             <div className="flex gap-2 mb-1">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={exitBulkMode}
+                onClick={clearBulkSelection}
                 data-testid="button-cancel-bulk"
               >
                 Cancel
@@ -1536,7 +1439,28 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           </div>
           {/* Total row */}
           <div className="flex justify-between items-center font-bold border-t pt-1.5">
-            <span>Total</span>
+            <div className="flex items-center gap-1.5">
+              <span>Total</span>
+              {selectedTab === "all" && (
+                <button
+                  onClick={handlePaymentsClick}
+                  className="flex items-center gap-1 text-xs font-normal text-muted-foreground hover-elevate active-elevate-2 rounded px-1 -mx-1"
+                  data-testid="button-who-paid"
+                >
+                  {payer ? (
+                    <>
+                      <span
+                        className="w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: getColorForPerson(payer.id) }}
+                      />
+                      <span>{payerLabel} paid</span>
+                    </>
+                  ) : (
+                    <span>· Who paid?</span>
+                  )}
+                </button>
+              )}
+            </div>
             <div className="flex items-center gap-1.5">
               <span data-testid="text-receipt-total">${displayTotals.total.toFixed(2)}</span>
               {totalsMatch && selectedTab === "all" && (
@@ -1548,7 +1472,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
           </div>
 
           {/* ── Dynamic CTA bar ── */}
-          {!bulkAssignMode && (
+          {bulkSelectedItems.size === 0 && (
             <div className="pt-1.5 border-t">
               <div className="flex items-center gap-2">
                 {isReadyToShare ? (
@@ -1591,7 +1515,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
                   </>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground mt-1.5 text-center" data-testid="text-cta-hint">{ctaHint}</p>
             </div>
           )}
         </div>

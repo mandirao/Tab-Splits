@@ -1148,24 +1148,32 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
 
                         return (
                           <div key={item.id} className="flex items-center divide-x">
-                            {/* Main: name + price below + bubbles */}
-                            <div className="flex-1 flex items-center gap-3 py-2 min-w-0">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                  {fractionLabel && (
-                                    <span className="text-xs text-muted-foreground font-medium tabular-nums flex-shrink-0">{fractionLabel}</span>
-                                  )}
-                                  <p className="text-sm font-medium leading-tight truncate">{item.name}</p>
-                                </div>
-                                <p className="text-xs text-muted-foreground">${share.toFixed(2)}</p>
+                            {/* Main: name + price, edit pencil inline next to the title */}
+                            <div className="flex-1 py-2 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                {fractionLabel && (
+                                  <span className="text-xs text-muted-foreground font-medium tabular-nums flex-shrink-0">{fractionLabel}</span>
+                                )}
+                                <p className="text-sm font-medium leading-tight truncate">{item.name}</p>
+                                <button
+                                  type="button"
+                                  onClick={() => setAssignEditSheet({ id: item.id, name: item.name, quantity: item.quantity ?? 1, price: item.price, category: item.category ?? null })}
+                                  className="p-1 rounded-md text-muted-foreground hover-elevate active-elevate-2 flex-shrink-0"
+                                  data-testid={`button-review-edit-${item.id}`}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
                               </div>
-                              {/* Bubbles — tap to reassign */}
-                              <button
-                                type="button"
-                                onClick={() => openAssignSheet(item.name, [item.id], assignedTo, hasQuantities ? quantities : undefined)}
-                                className="flex -space-x-1.5 flex-shrink-0 hover-elevate active-elevate-2 rounded-full p-0.5"
-                                data-testid={`button-review-item-${item.id}`}
-                              >
+                              <p className="text-xs text-muted-foreground">${share.toFixed(2)}</p>
+                            </div>
+                            {/* Bubbles — tap to reassign — far right column */}
+                            <button
+                              type="button"
+                              onClick={() => openAssignSheet(item.name, [item.id], assignedTo, hasQuantities ? quantities : undefined)}
+                              className="px-3 py-3 flex items-center justify-center self-stretch hover-elevate active-elevate-2 flex-shrink-0"
+                              data-testid={`button-review-item-${item.id}`}
+                            >
+                              <div className="flex -space-x-1.5">
                                 {assignedTo.length === 0 && (
                                   <div className="w-7 h-7 rounded-full ring-2 ring-border bg-muted/50 flex items-center justify-center">
                                     <Users className="h-3 w-3 text-muted-foreground" />
@@ -1187,16 +1195,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                                     +{assignedTo.length - 3}
                                   </div>
                                 )}
-                              </button>
-                            </div>
-                            {/* Pencil column */}
-                            <button
-                              type="button"
-                              onClick={() => setAssignEditSheet({ id: item.id, name: item.name, quantity: item.quantity ?? 1, price: item.price, category: item.category ?? null })}
-                              className="px-3 py-3 flex items-center justify-center self-stretch text-muted-foreground hover-elevate active-elevate-2 flex-shrink-0"
-                              data-testid={`button-review-edit-${item.id}`}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
+                              </div>
                             </button>
                           </div>
                         );
@@ -1816,17 +1815,24 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
 
         const renderItemRow = (item: ReceiptItem) => (
           <div key={item.id} className="flex items-center divide-x">
-            {/* Name + price */}
+            {/* Name + price, edit pencil inline next to the title */}
             <div className="flex-1 min-w-0 px-4 py-3">
               <div className="flex items-center gap-1.5 min-w-0">
                 {item.quantity > 1 && !item.name.startsWith(`${item.quantity} `) && (
                   <span className="text-xs text-muted-foreground font-medium tabular-nums flex-shrink-0">{item.quantity}×</span>
                 )}
                 <p className="text-sm font-medium truncate">{item.name}</p>
+                <button
+                  onClick={() => onEditItem(item)}
+                  className="p-1 rounded-md text-muted-foreground hover-elevate active-elevate-2 flex-shrink-0"
+                  data-testid={`button-edit-item-${item.id}`}
+                >
+                  <Pencil className="h-3 w-3" />
+                </button>
               </div>
               <p className="text-xs text-muted-foreground tabular-nums mt-0.5">${parseFloat(item.price).toFixed(2)}</p>
             </div>
-            {/* Category pill column */}
+            {/* Category pill column — far right */}
             <div className="px-2 self-stretch flex items-center flex-shrink-0">
               <Select
                 value={item.category ?? "none"}
@@ -1848,14 +1854,6 @@ function ReviewItemsStep({ receiptId, items, receipt, subtotalDiff, fromExisting
                 </SelectContent>
               </Select>
             </div>
-            {/* Pencil column — opens shared edit drawer */}
-            <button
-              onClick={() => onEditItem(item)}
-              className="px-3 py-3 flex items-center justify-center self-stretch text-muted-foreground hover-elevate active-elevate-2 flex-shrink-0"
-              data-testid={`button-edit-item-${item.id}`}
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
           </div>
         );
 
@@ -2024,50 +2022,53 @@ function AssignCategorySection({ label, items, assigned, peopleWithColors, getPe
           const drawerLabel = qty > 1 && !nameHasCount ? `${qty}× ${item.name}` : item.name;
           return (
             <div key={item.id} className="flex items-center divide-x">
+              <div className="flex-1 flex items-center gap-3 px-4 py-2.5 min-w-0">
+                {/* Per-item indicator */}
+                <div className={`h-4 w-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                  isAssigned ? "border-primary bg-primary" : "border-muted-foreground/30"
+                }`}>
+                  {isAssigned && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1 min-w-0">
+                    {qty > 1 && !nameHasCount && (
+                      <span className="text-muted-foreground font-medium text-sm flex-shrink-0">{qty}×</span>
+                    )}
+                    <p className="text-sm truncate">{item.name}</p>
+                    <button type="button"
+                      onClick={() => onEditItem(item)}
+                      className="p-1 rounded-md text-muted-foreground hover-elevate active-elevate-2 flex-shrink-0"
+                      data-testid={`button-edit-assign-item-${item.id}`}>
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">${parseFloat(item.price).toFixed(2)}</p>
+                </div>
+              </div>
+              {/* Assign column — far right */}
               <button type="button"
                 onClick={() => onAssignItem(item.id, drawerLabel)}
-                className="flex-1 flex items-center gap-3 px-4 py-2.5 hover-elevate active-elevate-2 text-left min-w-0"
+                className="px-3 py-2.5 flex items-center justify-center self-stretch hover-elevate active-elevate-2 flex-shrink-0"
                 data-testid={`button-assign-item-${item.id}`}>
-              {/* Per-item indicator */}
-              <div className={`h-4 w-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-                isAssigned ? "border-primary bg-primary" : "border-muted-foreground/30"
-              }`}>
-                {isAssigned && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm truncate">
-                  {qty > 1 && !nameHasCount && (
-                    <span className="text-muted-foreground font-medium mr-1">{qty}×</span>
-                  )}
-                  {item.name}
-                </p>
-                <p className="text-xs text-muted-foreground">${parseFloat(item.price).toFixed(2)}</p>
-              </div>
-              <div className="flex -space-x-1.5 flex-shrink-0">
-                {!isAssigned && <span className="text-xs text-muted-foreground italic pr-1">tap to assign</span>}
-                {assignedPeople.slice(0, 4).map(pid => {
-                  const person = peopleWithColors.find(p => p.id === pid);
-                  if (!person) return null;
-                  return (
-                    <div key={pid} title={person.name}
-                      className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center ring-2 ring-background"
-                      style={{ backgroundColor: person.color }}>
-                      {getInitials(person.name)}
+                <div className="flex -space-x-1.5">
+                  {!isAssigned && <span className="text-xs text-muted-foreground italic pr-1 whitespace-nowrap">tap to assign</span>}
+                  {assignedPeople.slice(0, 4).map(pid => {
+                    const person = peopleWithColors.find(p => p.id === pid);
+                    if (!person) return null;
+                    return (
+                      <div key={pid} title={person.name}
+                        className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center ring-2 ring-background"
+                        style={{ backgroundColor: person.color }}>
+                        {getInitials(person.name)}
+                      </div>
+                    );
+                  })}
+                  {assignedPeople.length > 4 && (
+                    <div className="w-7 h-7 rounded-full ring-2 ring-background bg-muted flex items-center justify-center text-xs font-semibold">
+                      +{assignedPeople.length - 4}
                     </div>
-                  );
-                })}
-                {assignedPeople.length > 4 && (
-                  <div className="w-7 h-7 rounded-full ring-2 ring-background bg-muted flex items-center justify-center text-xs font-semibold">
-                    +{assignedPeople.length - 4}
-                  </div>
-                )}
-              </div>
-              </button>
-              <button type="button"
-                onClick={() => onEditItem(item)}
-                className="px-3 py-2.5 flex items-center justify-center text-muted-foreground hover-elevate active-elevate-2 flex-shrink-0"
-                data-testid={`button-edit-assign-item-${item.id}`}>
-                <Pencil className="h-3.5 w-3.5" />
+                  )}
+                </div>
               </button>
             </div>
           );
