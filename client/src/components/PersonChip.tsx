@@ -47,6 +47,7 @@ export default function PersonChip({
           }}
           className="ml-0.5 hover-elevate rounded-full p-0.5"
           data-testid="button-remove-person"
+          aria-label={`Remove ${name}`}
         >
           <X className="h-3 w-3" />
         </button>

@@ -17,6 +17,7 @@ import {
   payments,
   users,
 } from "../shared/schema";
+import { getItemShares } from "../shared/splitMath";
 import { db } from "./db";
 import { eq, and, isNull, or, desc } from "drizzle-orm";
 
@@ -335,27 +336,11 @@ export class DatabaseStorage implements IStorage {
     const tipNum = parseFloat(receipt.tip);
 
     items.forEach(item => {
-      const assignedTo = (item.assignedTo as string[]) || [];
-      if (assignedTo.length > 0) {
-        const unitPrice = parseFloat(item.price);
-        const itemQty = Number(item.quantity) || 1;
-        const qtys = (item.assignedQuantities as Record<string, number> | null) || {};
-        const hasQtys = assignedTo.some(pid => (qtys[pid] ?? 0) > 0);
-        if (hasQtys) {
-          assignedTo.forEach(personId => {
-            const personShare = (qtys[personId] ?? 0) * unitPrice;
-            const current = owedByPerson.get(personId) || 0;
-            owedByPerson.set(personId, current + personShare);
-          });
-        } else {
-          const totalLineCost = unitPrice * itemQty;
-          const pricePerPerson = totalLineCost / assignedTo.length;
-          assignedTo.forEach(personId => {
-            const current = owedByPerson.get(personId) || 0;
-            owedByPerson.set(personId, current + pricePerPerson);
-          });
-        }
-      }
+      const shares = getItemShares(item);
+      Object.entries(shares).forEach(([personId, personShare]) => {
+        const current = owedByPerson.get(personId) || 0;
+        owedByPerson.set(personId, current + personShare);
+      });
     });
 
     const taxTipMultiplier = subtotalNum > 0 ? (taxNum + tipNum) / subtotalNum : 0;

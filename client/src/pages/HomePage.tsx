@@ -227,7 +227,7 @@ function ManageDinersSheet({ open, onOpenChange }: { open: boolean; onOpenChange
                               <p className="text-xs text-muted-foreground">{pendingContact.phone}</p>
                             )}
                           </div>
-                          <Button size="icon" variant="ghost" onClick={() => setPendingContact(null)} data-testid="button-clear-contact">
+                          <Button size="icon" variant="ghost" onClick={() => setPendingContact(null)} data-testid="button-clear-contact" aria-label="Clear selected contact">
                             <X className="h-4 w-4" />
                           </Button>
                         </div>
@@ -344,10 +344,10 @@ function ManageDinersSheet({ open, onOpenChange }: { open: boolean; onOpenChange
                           )}
                         </div>
                         <div className="flex gap-1 flex-shrink-0">
-                          <Button size="icon" variant="ghost" onClick={() => startEdit(person)} data-testid={`button-edit-diner-${person.id}`}>
+                          <Button size="icon" variant="ghost" onClick={() => startEdit(person)} data-testid={`button-edit-diner-${person.id}`} aria-label={`Edit ${person.name}`}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button size="icon" variant="ghost" className="text-destructive" onClick={() => setDeleteDialogPerson(person)} data-testid={`button-delete-diner-${person.id}`}>
+                          <Button size="icon" variant="ghost" className="text-destructive" onClick={() => setDeleteDialogPerson(person)} data-testid={`button-delete-diner-${person.id}`} aria-label={`Delete ${person.name}`}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -401,13 +401,12 @@ export default function HomePage() {
   });
 
   const { data: allItems = [] } = useQuery<ReceiptItem[]>({
-    queryKey: ["/api/items/all"],
+    queryKey: ["/api/items/all", receipts.map(r => r.id)],
     queryFn: async () => {
       if (!receipts.length) return [];
-      const itemPromises = receipts.map(receipt =>
-        fetch(`/api/receipts/${receipt.id}/items`).then(r => r.json())
+      const itemArrays = await Promise.all(
+        receipts.map(receipt => apiRequest(`/api/receipts/${receipt.id}/items`, "GET"))
       );
-      const itemArrays = await Promise.all(itemPromises);
       return itemArrays.flat();
     },
     enabled: receipts.length > 0

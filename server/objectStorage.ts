@@ -1,6 +1,16 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { randomUUID } from "crypto";
 import { StorageClient } from "@supabase/storage-js";
+
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB
+const ALLOWED_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
+
+function requireAuth(req: Request, res: Response, next: NextFunction) {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  next();
+}
 
 // Receipt images live in a private Supabase Storage bucket. Uploads use
 // short-lived signed upload URLs (client PUTs the file directly to Supabase);
@@ -24,11 +34,17 @@ function getStorage() {
 export function registerObjectStorageRoutes(app: Express): void {
   // Request a signed URL for a direct-to-storage upload.
   // The client sends JSON metadata only, then PUTs the file to uploadURL.
-  app.post("/api/uploads/request-url", async (req, res) => {
+  app.post("/api/uploads/request-url", requireAuth, async (req, res) => {
     try {
       const { name, size, contentType } = req.body;
       if (!name) {
         return res.status(400).json({ error: "Missing required field: name" });
+      }
+      if (contentType && !ALLOWED_CONTENT_TYPES.has(contentType)) {
+        return res.status(400).json({ error: "Unsupported file type" });
+      }
+      if (size && size > MAX_UPLOAD_BYTES) {
+        return res.status(400).json({ error: "File too large" });
       }
 
       const objectPath = `uploads/${randomUUID()}`;

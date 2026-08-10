@@ -1,15 +1,20 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import type { ReceiptItem } from "@shared/schema";
-import { Image, ChevronRight, ArrowRight } from "lucide-react";
+import { getPersonTotals } from "@shared/splitMath";
+import { ChevronRight, ArrowRight } from "lucide-react";
 import logoUrl from "@assets/icon-1024_1775014486817.png";
 import { getDisplayNames } from "@/lib/personDisplay";
-import { getInitials, PERSON_COLORS } from "@/lib/categories";
+import { firstNameOnly, getPeopleWithColors } from "@/lib/receiptSummary";
+import { getInitials } from "@/lib/categories";
+import ReceiptSummaryItemRow from "@/components/ReceiptSummaryItemRow";
+import ReceiptSummaryTabRow from "@/components/ReceiptSummaryTabRow";
+import ReceiptSummaryTotalsRows from "@/components/ReceiptSummaryTotalsRows";
+import ReceiptPhotoDialog from "@/components/ReceiptPhotoDialog";
+import VenmoPayButton from "@/components/VenmoPayButton";
 
 interface RedactedPerson {
   id: string;
@@ -36,92 +41,12 @@ interface SharedReceiptPayload {
   people: RedactedPerson[];
 }
 
-function gcd(a: number, b: number): number { return b === 0 ? a : gcd(b, a % b); }
-
-
-function firstNameOnly(fullName: string) {
-  return fullName.trim().split(/\s+/)[0] ?? fullName;
-}
-
-function SharedItemRow({
-  item,
-  isAllTab,
-  selectedTab,
-  getColorForPerson,
-  getPersonById,
-}: {
-  item: ReceiptItem;
-  isAllTab: boolean;
-  selectedTab: string;
-  getColorForPerson: (pid: string) => string;
-  getPersonById: (id: string) => { id: string; name: string; color: string } | undefined;
-}) {
-  const assignedPeople = (item.assignedTo as string[]) || [];
-  const isAssigned = assignedPeople.length > 0;
-  const qtys = (item.assignedQuantities as Record<string, number>) || {};
-  const hasQtys = assignedPeople.some(pid => (qtys[pid] ?? 0) > 0);
-  const totalQty = hasQtys
-    ? assignedPeople.reduce((s, pid) => s + (qtys[pid] ?? 0), 0)
-    : assignedPeople.length;
-
-  const unitPrice = parseFloat(item.price) || 0;
-  const myQty = !isAllTab ? (hasQtys ? (qtys[selectedTab] ?? 0) : 1) : 1;
-  let displayPrice = unitPrice;
-  if (!isAllTab && isAssigned) {
-    displayPrice = hasQtys
-      ? (qtys[selectedTab] ?? 0) * unitPrice
-      : (unitPrice * (item.quantity || 1)) / assignedPeople.length;
-  }
-
-  const itemQty = item.quantity || 1;
-  const effNum = itemQty * myQty;
-  const effDen = isAllTab ? 1 : totalQty;
-  const g = gcd(effNum, effDen);
-  const sNum = effNum / g;
-  const sDen = effDen / g;
-  const effBadge = isAllTab
-    ? (itemQty > 1 ? `${itemQty}x` : null)
-    : isAssigned && !(sNum === 1 && sDen === 1)
-      ? (sDen === 1 ? `${sNum}x` : `${sNum}/${sDen}`)
-      : null;
-
-  return (
-    <div
-      className={`flex items-center gap-2 py-2 ${!isAssigned ? 'opacity-60' : ''}`}
-      data-testid={`item-row-${item.id}`}
-    >
-      {effBadge && (
-        <Badge variant="outline" className="text-xs px-1.5 shrink-0">
-          {effBadge}
-        </Badge>
-      )}
-      <span className="flex-1 min-w-0 font-medium text-sm truncate">{item.name}</span>
-      <span className="text-sm text-muted-foreground tabular-nums shrink-0">${displayPrice.toFixed(2)}</span>
-      {isAllTab && isAssigned && (
-        <div className="flex -space-x-1 shrink-0">
-          {assignedPeople.map((pid, idx) => (
-            <div
-              key={idx}
-              className="w-7 h-7 rounded-full text-white text-xs font-semibold flex items-center justify-center ring-2 ring-background"
-              style={{ backgroundColor: getColorForPerson(pid) }}
-            >
-              {getInitials(getPersonById(pid)?.name || "")}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function SharedReceiptPage({ params }: { params: { token: string } }) {
   const shareToken = params?.token || window.location.pathname.split('/').pop();
 
   const [isVerified, setIsVerified] = useState(false);
   const [verifiedPersonId, setVerifiedPersonId] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<string>("all");
-
-  const tabRowRef = useRef<HTMLDivElement>(null);
 
   // Always fetch — name selection is just a UX gate, not a security gate
   const { data, isLoading, error } = useQuery<SharedReceiptPayload>({
@@ -132,21 +57,8 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
   const items = data?.items || [];
   const allPeople = data?.people || [];
 
-  const peopleWithColors = allPeople.map((person, idx) => ({
-    ...person,
-    color: PERSON_COLORS[idx % PERSON_COLORS.length],
-  }));
-
+  const { peopleWithColors, getPersonById, getColorForPerson } = getPeopleWithColors(allPeople);
   const displayNames = getDisplayNames(peopleWithColors);
-  const getPersonById = (id: string) => peopleWithColors.find(p => p.id === id);
-  const getColorForPerson = (id: string) => getPersonById(id)?.color || PERSON_COLORS[0];
-
-  // Scroll the active tab into view whenever selectedTab changes
-  useEffect(() => {
-    if (!tabRowRef.current) return;
-    const active = tabRowRef.current.querySelector<HTMLElement>('[data-active="true"]');
-    active?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-  }, [selectedTab]);
 
   // ── Name picker ──────────────────────────────────────────────────────────────
   if (!isVerified) {
@@ -249,29 +161,7 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
   const tip = parseFloat(receipt.tip) || 0;
   const total = subtotal + tax + tip;
 
-  const personTotals = new Map<string, { subtotal: number; tax: number; tip: number; total: number }>();
-  items.forEach(item => {
-    const unitPrice = parseFloat(item.price) || 0;
-    const itemQty = Number(item.quantity) || 1;
-    const assignedPeople = (item.assignedTo as string[]) || [];
-    const qtys = (item.assignedQuantities as Record<string, number>) || {};
-    if (assignedPeople.length > 0) {
-      const hasQtys = assignedPeople.some(pid => (qtys[pid] ?? 0) > 0);
-      assignedPeople.forEach(pid => {
-        const share = hasQtys
-          ? (qtys[pid] ?? 0) * unitPrice
-          : (unitPrice * itemQty) / assignedPeople.length;
-        if (!personTotals.has(pid)) personTotals.set(pid, { subtotal: 0, tax: 0, tip: 0, total: 0 });
-        personTotals.get(pid)!.subtotal += share;
-      });
-    }
-  });
-  personTotals.forEach((t) => {
-    const proportion = subtotal > 0 ? t.subtotal / subtotal : 0;
-    t.tax = tax * proportion;
-    t.tip = tip * proportion;
-    t.total = t.subtotal + t.tax + t.tip;
-  });
+  const personTotals = getPersonTotals(items, { subtotal, tax, tip });
 
   // ── Tab filtering ─────────────────────────────────────────────────────────────
   const isAllTab = selectedTab === "all";
@@ -303,81 +193,17 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <ThemeToggle />
-            {receipt.imageUrl && (
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button size="sm" variant="outline" className="gap-1.5" data-testid="button-view-receipt-image">
-                    <Image className="h-3.5 w-3.5" />
-                    <span>View photo</span>
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-auto" aria-describedby={undefined}>
-                  <DialogHeader>
-                    <DialogTitle>Receipt Photo</DialogTitle>
-                  </DialogHeader>
-                  <div className="flex items-center justify-center">
-                    <img
-                      src={receipt.imageUrl}
-                      alt="Original receipt"
-                      className="max-w-full max-h-[70vh] object-contain rounded-lg"
-                      data-testid="img-receipt-scan"
-                    />
-                  </div>
-                </DialogContent>
-              </Dialog>
-            )}
+            <ReceiptPhotoDialog imageUrl={receipt.imageUrl} />
           </div>
         </div>
       </header>
 
-      {/* Tab row */}
-      <div className="sticky top-[73px] z-40 bg-background border-b">
-        <div
-          ref={tabRowRef}
-          className="flex overflow-x-auto scrollbar-hide px-3 py-2 gap-2"
-        >
-          {/* All tab */}
-          <button
-            data-active={selectedTab === "all"}
-            onClick={() => setSelectedTab("all")}
-            className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors border ${
-              selectedTab === "all"
-                ? "bg-primary text-primary-foreground border-primary"
-                : "border-border text-muted-foreground hover-elevate"
-            }`}
-            data-testid="tab-all"
-          >
-            All
-          </button>
-
-          {/* Per-person tabs */}
-          {peopleInTabs.map(person => {
-            const isActive = selectedTab === person.id;
-            return (
-              <button
-                key={person.id}
-                data-active={isActive}
-                onClick={() => setSelectedTab(person.id)}
-                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors border ${
-                  isActive
-                    ? "text-white"
-                    : "border-border text-muted-foreground hover-elevate"
-                }`}
-                style={isActive ? { backgroundColor: person.color, borderColor: person.color } : undefined}
-                data-testid={`tab-person-${person.id}`}
-              >
-                {!isActive && (
-                  <div
-                    className="w-4 h-4 rounded-full shrink-0"
-                    style={{ backgroundColor: person.color }}
-                  />
-                )}
-                {displayNames.get(person.id) ?? person.name}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <ReceiptSummaryTabRow
+        people={peopleInTabs}
+        displayNames={displayNames}
+        selectedTab={selectedTab}
+        onSelectTab={setSelectedTab}
+      />
 
       <main className="p-4 pb-24 space-y-3">
 
@@ -394,13 +220,13 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
                 <p className="text-sm text-muted-foreground py-3">No items assigned.</p>
               ) : (
                 filteredItems.map(item => (
-                  <SharedItemRow
+                  <ReceiptSummaryItemRow
                     key={item.id}
                     item={item}
                     isAllTab={isAllTab}
                     selectedTab={selectedTab}
                     getColorForPerson={getColorForPerson}
-                    getPersonById={getPersonById}
+                    getInitialsForPerson={(id) => getInitials(getPersonById(id)?.name || "")}
                   />
                 ))
               )}
@@ -409,38 +235,23 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
             {/* Person-tab totals — connected at the bottom of the items card */}
             {!isAllTab && myTotals && (
               <div className="border-t mx-0 px-4 pt-3 pb-4 space-y-2 mt-1">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span>${myTotals.subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Tax</span>
-                  <span>${myTotals.tax.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Tip</span>
-                  <span>${myTotals.tip.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-lg font-bold pt-2 border-t">
-                  <span>Total</span>
-                  <span data-testid={`text-person-total-${selectedTab}`}>${myTotals.total.toFixed(2)}</span>
-                </div>
+                <ReceiptSummaryTotalsRows
+                  subtotal={myTotals.subtotal}
+                  tax={myTotals.tax}
+                  tip={myTotals.tip}
+                  total={myTotals.total}
+                  totalTestId={`text-person-total-${selectedTab}`}
+                />
 
                 {receipt.paidByVenmo &&
                  verifiedPersonId === selectedTab &&
                  receipt.paidById !== selectedTab && (
-                  <Button
-                    className="w-full mt-1"
-                    onClick={() => {
-                      const username = encodeURIComponent(receipt.paidByVenmo || "");
-                      const amount = myTotals.total.toFixed(2);
-                      const note = encodeURIComponent(`Tab Splits - ${receipt.restaurantName || 'Receipt'}`);
-                      window.location.href = `venmo://paycharge?txn=pay&recipients=${username}&amount=${amount}&note=${note}`;
-                    }}
-                    data-testid={`button-pay-venmo-${selectedTab}`}
-                  >
-                    Pay @{receipt.paidByVenmo} on Venmo
-                  </Button>
+                  <VenmoPayButton
+                    venmoUsername={receipt.paidByVenmo}
+                    amount={myTotals.total}
+                    restaurantName={receipt.restaurantName ?? ""}
+                    testId={`button-pay-venmo-${selectedTab}`}
+                  />
                 )}
               </div>
             )}
@@ -451,22 +262,16 @@ export default function SharedReceiptPage({ params }: { params: { token: string 
         {isAllTab && (
           <Card>
             <CardContent className="pt-4 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span data-testid="text-receipt-subtotal">${subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Tax</span>
-                <span data-testid="text-receipt-tax">${tax.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Tip</span>
-                <span data-testid="text-receipt-tip">${tip.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-lg font-bold pt-2 border-t">
-                <span>Total</span>
-                <span data-testid="text-receipt-total">${total.toFixed(2)}</span>
-              </div>
+              <ReceiptSummaryTotalsRows
+                subtotal={subtotal}
+                tax={tax}
+                tip={tip}
+                total={total}
+                totalTestId="text-receipt-total"
+                subtotalTestId="text-receipt-subtotal"
+                taxTestId="text-receipt-tax"
+                tipTestId="text-receipt-tip"
+              />
 
               {/* Who paid — slim inline row */}
               {payer && (

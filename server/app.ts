@@ -92,8 +92,8 @@ export async function createApp(): Promise<{ app: express.Express; server: Serve
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
+    console.error(err);
     res.status(status).json({ message });
-    throw err;
   });
 
   return { app, server };

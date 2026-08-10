@@ -21,9 +21,16 @@ import {
   type Person,
 } from "../shared/schema";
 import { fromError } from "zod-validation-error";
+import { z, ZodError } from "zod";
 import OpenAI from "openai";
 import { registerObjectStorageRoutes } from "./objectStorage";
 import bcrypt from "bcrypt";
+
+const linkPhoneSchema = z.object({
+  phone: z.string().min(1).max(32),
+  personId: z.string().optional(),
+  name: z.string().min(1).max(200).optional(),
+});
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -34,6 +41,21 @@ const openai = new OpenAI({
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session.userId) {
     return res.status(401).json({ message: "Unauthorized" });
+  }
+  next();
+}
+
+const ADMIN_EMAILS = new Set(
+  (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map(email => email.trim().toLowerCase())
+    .filter(Boolean)
+);
+
+function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  const email = req.session.userEmail?.toLowerCase();
+  if (!email || !ADMIN_EMAILS.has(email)) {
+    return res.status(403).json({ message: "Forbidden" });
   }
   next();
 }
@@ -269,7 +291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/share/:token/verify-phone", async (req, res) => {
+  app.post("/api/share/:token/verify-phone", ipRateLimit(20, 15 * 60 * 1000, "Too many attempts. Please wait 15 minutes and try again."), async (req, res) => {
     try {
       const { phone } = req.body;
       if (!phone) return res.status(400).json({ message: "Phone number is required" });
@@ -294,10 +316,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/share/:token/link-phone", async (req, res) => {
+  app.post("/api/share/:token/link-phone", ipRateLimit(20, 15 * 60 * 1000, "Too many attempts. Please wait 15 minutes and try again."), async (req, res) => {
     try {
-      const { phone, personId, name } = req.body;
-      if (!phone) return res.status(400).json({ message: "Phone number is required" });
+      const { phone, personId, name } = linkPhoneSchema.parse(req.body);
 
       const receipt = await storage.getReceiptByShareToken(req.params.token);
       if (!receipt) return res.status(404).json({ message: "Receipt not found" });
@@ -314,13 +335,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         person = await storage.getPerson(personId);
         if (!person) return res.status(404).json({ message: "Person not found" });
       } else if (name) {
-        person = await storage.createPerson({ name, phone });
+        person = await storage.createPerson(insertPersonSchema.parse({ name, phone }));
       } else {
         return res.status(400).json({ message: "Either personId or name is required" });
       }
 
       res.json({ verified: true, personId: person.id, personName: person.name });
     } catch (error: any) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ message: fromError(error).toString() });
+      }
       res.status(500).json({ message: error.message });
     }
   });
@@ -358,6 +382,7 @@ CRITICAL REQUIREMENTS:
 3. Use exact item names from the receipt
 4. Parse quantities if shown (e.g., "2x Burger" = quantity: 2)
 5. All prices must be numbers, not strings
+6. "price" is always the TOTAL price for that line as printed on the receipt (i.e. it already covers every unit in "quantity") — NOT a per-unit price. E.g. a line reading "2 Burger ... 24.00" must be {"name": "Burger", "quantity": 2, "price": 24.00}, not price: 12.00.
 
 AUTO-GRATUITY / INCLUDED TIP DETECTION (very important):
 - Look for line items labeled: "Gratuity", "Auto Gratuity", "Auto-Grat", "Service Charge", "Mandatory Gratuity", "Suggested Gratuity", "Included Tip", or any similar label
@@ -370,10 +395,10 @@ AUTO-GRATUITY / INCLUDED TIP DETECTION (very important):
 ITEMS LIST:
 - Skip ONLY: order numbers, dates, phone numbers, addresses, headers/footers, tax lines, and any gratuity/tip/service charge lines (those go in "tip")
 - Do NOT skip modifiers, add-ons, or substitutions that have a price
-- If the same item name appears on multiple lines (e.g. "2x Lychee Martini" and "1x Lychee Martini"), COMBINE them into a single entry with the total quantity and the per-unit price
+- If the same item name appears on multiple lines (e.g. "2x Lychee Martini" and "1x Lychee Martini"), COMBINE them into a single entry with the total quantity and the combined total price
 
 MATH VERIFICATION:
-- sum of (item.price * item.quantity) should equal subtotal (before tax/tip)
+- sum of item.price (each already a line total) should equal subtotal (before tax/tip)
 - subtotal + tax + tip should equal total
 
 Return ONLY the JSON object, no additional text.`
@@ -408,7 +433,7 @@ Return ONLY the JSON object, no additional text.`
           }
         }
         if (gratItems.length > 0) {
-          const gratTotal = gratItems.reduce((sum: number, it: any) => sum + (Number(it.price) * (Number(it.quantity) || 1)), 0);
+          const gratTotal = gratItems.reduce((sum: number, it: any) => sum + (Number(it.price) || 0), 0);
           data.items = cleanItems;
           data.subtotal = Math.max(0, Number(data.subtotal ?? 0) - gratTotal);
           const currentTip = Number(data.tip ?? 0);
@@ -434,18 +459,18 @@ Return ONLY the JSON object, no additional text.`
         for (const item of data.items) {
           const key = normalize(item.name);
           const qty = Math.max(1, Number(item.quantity) || 1);
-          const unitPrice = Number(item.price) || 0;
+          const linePrice = Number(item.price) || 0;
           if (seen[key]) {
             seen[key].quantity += qty;
-            seen[key].totalPrice += unitPrice * qty;
+            seen[key].totalPrice += linePrice;
           } else {
-            seen[key] = { name: item.name, quantity: qty, totalPrice: unitPrice * qty };
+            seen[key] = { name: item.name, quantity: qty, totalPrice: linePrice };
           }
         }
         data.items = Object.values(seen).map(m => ({
           name: m.name,
           quantity: m.quantity,
-          price: +(m.totalPrice / m.quantity).toFixed(2),
+          price: +m.totalPrice.toFixed(2),
         }));
       }
 
@@ -709,6 +734,8 @@ Return ONLY a JSON object mapping each ID to its category: {"id1": "meal", "id2"
       if (!owned) return;
       const { personId } = req.body;
       if (!personId) return res.status(400).json({ message: "personId is required" });
+      const person = await getOwnedPerson(personId, req.session.userId!, res);
+      if (!person) return;
       const receiptPerson = await storage.addPersonToReceipt(req.params.id, personId);
       res.json(receiptPerson);
     } catch (error: any) {
@@ -795,7 +822,7 @@ Return ONLY a JSON object mapping each ID to its category: {"id1": "meal", "id2"
 
   // ─── Admin stats ──────────────────────────────────────────────────────────
 
-  app.get("/api/admin/stats", requireAuth, async (req, res) => {
+  app.get("/api/admin/stats", requireAuth, requireAdmin, async (req, res) => {
     try {
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());

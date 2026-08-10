@@ -61,6 +61,7 @@ export default function RegularPersonCard({
                 onRemove();
               }}
               data-testid="button-remove"
+              aria-label={`Remove ${name}`}
             >
               <X className="h-4 w-4" />
             </Button>

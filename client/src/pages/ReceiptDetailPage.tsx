@@ -39,15 +39,10 @@ import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Receipt, ReceiptItem, Person } from "@shared/schema";
+import { getItemLineTotal, getPersonItemShare, getPersonTotals } from "@shared/splitMath";
 import ReceiptWizard from "@/components/ReceiptWizard";
 import { CAT_LABELS, CAT_LABELS_SHORT, CATEGORY_ORDER, getInitials, PERSON_COLORS } from "@/lib/categories";
 import AssignPersonSheetBody from "@/components/AssignPersonSheetBody";
-
-interface Settlement {
-  from: Person;
-  to: Person;
-  amount: string;
-}
 import { useToast } from "@/hooks/use-toast";
 import QRCodeLib from "qrcode";
 
@@ -546,11 +541,6 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     queryKey: ["/api/people"],
   });
 
-  // Fetch settlement calculation
-  const { data: settlement = [] } = useQuery<Settlement[]>({
-    queryKey: ["/api/receipts", receiptId, "settlement"],
-  });
-
   // People on this receipt with colors (for assignment UI, manage people sheet, and counter)
   const peopleWithColors: PersonWithColor[] = useMemo(() => {
     return receiptPeople.map((person, idx) => ({
@@ -1000,35 +990,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
   const getColorForPerson = (personId: string) => getPersonById(personId)?.color || PERSON_COLORS[0];
 
   // Calculate per-person totals
-  const personTotals = new Map<string, { subtotal: number; tax: number; tip: number; total: number }>();
-  
-  items.forEach(item => {
-    const unitPrice = parseFloat(item.price) || 0;
-    const itemQty = Number(item.quantity) || 1;
-    const assignedPeople = (item.assignedTo as string[]) || [];
-    const qtys = (item.assignedQuantities as Record<string, number>) || {};
-    
-    if (assignedPeople.length > 0) {
-      const hasQtys = assignedPeople.some(pid => (qtys[pid] ?? 0) > 0);
-      assignedPeople.forEach(personId => {
-        const personShare = hasQtys
-          ? (qtys[personId] ?? 0) * unitPrice
-          : (unitPrice * itemQty) / assignedPeople.length;
-        if (!personTotals.has(personId)) {
-          personTotals.set(personId, { subtotal: 0, tax: 0, tip: 0, total: 0 });
-        }
-        const current = personTotals.get(personId)!;
-        current.subtotal += personShare;
-      });
-    }
-  });
-
-  personTotals.forEach((totals, personId) => {
-    const proportion = subtotal > 0 ? totals.subtotal / subtotal : 0;
-    totals.tax = tax * proportion;
-    totals.tip = tipAmount * proportion;
-    totals.total = totals.subtotal + totals.tax + totals.tip;
-  });
+  const personTotals = getPersonTotals(items, { subtotal, tax, tip: tipAmount });
 
   // Check if there are unassigned items
   const hasUnassignedItems = items.some(item => (item.assignedTo as string[] || []).length === 0);
@@ -1045,7 +1007,7 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
 
   // Calculate running total of all items
   const itemsSubtotal = items.reduce((sum, item) => {
-    return sum + (parseFloat(item.price) || 0);
+    return sum + getItemLineTotal(item);
   }, 0);
   
   // Check if items match receipt subtotal
@@ -1126,18 +1088,11 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
     const assignedPeople = (item.assignedTo as string[]) || [];
     const isPersonTabCtx = !["all", "unassigned", ...CATEGORY_TABS].includes(selectedTab as any);
     let displayQuantity: string | undefined;
-    let displayPrice = parseFloat(item.price) || 0;
+    let displayPrice = getItemLineTotal(item);
     if (isPersonTabCtx && assignedPeople.length > 0) {
       const adjustedQty = getAdjustedQuantity(item, selectedTab);
       displayQuantity = formatQuantity(adjustedQty);
-      const qtys = (item.assignedQuantities as Record<string, number>) || {};
-      const unitP = parseFloat(item.price) || 0;
-      const hasQtys = assignedPeople.some(pid => (qtys[pid] ?? 0) > 0);
-      if (hasQtys) {
-        displayPrice = (qtys[selectedTab] ?? 0) * unitP;
-      } else {
-        displayPrice = (unitP * (Number(item.quantity) || 1)) / assignedPeople.length;
-      }
+      displayPrice = getPersonItemShare(item, selectedTab);
     }
     return (
       <ReceiptItemRow
@@ -1585,7 +1540,9 @@ export default function ReceiptDetailPage({ params }: { params: { id: string } }
             <div className="flex items-center gap-1.5">
               <span data-testid="text-receipt-total">${displayTotals.total.toFixed(2)}</span>
               {totalsMatch && selectedTab === "all" && (
-                <Check className="h-4 w-4 text-green-600 flex-shrink-0" title="Items total matches receipt subtotal" />
+                <span title="Items total matches receipt subtotal">
+                  <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
+                </span>
               )}
             </div>
           </div>

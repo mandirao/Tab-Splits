@@ -11,6 +11,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { trySessionStore } from "@/lib/imageUtils";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useUpload } from "@/hooks/use-upload";
 import {
   Camera, Upload, Loader2, RotateCw, RotateCcw, Check, ArrowLeft, ArrowRight,
   Sparkles, Users, Plus, X, CheckCircle2, Circle, AlertTriangle,
@@ -21,7 +22,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 import QRCodeLib from "qrcode";
 import type { Receipt, ReceiptItem, Person } from "@shared/schema";
+import { getItemLineTotal, getPersonItemShare } from "@shared/splitMath";
 import { CAT_LABELS, CAT_LABELS_SINGULAR, getInitials, PERSON_COLORS } from "@/lib/categories";
+import { gcd } from "@/lib/receiptSummary";
 import AssignPersonSheetBody from "@/components/AssignPersonSheetBody";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -57,6 +60,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { uploadFile } = useUpload();
 
   const [step, setStep] = useState(0);
   const [receiptId, setReceiptId] = useState<string | null>(null);
@@ -257,14 +261,9 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
         const arr = new Uint8Array(bytes.length);
         for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
         const file = new File([arr], `receipt-${newReceipt.id}.jpg`, { type: "image/jpeg" });
-        const urlRes = await fetch("/api/uploads/request-url", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
-        });
-        if (urlRes.ok) {
-          const { uploadURL, objectPath } = await urlRes.json();
-          const up = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
-          if (up.ok) await apiRequest(`/api/receipts/${newReceipt.id}`, "PATCH", { imageUrl: objectPath });
+        const uploaded = await uploadFile(file);
+        if (uploaded) {
+          await apiRequest(`/api/receipts/${newReceipt.id}`, "PATCH", { imageUrl: uploaded.objectPath });
         }
       } catch { /* silent */ }
 
@@ -635,17 +634,20 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
   // ─── Derived data for steps ───────────────────────────────────────────────
   const sub = parseFloat(receipt?.subtotal ?? "0") || 0;
   const tax = parseFloat(receipt?.tax ?? "0") || 0;
-  // item.price is always the per-unit price (OCR combines duplicate lines into
-  // quantity × per-unit price), so the line cost is always price × quantity.
-  const itemsSubtotalByUnit = items.reduce((s, i) => s + parseFloat(i.price) * i.quantity, 0);
+  // item.price is normally the total cost of the line (already accounts for
+  // quantity), but OCR occasionally returns a true per-unit price instead.
+  // Pick whichever interpretation reconciles with the receipt's own subtotal.
+  const itemsSubtotalAsLine = items.reduce((s, i) => s + getItemLineTotal(i), 0);
+  const itemsSubtotalAsUnit = items.reduce((s, i) => s + getItemLineTotal(i) * i.quantity, 0);
+  const itemsSubtotalByUnit = sub > 0 && Math.abs(itemsSubtotalAsUnit - sub) < Math.abs(itemsSubtotalAsLine - sub)
+    ? itemsSubtotalAsUnit
+    : itemsSubtotalAsLine;
   const subtotalDiff = sub > 0 ? Math.abs(itemsSubtotalByUnit - sub) : 0;
   const hasCategoryData = items.some(i => i.category);
   const hasServiceCharge = items.some(i =>
     SERVICE_CHARGE_TERMS.some(term => i.name.toLowerCase().includes(term))
   );
   const assignedCount = items.filter(i => (i.assignedTo as string[])?.length > 0).length;
-
-  const effectiveItemCost = (item: ReceiptItem) => parseFloat(item.price) * item.quantity;
 
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col" data-testid="wizard-overlay">
@@ -1056,19 +1058,6 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           const tipFromReceipt = parseFloat(receipt?.tip ?? "0") || tipAmt;
           const taxFromReceipt = parseFloat(receipt?.tax ?? "0") || 0;
 
-          const getPersonItemShare = (item: ReceiptItem, personId: string): number => {
-            const assignedTo = (item.assignedTo as string[]) || [];
-            if (!assignedTo.includes(personId)) return 0;
-            const cost = effectiveItemCost(item);
-            const quantities = (item.assignedQuantities as Record<string, number>) || {};
-            const hasQuantities = assignedTo.some(pid => (quantities[pid] ?? 0) > 0);
-            if (hasQuantities) {
-              const totalWeight = assignedTo.reduce((s, pid) => s + (quantities[pid] ?? 1), 0);
-              return totalWeight > 0 ? cost * (quantities[personId] ?? 1) / totalWeight : cost / assignedTo.length;
-            }
-            return cost / assignedTo.length;
-          };
-
           const getPersonSubtotal = (personId: string) =>
             items.reduce((s, item) => s + getPersonItemShare(item, personId), 0);
 
@@ -1150,7 +1139,6 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
                             const totalWeight = assignedTo.reduce((s, pid) => s + (quantities[pid] ?? 1), 0);
                             const myWeight = quantities[currentPerson.id] ?? 1;
                             // Try to express as a simple fraction
-                            const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
                             const g = gcd(myWeight, totalWeight);
                             fractionLabel = `${myWeight / g}/${totalWeight / g}`;
                           } else {
@@ -1426,7 +1414,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
           if (!assignSheet || assignSheet.itemIds.length !== 1) return undefined;
           const item = items.find(i => i.id === assignSheet.itemIds[0]);
           if (!item) return undefined;
-          const linePrice = parseFloat(item.price);
+          const linePrice = getItemLineTotal(item);
           const qty = drawerQtyOverrides[item.id] ?? item.quantity ?? 1;
           const effectiveCat = drawerCatOverrides[item.id] ?? item.category ?? "__none__";
           const catOptions = [...Object.entries(CAT_LABELS_SINGULAR), ["__none__", "Uncategorized"]] as [string, string][];
@@ -1475,9 +1463,7 @@ export default function ReceiptWizard({ open, onClose, initialReceiptId }: Recei
             return (
               <div className="space-y-1 rounded-md border border-border overflow-hidden">
                 {sheetItems.map((item, idx) => {
-                  const unitPrice = parseFloat(item.price);
-                  const qty = item.quantity ?? 1;
-                  const totalPrice = unitPrice * qty;
+                  const totalPrice = getItemLineTotal(item);
                   return (
                     <div key={item.id}
                       className={`flex items-center gap-2 px-3 py-2 ${idx < sheetItems.length - 1 ? "border-b border-border" : ""}`}>

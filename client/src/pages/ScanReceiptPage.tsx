@@ -7,10 +7,12 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { trySessionStore } from "@/lib/imageUtils";
 import { useToast } from "@/hooks/use-toast";
+import { useUpload } from "@/hooks/use-upload";
 
 export default function ScanReceiptPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { uploadFile } = useUpload();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [rotation, setRotation] = useState<number>(0); // 0, 90, 180, 270
@@ -141,8 +143,8 @@ export default function ScanReceiptPage() {
         return;
       }
 
-      const itemsSubtotal = response.items.reduce((sum: number, item: any) => 
-        sum + (item.price * item.quantity), 0
+      const itemsSubtotal = response.items.reduce((sum: number, item: any) =>
+        sum + item.price, 0
       );
       const expectedTotal = response.subtotal + response.tax + response.tip;
       const subtotalDiff = Math.abs(itemsSubtotal - response.subtotal);
@@ -185,34 +187,12 @@ export default function ScanReceiptPage() {
         const byteArray = new Uint8Array(byteNumbers);
         const blob = new Blob([byteArray], { type: 'image/jpeg' });
         const file = new File([blob], `receipt-${receipt.id}.jpg`, { type: 'image/jpeg' });
-        
-        // Request presigned URL
-        const urlRes = await fetch("/api/uploads/request-url", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: file.name,
-            size: file.size,
-            contentType: file.type,
-          }),
-        });
-        
-        if (urlRes.ok) {
-          const { uploadURL, objectPath } = await urlRes.json();
-          
-          // Upload file directly to presigned URL
-          const uploadRes = await fetch(uploadURL, {
-            method: "PUT",
-            body: file,
-            headers: { "Content-Type": file.type },
+
+        const uploaded = await uploadFile(file);
+        if (uploaded) {
+          await apiRequest(`/api/receipts/${receipt.id}`, "PATCH", {
+            imageUrl: uploaded.objectPath
           });
-          
-          if (uploadRes.ok) {
-            // Update receipt with image URL
-            await apiRequest(`/api/receipts/${receipt.id}`, "PATCH", {
-              imageUrl: objectPath
-            });
-          }
         }
       } catch (uploadError) {
         console.warn("Failed to upload receipt image to storage:", uploadError);
